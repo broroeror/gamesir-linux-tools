@@ -6,9 +6,9 @@ import App 1.0
 Window {
     id: win
     width: 1040
-    height: 680
+    height: 720
     minimumWidth: 900
-    minimumHeight: 600
+    minimumHeight: 620
     visible: true
     color: Theme.bg
     title: "GameSir Cyclone 2"
@@ -176,16 +176,32 @@ Window {
                 }
             }
 
+            // Sticks tab.
+            AxisConfigPage {
+                anchors.fill: parent
+                visible: win.currentTab === 1
+                isStick: true
+                sideKeys: [["Left Stick", "st"], ["Right Stick", "rs"]]
+            }
+
+            // Triggers tab.
+            AxisConfigPage {
+                anchors.fill: parent
+                visible: win.currentTab === 3
+                isStick: false
+                sideKeys: [["Left Trigger", "lt"], ["Right Trigger", "rt"]]
+            }
+
             // Lights tab.
             LightsPage {
                 anchors.fill: parent
                 visible: win.currentTab === 5
             }
 
-            // Placeholder for the not-yet-built sections (Sticks/Motion/Triggers/Vibration).
+            // Placeholder for the not-yet-built sections (Motion / Vibration).
             Item {
                 anchors.fill: parent
-                visible: win.currentTab !== 0 && win.currentTab !== 5
+                visible: win.currentTab === 2 || win.currentTab === 4
                 Card {
                     anchors.centerIn: parent
                     width: 420

@@ -9,3 +9,8 @@ AccentSlider 1.0 AccentSlider.qml
 ToggleSwitch 1.0 ToggleSwitch.qml
 ColorPicker 1.0 ColorPicker.qml
 LightsPage 1.0 LightsPage.qml
+RangeSlider 1.0 RangeSlider.qml
+CurveEditor 1.0 CurveEditor.qml
+PillButton 1.0 PillButton.qml
+PendingBar 1.0 PendingBar.qml
+AxisConfigPage 1.0 AxisConfigPage.qml

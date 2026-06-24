@@ -19,6 +19,7 @@ from PySide6.QtCore import QObject, Signal, Property, Slot, QTimer
 from gs_state import state, EXTRA_BTNS
 import gamesir_control as control
 import gamesir_led as led
+import gamesir_config as cfg
 import gamesir_kf_cache as kf_cache
 from gamesir_led import LIGHTS
 
@@ -26,6 +27,34 @@ from gamesir_led import LIGHTS
 def _led_async(fn, *args):
     """Every led.* write is fire-and-forget; run it off the Qt thread."""
     threading.Thread(target=lambda: fn(*args), daemon=True).start()
+
+
+# Friendly key -> (register address, review-label) for the scalar config fields
+# the Sticks/Triggers/Vibration pages edit.
+SCALARS = {
+    'st_dz_min':  (cfg.ST_DZ_MIN,  'Left stick deadzone min'),
+    'st_dz_max':  (cfg.ST_DZ_MAX,  'Left stick deadzone max'),
+    'st_adz_min': (cfg.ST_ADZ_MIN, 'Left stick anti-deadzone min'),
+    'st_adz_max': (cfg.ST_ADZ_MAX, 'Left stick anti-deadzone max'),
+    'rs_dz_min':  (cfg.RS_DZ_MIN,  'Right stick deadzone min'),
+    'rs_dz_max':  (cfg.RS_DZ_MAX,  'Right stick deadzone max'),
+    'rs_adz_min': (cfg.RS_ADZ_MIN, 'Right stick anti-deadzone min'),
+    'rs_adz_max': (cfg.RS_ADZ_MAX, 'Right stick anti-deadzone max'),
+    'lt_dz_min':  (cfg.LT_DZ_MIN,  'LT deadzone min'),
+    'lt_dz_max':  (cfg.LT_DZ_MAX,  'LT deadzone max'),
+    'lt_adz_min': (cfg.LT_ADZ_MIN, 'LT anti-deadzone min'),
+    'lt_adz_max': (cfg.LT_ADZ_MAX, 'LT anti-deadzone max'),
+    'rt_dz_min':  (cfg.RT_DZ_MIN,  'RT deadzone min'),
+    'rt_dz_max':  (cfg.RT_DZ_MAX,  'RT deadzone max'),
+    'rt_adz_min': (cfg.RT_ADZ_MIN, 'RT anti-deadzone min'),
+    'rt_adz_max': (cfg.RT_ADZ_MAX, 'RT anti-deadzone max'),
+    'vib_l':      (cfg.VIB_L,      'Vibration L'),
+    'vib_r':      (cfg.VIB_R,      'Vibration R'),
+}
+CURVE_ADDR = {'st': cfg.ST_CURVE, 'rs': cfg.RS_CURVE,
+              'lt': cfg.LT_CURVE, 'rt': cfg.RT_CURVE}
+TRAJ_ADDR = {'st': cfg.ST_TRAJ, 'rs': cfg.RS_TRAJ}
+HAIR_ADDR = {'lt': cfg.LT_HAIR, 'rt': cfg.RT_HAIR}
 
 
 def _hex(rgb):
@@ -43,6 +72,8 @@ class GamesirBridge(QObject):
     statusChanged = Signal()
     lightsChanged = Signal()
     lightingLoaded = Signal()       # fired when a slot's lighting is read back
+    configLoaded = Signal()         # fired when a profile's config is read back
+    pendingChanged = Signal()       # number of queued (unsaved) config edits
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -67,6 +98,12 @@ class GamesirBridge(QObject):
         self._sleep_label = '10 min'
         self._loaded_frames = []        # list of frames, each = 4 hex strings
 
+        # Per-profile config read-back + staged edits (Sticks/Triggers/Vibration).
+        self._loaded_profile = None
+        self._config_loading = None     # bank awaiting replies, or None
+        self._config = {}               # friendly key -> loaded value
+        self._pending = {}              # addr -> {'data','label','display'}
+
         self._input_timer = QTimer(self)
         self._input_timer.setInterval(16)        # ~60 Hz
         self._input_timer.timeout.connect(self._poll_input)
@@ -78,8 +115,9 @@ class GamesirBridge(QObject):
         self._status_timer.start()
 
         self._light_timer = QTimer(self)
-        self._light_timer.setInterval(120)       # gather record-read chunks
+        self._light_timer.setInterval(120)       # gather record/config read chunks
         self._light_timer.timeout.connect(self._poll_lighting)
+        self._light_timer.timeout.connect(self._poll_config)
         self._light_timer.start()
 
     # ------------------------------------------------------------------ polls
@@ -146,6 +184,48 @@ class GamesirBridge(QObject):
             self._light_colors = list(self._loaded_frames[0])
         self.lightsChanged.emit()
         self.lightingLoaded.emit()
+
+    def _poll_config(self):
+        """Read the selected profile's config once whenever the profile changes.
+        Switching profiles discards any unsaved edits (mirrors the DPG app)."""
+        prof = state['profile']
+        bank = cfg.profile_bank(prof)
+        if (bank is not None and prof != self._loaded_profile
+                and self._config_loading is None):
+            self._loaded_profile = prof
+            if self._pending:
+                self._pending = {}
+                self.pendingChanged.emit()
+            control.request_regs([(bank, addr, ln) for addr, ln in cfg.READ_FIELDS])
+            self._config_loading = bank
+
+        bank = self._config_loading
+        if bank is None:
+            return
+        vals = {addr: control.reg_result(bank, addr) for addr, _ln in cfg.READ_FIELDS}
+        if any(v is None for v in vals.values()):
+            return
+        self._config_loading = None
+        self._config = self._build_config(vals)
+        self.configLoaded.emit()
+
+    @staticmethod
+    def _build_config(vals):
+        g = lambda a: vals[a][0]
+        def curve(addr):
+            blk = vals[addr]
+            return {'type': cfg.curve_index(blk[0]),
+                    'points': [list(p) for p in cfg.curve_points(blk)]}
+        out = {
+            'st_traj': cfg.enum_index(g(cfg.ST_TRAJ), cfg.TRAJ), 'st_curve': curve(cfg.ST_CURVE),
+            'rs_traj': cfg.enum_index(g(cfg.RS_TRAJ), cfg.TRAJ), 'rs_curve': curve(cfg.RS_CURVE),
+            'lt_hair': cfg.enum_index(g(cfg.LT_HAIR), cfg.HAIR_MODES), 'lt_curve': curve(cfg.LT_CURVE),
+            'rt_hair': cfg.enum_index(g(cfg.RT_HAIR), cfg.HAIR_MODES), 'rt_curve': curve(cfg.RT_CURVE),
+            'poll': min(g(cfg.POLL_RATE), 2),
+        }
+        for key, (addr, _lbl) in SCALARS.items():
+            out[key] = g(addr)
+        return out
 
     # --------------------------------------------------------- input readouts
     # Sticks reported 0..255 with 128 at rest; expose as -1.0..+1.0 for QML.
@@ -332,6 +412,95 @@ class GamesirBridge(QObject):
     @Slot()
     def restoreLighting(self):
         _led_async(led.restore_factory)
+
+    # ------------------------------------------------------------- config editor
+    @Property('QVariantMap', notify=configLoaded)
+    def config(self):
+        """The selected profile's read-back config (friendly key -> value). QML
+        seeds its controls from this on configLoaded."""
+        return dict(self._config)
+
+    @Property('QVariantList', constant=True)
+    def pollRates(self):
+        return list(cfg.POLL_RATES)
+
+    @Property('QVariantList', constant=True)
+    def curveNames(self):
+        return list(cfg.CURVE_NAMES)        # presets; QML adds "Custom"
+
+    @Property('QVariantMap', constant=True)
+    def curvePresets(self):
+        """Preset name -> its three [x,y] control points, for the curve editor."""
+        return {name: [list(p) for p in cfg.curve_points(blk)]
+                for name, blk in cfg.CURVE_BLOCKS}
+
+    @Property('QVariantList', constant=True)
+    def hairModes(self):
+        return [name for name, _ in cfg.HAIR_MODES]
+
+    @Property(int, notify=pendingChanged)
+    def pendingCount(self):
+        return len(self._pending)
+
+    @Property('QVariantList', notify=pendingChanged)
+    def pendingList(self):
+        return [self._pending[a]['label'] + ': ' + self._pending[a]['display']
+                for a in sorted(self._pending)]
+
+    def _queue(self, addr, data, label, display):
+        if cfg.profile_bank(state['profile']) is None:
+            return
+        self._pending[addr] = {'data': list(data), 'label': label, 'display': str(display)}
+        self.pendingChanged.emit()
+
+    @Slot(str, int)
+    def setScalar(self, key, value):
+        addr, label = SCALARS[key]
+        self._queue(addr, [max(0, min(255, int(value)))], label, str(int(value)))
+
+    @Slot(str, int)
+    def setTraj(self, side, index):
+        name, code = cfg.TRAJ[index]
+        self._queue(TRAJ_ADDR[side], [code],
+                    ('Left' if side == 'st' else 'Right') + ' stick trajectory', name)
+
+    @Slot(str, int)
+    def setHair(self, side, index):
+        name, data = cfg.HAIR_MODES[index]
+        self._queue(HAIR_ADDR[side], list(data), side.upper() + ' hair-trigger', name)
+
+    @Slot(str, int)
+    def setPoll(self, index):
+        self._queue(cfg.POLL_RATE, [index], 'Poll rate', cfg.POLL_RATES[index])
+
+    @Slot(str, str, 'QVariantList')
+    def setCurve(self, key, name, points):
+        addr = CURVE_ADDR[key]
+        if name == 'Custom':
+            pts = [(int(p[0]), int(p[1])) for p in points]
+            self._queue(addr, cfg.custom_curve_block(pts), key.upper() + ' curve', 'Custom')
+        else:
+            self._queue(addr, cfg.curve_block(name), key.upper() + ' curve', name)
+
+    @Slot()
+    def applyConfig(self):
+        bank = cfg.profile_bank(state['profile'])
+        if bank is None:
+            return
+        changes = [(a, r['data']) for a, r in self._pending.items()]
+
+        def run():
+            for addr, data in changes:
+                control.write_reg(bank, addr, data)
+        threading.Thread(target=run, daemon=True).start()
+        self._pending = {}
+        self.pendingChanged.emit()
+
+    @Slot()
+    def discardConfig(self):
+        self._pending = {}
+        self.pendingChanged.emit()
+        self.configLoaded.emit()        # snap controls back to last-loaded values
 
     # ------------------------------------------------------------- user actions
     @Slot(int)
