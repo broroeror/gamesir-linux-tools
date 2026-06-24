@@ -14,9 +14,25 @@ Item {
     property bool playing: true
     property string sleepSel: "10 min"
 
-    Component.onCompleted: {
-        frames = [bridge.lightColors.slice()]
-        selectZone(0)
+    Component.onCompleted: syncFromBridge()
+
+    // Pull the page in line with the controller's real lighting state. Runs at
+    // startup and whenever the bridge reads a new active slot back.
+    function syncFromBridge() {
+        frames = bridge.loadedFrames.length > 0 ? bridge.loadedFrames
+                                                : [bridge.lightColors.slice()]
+        curFrame = 0
+        audioSw.checked = bridge.audioReactive
+        wakeSw.checked = bridge.pickupWake
+        sleepSel = bridge.sleepLabel
+        briSlider.value = bridge.brightness
+        spdSlider.value = bridge.speed
+        selectZone(sel)
+    }
+
+    Connections {
+        target: bridge
+        function onLightingLoaded() { page.syncFromBridge() }
     }
 
     // ---- helpers -----------------------------------------------------------
@@ -123,6 +139,7 @@ Item {
                            font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                 }
                 AccentSlider {
+                    id: briSlider
                     width: parent.width; from: 0; to: 100; value: bridge.brightness
                     onMoved: bridge.setBrightness(value)
                 }
@@ -135,6 +152,7 @@ Item {
                            font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                 }
                 AccentSlider {
+                    id: spdSlider
                     width: parent.width; from: 1; to: 20; value: bridge.speed
                     onMoved: bridge.setSpeed(value)
                 }

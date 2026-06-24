@@ -42,6 +42,7 @@ class GamesirBridge(QObject):
     inputChanged = Signal()
     statusChanged = Signal()
     lightsChanged = Signal()
+    lightingLoaded = Signal()       # fired when a slot's lighting is read back
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -56,6 +57,16 @@ class GamesirBridge(QObject):
         self._brightness = 100      # 0..100 (device byte range is 0..0x64 == 100)
         self._speed = 10            # 1..20 UI (higher = faster)
 
+        # Lighting read-back: pull the active slot's real state off the device so
+        # the Lights page opens reflecting reality (mirrors the Dear PyGui app's
+        # auto-load: load once per active-slot change, gathered across polls).
+        self._loaded_led_slot = None
+        self._led_loading = None        # slot awaiting replies, or None
+        self._audio_reactive = False
+        self._pickup_wake = False
+        self._sleep_label = '10 min'
+        self._loaded_frames = []        # list of frames, each = 4 hex strings
+
         self._input_timer = QTimer(self)
         self._input_timer.setInterval(16)        # ~60 Hz
         self._input_timer.timeout.connect(self._poll_input)
@@ -65,6 +76,11 @@ class GamesirBridge(QObject):
         self._status_timer.setInterval(250)      # 4 Hz
         self._status_timer.timeout.connect(self._poll_status)
         self._status_timer.start()
+
+        self._light_timer = QTimer(self)
+        self._light_timer.setInterval(120)       # gather record-read chunks
+        self._light_timer.timeout.connect(self._poll_lighting)
+        self._light_timer.start()
 
     # ------------------------------------------------------------------ polls
     def _poll_input(self):
@@ -85,6 +101,51 @@ class GamesirBridge(QObject):
         if sig != self._status_sig:
             self._status_sig = sig
             self.statusChanged.emit()
+
+    def _poll_lighting(self):
+        """Read the active lighting slot's real state once, whenever the active
+        slot first appears or changes. Reads queue on the reader thread and land
+        over several polls; we publish once every chunk + power byte is in."""
+        slot = state['led_slot']
+        if (slot is not None and 0 <= slot <= 3
+                and slot != self._loaded_led_slot and self._led_loading is None):
+            self._loaded_led_slot = slot
+            control.request_regs(led.record_read_fields(slot) + [
+                (led.LED_BANK, led.AUDIO_REACTIVE, 1),
+                (led.LED_BANK, led.PICKUP_WAKE, 1),
+                (led.LED_BANK, led.SLEEP_TIMEOUT, 1),
+            ])
+            self._led_loading = slot
+
+        slot = self._led_loading
+        if slot is None:
+            return
+        recvals = {addr: control.reg_result(bank, addr)
+                   for bank, addr, _ln in led.record_read_fields(slot)}
+        audio = control.reg_result(led.LED_BANK, led.AUDIO_REACTIVE)
+        pickup = control.reg_result(led.LED_BANK, led.PICKUP_WAKE)
+        sleep = control.reg_result(led.LED_BANK, led.SLEEP_TIMEOUT)
+        if (any(v is None for v in recvals.values())
+                or audio is None or pickup is None or sleep is None):
+            return                              # still waiting on replies
+
+        self._led_loading = None
+        record = led.stitch_record(slot, recvals)
+        if record is None:
+            return
+        decoded = led.decode_record(record)
+
+        self._audio_reactive = bool(audio[0])
+        self._pickup_wake = bool(pickup[0])
+        self._sleep_label = led.sleep_label(sleep[0])
+        self._speed = decoded['speed']
+        self._brightness = decoded['brightness']
+        count = max(1, decoded['count'])
+        self._loaded_frames = [[_hex(c) for c in fr] for fr in decoded['frames'][:count]]
+        if self._loaded_frames:
+            self._light_colors = list(self._loaded_frames[0])
+        self.lightsChanged.emit()
+        self.lightingLoaded.emit()
 
     # --------------------------------------------------------- input readouts
     # Sticks reported 0..255 with 128 at rest; expose as -1.0..+1.0 for QML.
@@ -189,6 +250,23 @@ class GamesirBridge(QObject):
     @Property(int, notify=lightsChanged)
     def speed(self):
         return self._speed
+
+    # Read-back state (populated by _poll_lighting; QML refreshes on lightingLoaded)
+    @Property(bool, notify=lightingLoaded)
+    def audioReactive(self):
+        return self._audio_reactive
+
+    @Property(bool, notify=lightingLoaded)
+    def pickupWake(self):
+        return self._pickup_wake
+
+    @Property(str, notify=lightingLoaded)
+    def sleepLabel(self):
+        return self._sleep_label
+
+    @Property('QVariantList', notify=lightingLoaded)
+    def loadedFrames(self):
+        return [list(f) for f in self._loaded_frames]
 
     # --- lighting writes (all fire-and-forget to the active slot) -----------
     def _zone_rgb(self):
