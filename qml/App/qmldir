@@ -13,4 +13,5 @@ RangeSlider 1.0 RangeSlider.qml
 CurveEditor 1.0 CurveEditor.qml
 PillButton 1.0 PillButton.qml
 PendingBar 1.0 PendingBar.qml
+ConfirmButton 1.0 ConfirmButton.qml
 AxisConfigPage 1.0 AxisConfigPage.qml

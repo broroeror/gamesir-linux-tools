@@ -196,6 +196,28 @@ Window {
                             font.pixelSize: Theme.fontM
                         }
                     }
+                    Card {
+                        title: "Default profile"
+                        Layout.fillWidth: true
+                        Text {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            text: bridge.profile > 0
+                                  ? "Reset Profile " + bridge.profile + " to its out-of-box " +
+                                    "factory state — buttons, sticks, triggers, vibration, and " +
+                                    "default lighting."
+                                  : "Select a profile (1–4) above to enable a factory reset."
+                            color: Theme.textDim
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontM
+                        }
+                        ConfirmButton {
+                            visible: bridge.profile > 0
+                            label: "Reset to default"
+                            confirmLabel: "Reset Profile " + bridge.profile + "?"
+                            onConfirmed: bridge.resetProfileToDefault()
+                        }
+                    }
                     Item { Layout.fillHeight: true }
                 }
             }

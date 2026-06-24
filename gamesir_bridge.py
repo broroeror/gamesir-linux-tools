@@ -23,6 +23,7 @@ import gamesir_led as led
 import gamesir_config as cfg
 import gamesir_kf_cache as kf_cache
 import gamesir_kwin as kwin
+import gamesir_factory as factory
 from gamesir_led import LIGHTS
 
 
@@ -66,6 +67,13 @@ CURVE_ADDR = {'st': cfg.ST_CURVE, 'rs': cfg.RS_CURVE,
               'lt': cfg.LT_CURVE, 'rt': cfg.RT_CURVE}
 TRAJ_ADDR = {'st': cfg.ST_TRAJ, 'rs': cfg.RS_TRAJ}
 HAIR_ADDR = {'lt': cfg.LT_HAIR, 'rt': cfg.RT_HAIR}
+
+# Reverse lookups so a saved write can be folded back into the cached config
+# snapshot (keeps the editor consistent across sub-tab switches after a Save).
+_ADDR_TO_SCALAR = {addr: key for key, (addr, _l) in SCALARS.items()}
+_ADDR_TO_CURVE = {addr: side for side, addr in CURVE_ADDR.items()}
+_ADDR_TO_TRAJ = {addr: side for side, addr in TRAJ_ADDR.items()}
+_ADDR_TO_HAIR = {addr: side for side, addr in HAIR_ADDR.items()}
 
 
 def _hex(rgb):
@@ -518,12 +526,31 @@ class GamesirBridge(QObject):
         else:
             self._queue(addr, cfg.curve_block(name), key.upper() + ' curve', name)
 
+    def _fold(self, addr, data):
+        """Mirror a written value back into the cached config snapshot so the
+        editor doesn't re-seed a stale value after Save (the 'second edit reverts
+        the first' bug: the device was correct, but our cache wasn't)."""
+        if addr in _ADDR_TO_SCALAR:
+            self._config[_ADDR_TO_SCALAR[addr]] = data[0]
+        elif addr in _ADDR_TO_CURVE:
+            self._config[_ADDR_TO_CURVE[addr] + '_curve'] = {
+                'type': cfg.curve_index(data[0]),
+                'points': [list(p) for p in cfg.curve_points(data)]}
+        elif addr in _ADDR_TO_TRAJ:
+            self._config[_ADDR_TO_TRAJ[addr] + '_traj'] = cfg.enum_index(data[0], cfg.TRAJ)
+        elif addr in _ADDR_TO_HAIR:
+            self._config[_ADDR_TO_HAIR[addr] + '_hair'] = cfg.enum_index(data[0], cfg.HAIR_MODES)
+        elif addr == cfg.POLL_RATE:
+            self._config['poll'] = data[0]
+
     @Slot()
     def applyConfig(self):
         bank = cfg.profile_bank(state['profile'])
         if bank is None:
             return
         changes = [(a, r['data']) for a, r in self._pending.items()]
+        for addr, data in changes:
+            self._fold(addr, data)
 
         def run():
             for addr, data in changes:
@@ -537,6 +564,23 @@ class GamesirBridge(QObject):
         self._pending = {}
         self.pendingChanged.emit()
         self.configLoaded.emit()        # snap controls back to last-loaded values
+
+    @Slot()
+    def resetProfileToDefault(self):
+        """Rewrite the active profile to its factory out-of-box state (config +
+        cleared remaps + default lighting), captured from the official app. Drops
+        any staged edits and re-reads so every page reflects the reset."""
+        bank = cfg.profile_bank(state['profile'])
+        if bank is None:
+            return
+        self._pending = {}
+        self.pendingChanged.emit()
+
+        def run():
+            factory.restore_default_profile(bank)
+            self._loaded_profile = None     # force config re-read after writes land
+            self._loaded_led_slot = None    # and lighting re-read
+        threading.Thread(target=run, daemon=True).start()
 
     # ------------------------------------------------------------- user actions
     @Slot(int)
