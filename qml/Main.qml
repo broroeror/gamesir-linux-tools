@@ -120,106 +120,16 @@ Window {
             Layout.fillWidth: true
             Layout.fillHeight: true
 
-            // Buttons tab: live controller centered, with side panels (M1 shows
-            // the controller; side cards fill in as later sections land).
-            RowLayout {
+            // Buttons tab (front page): live controller + remap + reset.
+            ButtonsPage {
                 anchors.fill: parent
-                anchors.margins: 20
-                spacing: 16
                 visible: win.currentTab === 0
+            }
 
-                ColumnLayout {
-                    Layout.fillWidth: false
-                    Layout.minimumWidth: 240
-                    Layout.preferredWidth: 240
-                    Layout.maximumWidth: 240
-                    Layout.fillHeight: true
-                    spacing: 16
-                    Card {
-                        title: "Live input"
-                        Layout.fillWidth: true
-                        Text {
-                            width: parent.width
-                            wrapMode: Text.WordWrap
-                            text: "Press buttons and move the sticks — the " +
-                                  "controller view reflects them in real time."
-                            color: Theme.textDim
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontM
-                        }
-                    }
-                    Item { Layout.fillHeight: true }
-                }
-
-                // Center controller
-                Item {
-                    id: centerArea
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Column {
-                        anchors.centerIn: parent
-                        spacing: 10
-                        ControllerView {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            width: Math.min(implicitWidth, centerArea.width - 24)
-                            height: width / aspect
-                        }
-                        Text {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            text: "CYCLONE 2"
-                            color: Theme.textDim
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontL
-                            font.weight: Font.Bold
-                            font.letterSpacing: 2
-                        }
-                    }
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: false
-                    Layout.minimumWidth: 240
-                    Layout.preferredWidth: 240
-                    Layout.maximumWidth: 240
-                    Layout.fillHeight: true
-                    spacing: 16
-                    Card {
-                        title: "Buttons"
-                        Layout.fillWidth: true
-                        Text {
-                            width: parent.width
-                            wrapMode: Text.WordWrap
-                            text: "Remap and shift-layer assignment land here in a " +
-                                  "later milestone."
-                            color: Theme.textDim
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontM
-                        }
-                    }
-                    Card {
-                        title: "Default profile"
-                        Layout.fillWidth: true
-                        Text {
-                            width: parent.width
-                            wrapMode: Text.WordWrap
-                            text: bridge.profile > 0
-                                  ? "Reset Profile " + bridge.profile + " to its out-of-box " +
-                                    "factory state — buttons, sticks, triggers, vibration, and " +
-                                    "default lighting."
-                                  : "Select a profile (1–4) above to enable a factory reset."
-                            color: Theme.textDim
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontM
-                        }
-                        ConfirmButton {
-                            visible: bridge.profile > 0
-                            label: "Reset to default"
-                            confirmLabel: "Reset Profile " + bridge.profile + "?"
-                            onConfirmed: bridge.resetProfileToDefault()
-                        }
-                    }
-                    Item { Layout.fillHeight: true }
-                }
+            // Vibration tab.
+            VibrationPage {
+                anchors.fill: parent
+                visible: win.currentTab === 4
             }
 
             // Sticks tab.
@@ -244,20 +154,20 @@ Window {
                 visible: win.currentTab === 5
             }
 
-            // Placeholder for the not-yet-built sections (Motion / Vibration).
+            // Motion tab — stub (gyro/motion isn't in the reverse-engineering yet).
             Item {
                 anchors.fill: parent
-                visible: win.currentTab === 2 || win.currentTab === 4
+                visible: win.currentTab === 2
                 Card {
                     anchors.centerIn: parent
-                    width: 420
-                    title: win.tabs[win.currentTab]
+                    width: 440
+                    title: "Motion"
                     Text {
                         width: parent.width
                         wrapMode: Text.WordWrap
-                        text: "The “" + win.tabs[win.currentTab] + "” section is " +
-                              "coming in a later milestone. The foundation " +
-                              "(theme, nav, live input, profile switching) is in place."
+                        text: "Motion / gyro isn't supported yet — the controller's motion " +
+                              "protocol hasn't been reverse-engineered. This tab is a " +
+                              "placeholder until it is."
                         color: Theme.textDim
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontM

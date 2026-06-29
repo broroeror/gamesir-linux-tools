@@ -74,6 +74,8 @@ _ADDR_TO_SCALAR = {addr: key for key, (addr, _l) in SCALARS.items()}
 _ADDR_TO_CURVE = {addr: side for side, addr in CURVE_ADDR.items()}
 _ADDR_TO_TRAJ = {addr: side for side, addr in TRAJ_ADDR.items()}
 _ADDR_TO_HAIR = {addr: side for side, addr in HAIR_ADDR.items()}
+_ADDR_TO_REMAP = {addr: name for name, addr in cfg.REMAP_SLOTS}
+_REMAP_ADDR = {name: addr for name, addr in cfg.REMAP_SLOTS}
 
 
 def _hex(rgb):
@@ -216,13 +218,16 @@ class GamesirBridge(QObject):
             if self._pending:
                 self._pending = {}
                 self.pendingChanged.emit()
-            control.request_regs([(bank, addr, ln) for addr, ln in cfg.READ_FIELDS])
+            reqs = [(bank, addr, ln) for addr, ln in cfg.READ_FIELDS]
+            reqs += [(bank, addr, 2) for _n, addr in cfg.REMAP_SLOTS]
+            control.request_regs(reqs)
             self._config_loading = bank
 
         bank = self._config_loading
         if bank is None:
             return
         vals = {addr: control.reg_result(bank, addr) for addr, _ln in cfg.READ_FIELDS}
+        vals.update({addr: control.reg_result(bank, addr) for _n, addr in cfg.REMAP_SLOTS})
         if any(v is None for v in vals.values()):
             return
         self._config_loading = None
@@ -245,6 +250,11 @@ class GamesirBridge(QObject):
         }
         for key, (addr, _lbl) in SCALARS.items():
             out[key] = g(addr)
+        remap = {}
+        for name, addr in cfg.REMAP_SLOTS:
+            rec = vals[addr]
+            remap[name] = cfg.remap_target_name(rec[0], rec[1] if len(rec) > 1 else 0)
+        out['remap'] = remap
         return out
 
     # --------------------------------------------------------- input readouts
@@ -517,6 +527,20 @@ class GamesirBridge(QObject):
     def setPoll(self, index):
         self._queue(cfg.POLL_RATE, [index], 'Poll rate', cfg.POLL_RATES[index])
 
+    @Property('QVariantList', constant=True)
+    def remapSources(self):
+        return [name for name, _ in cfg.REMAP_SLOTS]
+
+    @Property('QVariantList', constant=True)
+    def remapTargets(self):
+        return list(cfg.REMAP_ITEMS)
+
+    @Slot(str, str)
+    def setRemap(self, source, target):
+        addr = _REMAP_ADDR.get(source)
+        if addr is not None:
+            self._queue(addr, cfg.remap_write_bytes(target), 'Remap ' + source, target)
+
     @Slot(str, str, 'QVariantList')
     def setCurve(self, key, name, points):
         addr = CURVE_ADDR[key]
@@ -542,6 +566,10 @@ class GamesirBridge(QObject):
             self._config[_ADDR_TO_HAIR[addr] + '_hair'] = cfg.enum_index(data[0], cfg.HAIR_MODES)
         elif addr == cfg.POLL_RATE:
             self._config['poll'] = data[0]
+        elif addr in _ADDR_TO_REMAP:
+            rec = self._config.setdefault('remap', {})
+            rec[_ADDR_TO_REMAP[addr]] = cfg.remap_target_name(
+                data[0], data[1] if len(data) > 1 else 0)
 
     @Slot()
     def applyConfig(self):
