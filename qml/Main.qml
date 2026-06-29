@@ -14,6 +14,7 @@ Window {
     title: "GameSir Cyclone 2"
 
     property int currentTab: 0
+    property bool settingsOpen: false
     readonly property var tabs: ["Buttons", "Sticks", "Motion", "Triggers", "Vibration", "Lights"]
 
     // Faint red glow in the top-left corner, like the first-party app.
@@ -89,6 +90,20 @@ Window {
                 }
 
                 StatusPill {}
+
+                Rectangle {
+                    Layout.alignment: Qt.AlignVCenter
+                    width: 34; height: 34; radius: 8
+                    color: win.settingsOpen ? Theme.accent
+                                            : (gearHov.hovered ? Theme.cardHover : "transparent")
+                    Behavior on color { ColorAnimation { duration: 120 } }
+                    Text {
+                        anchors.centerIn: parent; text: "⚙"; font.pixelSize: 18
+                        color: win.settingsOpen ? "white" : Theme.textDim
+                    }
+                    HoverHandler { id: gearHov }
+                    TapHandler { onTapped: win.settingsOpen = !win.settingsOpen }
+                }
             }
         }
 
@@ -172,6 +187,71 @@ Window {
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontM
                     }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------- settings overlay
+    Rectangle {
+        anchors.fill: parent
+        visible: win.settingsOpen
+        color: Qt.rgba(0, 0, 0, 0.55)
+        MouseArea { anchors.fill: parent; onClicked: win.settingsOpen = false }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: 480
+            height: col.implicitHeight + 40
+            radius: Theme.radius
+            color: Theme.card
+            border.color: Theme.cardBorder; border.width: 1
+            MouseArea { anchors.fill: parent }   // swallow clicks so they don't close
+
+            Column {
+                id: col
+                anchors.fill: parent
+                anchors.margins: 20
+                spacing: 16
+
+                Item {
+                    width: parent.width; height: 26
+                    Text {
+                        anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+                        text: "Settings"; color: Theme.text
+                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontL
+                        font.weight: Font.DemiBold
+                    }
+                    Rectangle {
+                        anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                        width: 26; height: 26; radius: 6
+                        color: closeHov.hovered ? Theme.cardHover : "transparent"
+                        Text { anchors.centerIn: parent; text: "✕"; color: Theme.textDim; font.pixelSize: 14 }
+                        HoverHandler { id: closeHov }
+                        TapHandler { onTapped: win.settingsOpen = false }
+                    }
+                }
+
+                Rectangle { width: parent.width; height: 1; color: Theme.cardBorder }
+
+                Text {
+                    text: "Backup & Restore"; color: Theme.text
+                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
+                    font.weight: Font.DemiBold
+                }
+                BackupPanel { width: parent.width }
+
+                Rectangle { width: parent.width; height: 1; color: Theme.cardBorder }
+
+                Text {
+                    text: "Lighting"; color: Theme.text
+                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
+                    font.weight: Font.DemiBold
+                }
+                ConfirmButton {
+                    label: "Restore default lighting"
+                    confirmLabel: "Restore default lighting?"
+                    onConfirmed: bridge.restoreLighting()
                 }
             }
         }

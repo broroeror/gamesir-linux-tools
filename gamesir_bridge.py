@@ -14,6 +14,7 @@ Two cadences:
 
 import threading
 import time
+from datetime import datetime
 
 from PySide6.QtCore import QObject, Signal, Property, Slot, QTimer
 
@@ -24,7 +25,10 @@ import gamesir_config as cfg
 import gamesir_kf_cache as kf_cache
 import gamesir_kwin as kwin
 import gamesir_factory as factory
+import gamesir_backup as backup
 from gamesir_led import LIGHTS
+
+from PySide6.QtCore import QUrl
 
 
 def _led_async(fn, *args):
@@ -96,6 +100,9 @@ class GamesirBridge(QObject):
     mouseModeChanged = Signal()
     configLoaded = Signal()         # fired when a profile's config is read back
     pendingChanged = Signal()       # number of queued (unsaved) config edits
+    backupBusyChanged = Signal()
+    backupProgress = Signal(int, int)   # done, total
+    backupStatus = Signal(bool, str)    # ok, message
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -125,6 +132,7 @@ class GamesirBridge(QObject):
         self._config_loading = None     # bank awaiting replies, or None
         self._config = {}               # friendly key -> loaded value
         self._pending = {}              # addr -> {'data','label','display'}
+        self._backup_busy = False
 
         self._input_timer = QTimer(self)
         self._input_timer.setInterval(16)        # ~60 Hz
@@ -466,6 +474,53 @@ class GamesirBridge(QObject):
     def setMouseMode(self, on):
         kwin.set_enabled(on)
         self.mouseModeChanged.emit()
+
+    # ------------------------------------------------------------- backup/restore
+    @Property(bool, notify=backupBusyChanged)
+    def backupBusy(self):
+        return self._backup_busy
+
+    @staticmethod
+    def _to_path(url_or_path):
+        u = QUrl(url_or_path)
+        return u.toLocalFile() if u.isLocalFile() else url_or_path
+
+    @Property(str, constant=True)
+    def defaultBackupName(self):
+        return 'gamesir_backup_' + datetime.now().strftime('%Y%m%d') + '.json'
+
+    def _backup_done(self, ok, msg):
+        self._backup_busy = False
+        self.backupBusyChanged.emit()
+        self.backupStatus.emit(ok, msg)
+        # A restore changes the device underneath us — re-read everything.
+        self._loaded_profile = None
+        self._loaded_led_slot = None
+
+    @Slot(str)
+    def exportBackup(self, url):
+        if self._backup_busy:
+            return
+        self._backup_busy = True
+        self.backupBusyChanged.emit()
+        backup.export_async(self._to_path(url),
+                            on_progress=lambda d, t: self.backupProgress.emit(d, t),
+                            on_done=self._backup_done)
+
+    @Slot(str)
+    def importBackup(self, url):
+        if self._backup_busy:
+            return
+        try:
+            data = backup.load(self._to_path(url))
+        except (OSError, ValueError) as e:
+            self.backupStatus.emit(False, str(e))
+            return
+        self._backup_busy = True
+        self.backupBusyChanged.emit()
+        backup.apply_backup(data,
+                            on_progress=lambda d, t: self.backupProgress.emit(d, t),
+                            on_done=self._backup_done)
 
     # ------------------------------------------------------------- config editor
     @Property('QVariantMap', notify=configLoaded)
