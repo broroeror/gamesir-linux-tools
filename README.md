@@ -25,15 +25,47 @@ Remaining bugs, proposed changes, and open reverse-engineering questions live in
 **[TODO.md](TODO.md)** — a living checklist. This is a hobby reverse-engineering
 project; fork it and customize it however you like.
 
+## The app
+
+There are two frontends over the same reverse-engineered core:
+
+- **`gamesir_qt.py`** — the **Qt/QML app** (PySide6): a polished, KDE-native UI
+  with a live controller render, per-zone RGB + keyframes, stick/trigger curves,
+  button remap, vibration, backup/restore, and a mouse-mode toggle. This is the
+  one you install below.
+- **`gamesir_gui.py`** — the original Dear PyGui app, kept as a lean fallback.
+
+## Install (Qt app)
+
+On **Arch / KDE**, one command after cloning:
+
+```sh
+git clone <repo-url> && cd "GameSir Linux"
+./install.sh
+```
+
+`install.sh` installs into your home (`~/.local`), so the only step that needs
+`sudo` is the one-time udev rule that lets you open the controller without root.
+Afterwards **GameSir Cyclone 2** appears in your app launcher (or run
+`gamesir-cyclone2`). Remove it with `./uninstall.sh`.
+
+Prefer the Arch-native route? A [`packaging/PKGBUILD`](packaging/PKGBUILD) is
+included to publish to the AUR (`yay -S gamesir-cyclone2-git`).
+
 ## Requirements
 
 - Python 3
 - [`hidapi`](https://pypi.org/project/hidapi/) (`import hid`)
-- [`dearpygui`](https://pypi.org/project/dearpygui/)
-- `xrandr` (optional; used only to place the window on the primary monitor)
+- [`PySide6`](https://pypi.org/project/PySide6/) — for the Qt app
+  (Arch: `python-pyside6`)
+- [`dearpygui`](https://pypi.org/project/dearpygui/) — only for the legacy app
+- `xrandr` (optional; legacy app's window placement)
 
 ```sh
-pip install hidapi dearpygui
+# Arch
+sudo pacman -S --needed python python-pyside6 python-hidapi
+# or via pip
+pip install hidapi PySide6
 ```
 
 ## Running

@@ -1,0 +1,59 @@
+# Maintainer: <your name> <your email>
+#
+# AUR package for the GameSir Cyclone 2 Linux control app (Qt/QML frontend).
+# Publish this to the AUR so Arch users can install with one command:
+#
+#     yay -S gamesir-cyclone2-git
+#
+# Before publishing: set `url`/`source` to your GitHub repo, fill in the
+# Maintainer line, and run `updpkgsums` is not needed for a VCS source.
+pkgname=gamesir-cyclone2-git
+pkgver=0.2.0
+pkgrel=1
+pkgdesc="Configure the GameSir Cyclone 2 controller (lighting, sticks, triggers, buttons) on Linux"
+arch=('any')
+url="https://github.com/<youruser>/gamesir-cyclone2"        # <-- set me
+license=('MIT')
+depends=('python' 'python-pyside6' 'python-hidapi')
+makedepends=('git')
+provides=('gamesir-cyclone2')
+conflicts=('gamesir-cyclone2')
+source=("$pkgname::git+${url}.git")                          # <-- VCS source
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$pkgname"
+  printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+package() {
+  cd "$pkgname"
+  local share="$pkgdir/usr/share/gamesir-cyclone2"
+
+  # app: python modules, qml tree, assets
+  install -d "$share"
+  install -Dm644 gamesir_*.py gs_*.py "$share"/
+  cp -r qml "$share"/
+  install -Dm644 assets/icon.png "$share"/assets/icon.png
+
+  # launcher
+  install -dm755 "$pkgdir/usr/bin"
+  cat > "$pkgdir/usr/bin/gamesir-cyclone2" <<'EOF'
+#!/usr/bin/env bash
+exec python3 /usr/share/gamesir-cyclone2/gamesir_qt.py "$@"
+EOF
+  chmod 755 "$pkgdir/usr/bin/gamesir-cyclone2"
+
+  # udev rule (vendor-scoped uaccess; no replug needed after trigger)
+  install -Dm644 70-gamesir.rules "$pkgdir/usr/lib/udev/rules.d/70-gamesir.rules"
+
+  # desktop entry + icons
+  install -Dm644 packaging/gamesir-cyclone2.desktop \
+    "$pkgdir/usr/share/applications/gamesir-cyclone2.desktop"
+  for sz in 48 64 128; do
+    install -Dm644 "assets/icon-${sz}.png" \
+      "$pkgdir/usr/share/icons/hicolor/${sz}x${sz}/apps/gamesir-cyclone2.png"
+  done
+  install -Dm644 assets/icon.png \
+    "$pkgdir/usr/share/icons/hicolor/256x256/apps/gamesir-cyclone2.png"
+}
