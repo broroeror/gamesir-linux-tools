@@ -35,11 +35,18 @@ DEFAULT_LIGHTING = [
 ]
 
 
-def restore_default_profile(bank, lighting=True):
+def restore_default_profile(bank, lighting=True, write_style=None, gen=None):
     """Rewrite profile `bank` (0x01..0x04) to factory defaults. When `lighting`
-    is set, also restore the default RGB record (shared across profiles)."""
+    is set, also restore the default RGB record (shared across profiles).
+
+    `write_style`/`gen` pin the writes to one controller session (see
+    gamesir_control): captured once by the caller so a controller switch mid-reset
+    can't reframe the remaining chunks for, or land them on, a different unit. A
+    refused write (rebind/disconnect) stops the reset rather than pressing on."""
     for addr, data in DEFAULT_PROFILE:
-        write_reg(bank, addr, data)
+        if not write_reg(bank, addr, data, write_style=write_style, gen=gen):
+            return
     if lighting:
         for addr, data in DEFAULT_LIGHTING:
-            write_reg(0x20, addr, data)
+            if not write_reg(0x20, addr, data, write_style=write_style, gen=gen):
+                return

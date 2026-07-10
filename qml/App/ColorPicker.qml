@@ -8,6 +8,10 @@ Item {
     property real hue: 0      // 0..1
     property real sat: 1
     property real val: 1
+    // upper bound on the selectable hue (fraction of the full wheel). Some
+    // hardware can't reach the whole wheel (e.g. the 8K ring tops out ~violet at
+    // 255/360); set hueMax to hide the unreachable slice so there's no dead zone.
+    property real hueMax: 1.0
     readonly property color color: Qt.hsva(hue, sat, val, 1)
     signal edited(color c)
 
@@ -17,7 +21,7 @@ Item {
     function setColor(c) {
         _probe = c
         if (_probe.hsvSaturation > 0.0001 && _probe.hsvValue > 0.0001 && _probe.hsvHue >= 0)
-            hue = _probe.hsvHue
+            hue = Math.min(hueMax, _probe.hsvHue)
         sat = _probe.hsvSaturation
         val = _probe.hsvValue
     }
@@ -63,29 +67,34 @@ Item {
         }
     }
 
-    // hue strip
-    Rectangle {
+    // hue strip. Only the left `hueMax` fraction of the full-wheel gradient is
+    // shown: the gradient rect is stretched to width/hueMax and clipped, so the
+    // visible bar spans hue 0..hueMax and the unreachable slice is off-screen.
+    Item {
         id: hueBar
         anchors.top: sv.bottom; anchors.topMargin: 10
-        width: parent.width; height: 14; radius: 7
-        gradient: Gradient {
-            orientation: Gradient.Horizontal
-            GradientStop { position: 0.00; color: "#ff0000" }
-            GradientStop { position: 0.17; color: "#ffff00" }
-            GradientStop { position: 0.33; color: "#00ff00" }
-            GradientStop { position: 0.50; color: "#00ffff" }
-            GradientStop { position: 0.67; color: "#0000ff" }
-            GradientStop { position: 0.83; color: "#ff00ff" }
-            GradientStop { position: 1.00; color: "#ff0000" }
+        width: parent.width; height: 14; clip: true
+        Rectangle {
+            width: hueBar.width / cp.hueMax; height: parent.height; radius: 7
+            gradient: Gradient {
+                orientation: Gradient.Horizontal
+                GradientStop { position: 0.00; color: "#ff0000" }
+                GradientStop { position: 0.17; color: "#ffff00" }
+                GradientStop { position: 0.33; color: "#00ff00" }
+                GradientStop { position: 0.50; color: "#00ffff" }
+                GradientStop { position: 0.67; color: "#0000ff" }
+                GradientStop { position: 0.83; color: "#ff00ff" }
+                GradientStop { position: 1.00; color: "#ff0000" }
+            }
         }
         Rectangle {
             width: 6; height: parent.height + 6; radius: 3
             color: "white"; border.color: "#333"; border.width: 1
-            x: cp.hue * parent.width - width / 2; y: -3
+            x: (cp.hue / cp.hueMax) * hueBar.width - width / 2; y: -3
         }
         MouseArea {
             anchors.fill: parent
-            function upd(mx) { cp.hue = Math.max(0, Math.min(1, mx / width)); cp._emit() }
+            function upd(mx) { cp.hue = Math.max(0, Math.min(cp.hueMax, mx / width * cp.hueMax)); cp._emit() }
             onPressed: upd(mouseX)
             onPositionChanged: if (pressed) upd(mouseX)
         }

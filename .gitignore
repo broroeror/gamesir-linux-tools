@@ -16,6 +16,13 @@ USBPcap Controller Tests/
 *.pcapng
 *.pcap
 
+# Local RE/testing scratch area: vendor Windows apps (GameSir Connect / Nexus),
+# their bundled .ufw firmware packages, raw flash dumps, and per-controller
+# captures/screenshots. ALL third-party/proprietary or device-specific - never
+# commit. Kept locally only.
+Controller Testing/
+*.ufw
+
 # Local backups exported by the app
 gamesir_backup_*.json
 
@@ -24,3 +31,12 @@ gamesir_backup_*.json
 Icons and Images/
 *.zip
 
+
+# Firmware library — your own controller's firmware backups. NEVER committed
+# (GameSir firmware is not redistributed; you create these locally via Backup).
+firmware/
+
+# jl-uboot-tool (kagaimiq, MIT) — the external loader read/write tool that the
+# optional firmware Backup & Restore feature needs. NOT bundled/redistributed:
+# install it here yourself (see FIRMWARE.md). Ignored so it's never committed.
+jl-uboot-tool/

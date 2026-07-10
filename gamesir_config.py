@@ -108,6 +108,49 @@ def custom_curve_block(points):
     return [CUSTOM_TYPE, 0x64, 0x00, 0x00, *flat]
 
 
+def warp_points(points, intensity):
+    """Warp a preset's standard control points to `intensity` (0..100). The
+    official app stores the curve's strength both in block byte +1 AND baked into
+    the points: intensity 100 = the standard shape, 0 = its inverse (reflected
+    across the y=x diagonal, i.e. x<->y swapped), 50 = linear. Points move as a
+    linear blend between P and transpose(P) -- verified against the captured
+    intensity sweeps (16_rt / 17_lt) to within calibration noise."""
+    f = max(0, min(100, intensity)) / 100.0
+    return [(round(x * f + y * (1 - f)), round(y * f + x * (1 - f)))
+            for x, y in points]
+
+
+def _s_sigmoid(x, a):
+    """Symmetric S: y = x^a/(x^a+(1-x)^a). a>1 = steep middle (standard S),
+    a<1 = flat middle (inverse), a=1 = linear."""
+    if x <= 0:
+        return 0.0
+    if x >= 1:
+        return 1.0
+    xa = x ** a
+    return xa / (xa + (1 - x) ** a)
+
+
+def preset_curve_block(name, intensity):
+    """Full 10-byte block for a named preset at a given intensity (0..100):
+    [type, intensity, 0, 0, points]. The S-Curve is sampled from a smooth steep-
+    middle sigmoid (a = 2^((I-50)/50): 100 standard, 50 linear, 0 inverse) so the
+    stored points match the rendered curve; the others warp their preset points.
+    Returns None for an unknown name."""
+    for n, blk in CURVE_BLOCKS:
+        if n == name:
+            if name == 'S-Curve':
+                a = 2 ** ((max(0, min(100, intensity)) - 50) / 50.0)
+                pts = [(x, round(_s_sigmoid(x / 255.0, a) * 255)) for x in (40, 128, 215)]
+            else:
+                pts = warp_points(curve_points(blk), intensity)
+            flat = []
+            for x, y in pts:
+                flat += [max(0, min(255, int(x))), max(0, min(255, int(y)))]
+            return [blk[0], max(0, min(100, int(intensity))), 0x00, 0x00, *flat]
+    return None
+
+
 def curve_points(block):
     """Decode a stored curve block's three (x, y) control points from bytes
     4..9. Falls back to CUSTOM_DEFAULT if the block is too short."""
@@ -220,6 +263,96 @@ REMAP_TARGETS = [         # what a source can be mapped TO -> code byte
 ]
 REMAP_NONE = 'Default'    # not remapped; written as [00 00]
 REMAP_ITEMS = [REMAP_NONE] + [name for name, _ in REMAP_TARGETS]
+
+# --- keyboard + mouse targets (both controllers accept these; caps 29/30) ------
+# The controller can emit keyboard/mouse HID. A target is written just like a
+# gamepad remap ([type=0x01, code]); the CODE picks the category by range. The
+# keyboard is a complete row-major enumeration of the US layout starting at
+# ESC=0x32 (verified against 12 captured anchors: A=0x5c, D=0x5e, C=0x6b, B=0x6d,
+# E=0x50, 1=0x40, F1=0x33, LShift=0x68, LCtrl=0x74, ...).
+# Each key is (label, width-units) so the picker can draw a real keyboard shape.
+_KB_ROWS = [
+    [('Esc', 1), ('F1', 1), ('F2', 1), ('F3', 1), ('F4', 1), ('F5', 1), ('F6', 1),
+     ('F7', 1), ('F8', 1), ('F9', 1), ('F10', 1), ('F11', 1), ('F12', 1)],
+    [('`', 1), ('1', 1), ('2', 1), ('3', 1), ('4', 1), ('5', 1), ('6', 1), ('7', 1),
+     ('8', 1), ('9', 1), ('0', 1), ('-', 1), ('=', 1), ('Backspace', 2)],
+    [('Tab', 1.5), ('Q', 1), ('W', 1), ('E', 1), ('R', 1), ('T', 1), ('Y', 1),
+     ('U', 1), ('I', 1), ('O', 1), ('P', 1), ('[', 1), (']', 1), ('\\', 1.5)],
+    [('Caps', 1.75), ('A', 1), ('S', 1), ('D', 1), ('F', 1), ('G', 1), ('H', 1),
+     ('J', 1), ('K', 1), ('L', 1), (';', 1), ("'", 1), ('Enter', 2.25)],
+    [('LShift', 2.25), ('Z', 1), ('X', 1), ('C', 1), ('V', 1), ('B', 1), ('N', 1),
+     ('M', 1), (',', 1), ('.', 1), ('/', 1), ('RShift', 2.75)],
+    [('LCtrl', 1.25), ('Win', 1.25), ('LAlt', 1.25), ('Space', 8.75),
+     ('RAlt', 1.25), ('RCtrl', 1.25)],
+]
+
+
+def _build_keyboard():
+    out, code = [], 0x32
+    for row in _KB_ROWS:
+        for name, _w in row:
+            out.append((name, code)); code += 1
+    return out
+
+
+KEYBOARD_TARGETS = _build_keyboard()          # (name, code), ESC=0x32 .. RCtrl=0x79
+
+
+def keyboard_rows():
+    """Rows of {name, code, w} for a keyboard-shaped picker layout."""
+    rows, code = [], 0x32
+    for row in _KB_ROWS:
+        r = []
+        for name, w in row:
+            r.append({'name': name, 'code': code, 'w': w}); code += 1
+        rows.append(r)
+    return rows
+# Left/Middle/Right confirmed (0xc8/0xc9/0xca); the rest extrapolated from the
+# mouse tab's order — verify Mouse4/5 + scroll live.
+MOUSE_TARGETS = [
+    ('Left Click', 0xc8), ('Middle Click', 0xc9), ('Right Click', 0xca),
+    ('Mouse 4', 0xcb), ('Mouse 5', 0xcc), ('Scroll Up', 0xcd), ('Scroll Down', 0xce),
+]
+
+# "Numeric Keypad" tab (media / navigation / volume / arrows / numpad). Codes are
+# NON-sequential (the app's own numbering) so they're listed explicitly, from cap
+# 32_8k_numpad: contiguous 0x7b-0x9b, with 0x7a = the greyed/non-mappable Stop key
+# (excluded). Numpad keys are prefixed "Num " to disambiguate from the main
+# keyboard's own digits/operators (which have different codes). Rows roughly mirror
+# the app's layout: nav/media on the left, the numpad block on the right.
+_NP_ROWS = [
+    [('Play', 0x9a, 1.5), ('Rewind', 0x9b, 1.5), ('FastFwd', 0x99, 1.6),
+     ('NumLock', 0x92, 1.7), ('Num /', 0x93, 1.1), ('Num *', 0x94, 1.1), ('Num -', 0x88, 1.1)],
+    [('Insert', 0x7b, 1.5), ('Home', 0x7c, 1.5), ('PgUp', 0x95, 1.6),
+     ('Num 7', 0x8f, 1.1), ('Num 8', 0x90, 1.1), ('Num 9', 0x91, 1.1), ('Num +', 0x80, 1.1)],
+    [('Delete', 0x96, 1.5), ('End', 0x98, 1.5), ('PgDn', 0x97, 1.6),
+     ('Num 4', 0x8c, 1.1), ('Num 5', 0x8d, 1.1), ('Num 6', 0x8e, 1.1)],
+    [('Vol -', 0x7d, 1.5), ('Mute', 0x7e, 1.5), ('Vol +', 0x7f, 1.6),
+     ('Num 1', 0x8a, 1.1), ('Num 2', 0x82, 1.1), ('Num 3', 0x81, 1.1), ('Num Enter', 0x83, 1.7)],
+    [('Up', 0x84, 1.5), ('Left', 0x85, 1.5), ('Down', 0x86, 1.6), ('Right', 0x87, 1.1),
+     ('Num 0', 0x8b, 1.1), ('Num .', 0x89, 1.1)],
+]
+NUMPAD_TARGETS = [(n, c) for row in _NP_ROWS for (n, c, _w) in row]
+
+
+def numpad_rows():
+    """Rows of {name, code, w} for a numpad-shaped picker layout."""
+    return [[{'name': n, 'code': c, 'w': w} for (n, c, w) in row] for row in _NP_ROWS]
+
+
+# categories for a target picker (macros + remaps). 'Buttons' = the gamepad set.
+TARGET_CATEGORIES = [
+    ('Buttons',  [(n, c) for n, c in REMAP_TARGETS if c != 0xff]),
+    ('Keyboard', KEYBOARD_TARGETS),
+    ('Numpad',   NUMPAD_TARGETS),
+    ('Mouse',    MOUSE_TARGETS),
+]
+_CODE_TO_LABEL = {c: n for _cat, items in TARGET_CATEGORIES for n, c in items}
+
+
+def target_label(code):
+    """Human name for any target code (gamepad / keyboard / mouse)."""
+    return _CODE_TO_LABEL.get(code, '0x%02x' % code)
 
 
 def remap_target_name(enable, code):

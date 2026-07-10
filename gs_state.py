@@ -22,6 +22,17 @@ state = {
     'connected': None,   # None = connecting, True = open, False = not found/lost
     'mode_ok': False,    # True when we're getting a populated Xbox-mode 0x12 report
     'firmware': None,    # firmware version string from USB bcdDevice (e.g. '3.52')
+    'controller': None,  # detected model short name ('Cyclone 2'/'G7'), else None
+    'wired': None,       # True = wired controller, False = its wireless dongle,
+                         # None = unknown (display hint; not a flash gate)
+    'controllers': [],   # all connected controllers: [{id, name, port, pid}]
+    'selected': None,    # id (USB port) of the controller the user wants driven
+    'driving': None,     # id whose vendor session is ACTUALLY open (lags 'selected'
+                         # by the reader's rebind; None during a switch / for evdev
+                         # models that have no vendor register channel)
+    'demo': False,       # Demo mode: the bridge synthesizes one of each supported
+                         # controller (no hardware). The reader idles and register
+                         # reads are answered with defaults, so every page renders.
 }
 
 EXTRA_BTNS = ('l4', 'r4', 'm', 'home', 'share')

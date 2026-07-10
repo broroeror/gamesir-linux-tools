@@ -11,14 +11,16 @@ keeps one read in flight at a time, so a full snapshot takes several seconds; th
 GUI shows progress via the on_progress callback.
 
 Each entry is labelled with a human-readable name (so the file is browsable) and
-keeps its raw register address + bytes (so restore stays exact). JSON shape:
-  { "schema": 2, "device": "...", "exported": "<iso>",
+keeps its raw register address + bytes (so restore stays exact). Each profile bank
+holds every editor field: analog (sticks/triggers), button remaps, gyro MOTION
+(Aim/Tilt) and per-paddle MACROS. Lighting is model-shaped — the Cyclone's keyframe
+slots+power, or the 8K's flat bank-0x20 'fields'. JSON shape:
+  { "schema": 3, "device": "...", "exported": "<iso>",
     "profiles": { "1": { "Vibration L": {"addr": "0x0020", "bytes": [75]}, ... }, ... },
-    "lighting": { "active_slot": {"addr": "0x0000", "bytes": [n]},
-                  "slots":  { "0": {"addr": "0x0001", "bytes": [124 bytes]}, ... },
-                  "power":  { "Audio reactive": {"addr": "0x026d", "bytes": [0]}, ... } } }
+    "lighting": { "active_slot": {...}, "slots": {...}, "power": {...} }   # Cyclone
+             OR { "fields": { "Light mode": {"addr": "0x0000", "bytes": [1]}, ... } } }  # 8K
 
-Restore reads both this schema and the older schema-1 (addr-keyed raw bytes).
+Restore reads this schema plus the older schema-1 (addr-keyed) and schema-2.
 """
 
 import json
@@ -28,11 +30,15 @@ from datetime import datetime
 
 import gamesir_control as control
 import gamesir_config as cfg
+import controller_profile as ctrl
 import gamesir_led as led
+import gamesir_led8k as led8k
+import gamesir_motion as motion
+import gamesir_macro as macro
 
-SCHEMA = 2
-DEVICE = 'GameSir Cyclone 2'
-PROFILES = (1, 2, 3, 4)
+SCHEMA = 3          # 3 adds motion + macros to profiles and model-aware lighting
+                    # (8K = flat 'fields'); restore still reads schema 1 and 2.
+DEVICE_FAMILY = 'GameSir'      # for messages; the snapshot stores the exact model
 LED_SLOTS = (0, 1, 2, 3, 4)
 POWER_ADDRS = (led.AUDIO_REACTIVE, led.PICKUP_WAKE, led.SLEEP_TIMEOUT)
 POWER_NAMES = {
@@ -41,30 +47,62 @@ POWER_NAMES = {
     led.SLEEP_TIMEOUT: 'Sleep timeout (min)',
 }
 
-# How long to wait for every queued read to land before giving up. A full
-# snapshot is ~180 sequential reads and the controller drops back-to-back
-# commands (so some get resent), so allow generous headroom.
-READ_TIMEOUT = 60.0
+# Readable names for the 8K's flat lighting/device block (bank 0x20).
+_LED8K_NAMES = {
+    led8k.MODE: 'Light mode', led8k.BRIGHT: 'Light brightness',
+    led8k.HOME_Q[0]: 'Home ring TL', led8k.HOME_Q[1]: 'Home ring TR',
+    led8k.HOME_Q[2]: 'Home ring BL', led8k.HOME_Q[3]: 'Home ring BR',
+    led8k.AUTO_ONOFF: 'Auto on/off', led8k.SLEEP_TIMER: 'Sleep timer',
+    led8k.DOCK_MODE: 'Dock LED mode', led8k.DOCK_BRIGHT: 'Dock LED brightness',
+}
+
+# How long to wait for every queued read to land before giving up. A full 8K
+# snapshot is now ~480 sequential reads (analog + remaps + motion + macros across
+# 4 banks + lighting) and the controller drops back-to-back commands (so some get
+# resent), so allow generous headroom.
+READ_TIMEOUT = 120.0
 
 
 def _profile_fields():
-    """(addr, length) snapshotted per profile bank: every editor field plus the
-    button-remap records."""
-    return list(cfg.READ_FIELDS) + [(addr, 2) for _, addr in cfg.REMAP_SLOTS]
+    """(addr, length, name) snapshotted per profile bank: analog editor fields,
+    button-remap records, gyro MOTION (Aim/Tilt), and per-paddle MACROS — the full
+    per-profile register surface, for the active controller's map."""
+    prof = ctrl.active()
+    labels = prof.field_labels()
+    out = [(addr, ln, labels.get(addr, f'0x{addr:04x}')) for addr, ln in prof.read_fields()]
+    out += [(addr, 2, 'Remap ' + name) for name, addr in prof.REMAP_SLOTS]
+    if prof.has_motion and prof.motion:
+        out += [(addr, ln, f'Motion 0x{addr:04x}')
+                for addr, ln in motion.read_addrs(prof.motion)]
+    if prof.has_macros:
+        for pname, base in prof.MACRO_SLOTS:
+            out += [(addr, ln, f'Macro {pname} 0x{addr:04x}')
+                    for addr, ln in macro.read_addrs(base, prof.macro_max)]
+    return out
+
+
+def _lighting_requests():
+    """(bank, addr, length) lighting reads for the active model: Cyclone keyframe
+    records + power, or the 8K's flat bank-0x20 block, or nothing."""
+    style = ctrl.active().lighting_style
+    if style == 'cyclone_keyframe':
+        reqs = [(led.LED_BANK, 0x0000, 1)]                 # active-slot selector
+        for slot in LED_SLOTS:
+            reqs += led.record_read_fields(slot)           # full 124-byte records
+        reqs += [(led.LED_BANK, addr, 1) for addr in POWER_ADDRS]
+        return reqs
+    if style == 'simple_8k':
+        return list(led8k.read_fields())                   # (bank, addr, len)
+    return []
 
 
 def _all_requests():
     """Every (bank, addr, length) read needed for a full snapshot."""
     reqs = []
-    for prof in PROFILES:
-        for addr, ln in _profile_fields():
+    for prof in ctrl.active().profile_banks:
+        for addr, ln, _nm in _profile_fields():
             reqs.append((prof, addr, ln))
-    reqs.append((led.LED_BANK, 0x0000, 1))                 # active-slot selector
-    for slot in LED_SLOTS:
-        reqs += led.record_read_fields(slot)               # full 124-byte records
-    for addr in POWER_ADDRS:
-        reqs.append((led.LED_BANK, addr, 1))
-    return reqs
+    return reqs + _lighting_requests()
 
 
 def export_async(path, on_progress=None, on_done=None):
@@ -114,28 +152,39 @@ def _entry(addr, byts):
 
 def _build(vals):
     """Assemble the JSON-serialisable snapshot dict from {(bank, addr): bytes}."""
+    fields = _profile_fields()
     profiles = {}
-    for prof in PROFILES:
-        profiles[str(prof)] = {cfg.field_name(addr): _entry(addr, vals[(prof, addr)])
-                               for addr, _ln in _profile_fields()}
-
-    led_vals = {a: vals[(led.LED_BANK, a)] for b, a in vals if b == led.LED_BANK}
-    slots = {str(slot): _entry(led.record_addr(slot), led.stitch_record(slot, led_vals))
-             for slot in LED_SLOTS}
-    power = {POWER_NAMES[addr]: _entry(addr, vals[(led.LED_BANK, addr)])
-             for addr in POWER_ADDRS}
-    lighting = {
-        'active_slot': _entry(0x0000, vals[(led.LED_BANK, 0x0000)]),
-        'slots': slots,
-        'power': power,
-    }
+    for prof in ctrl.active().profile_banks:
+        profiles[str(prof)] = {name: _entry(addr, vals[(prof, addr)])
+                               for addr, _ln, name in fields}
     return {
         'schema': SCHEMA,
-        'device': DEVICE,
+        'device': ctrl.active().name,
         'exported': datetime.now().isoformat(timespec='seconds'),
         'profiles': profiles,
-        'lighting': lighting,
+        'lighting': _build_lighting(vals),
     }
+
+
+def _build_lighting(vals):
+    """Lighting section for the active model: Cyclone keyframe slots + power, or
+    the 8K's flat 'fields' block, or empty."""
+    style = ctrl.active().lighting_style
+    if style == 'cyclone_keyframe':
+        led_vals = {a: vals[(led.LED_BANK, a)] for b, a in vals if b == led.LED_BANK}
+        return {
+            'active_slot': _entry(0x0000, vals[(led.LED_BANK, 0x0000)]),
+            'slots': {str(slot): _entry(led.record_addr(slot),
+                                        led.stitch_record(slot, led_vals))
+                      for slot in LED_SLOTS},
+            'power': {POWER_NAMES[addr]: _entry(addr, vals[(led.LED_BANK, addr)])
+                      for addr in POWER_ADDRS},
+        }
+    if style == 'simple_8k':
+        return {'fields': {_LED8K_NAMES.get(addr, f'0x{addr:04x}'):
+                           _entry(addr, vals[(led8k.BANK, addr)])
+                           for _b, addr, _ln in led8k.read_fields()}}
+    return {}
 
 
 def load(path):
@@ -144,8 +193,8 @@ def load(path):
     older schema-1 (addr-keyed) layout."""
     with open(path) as fh:
         data = json.load(fh)
-    if not isinstance(data, dict) or data.get('schema') not in (1, SCHEMA):
-        raise ValueError(f'Not a {DEVICE} backup (schema 1 or {SCHEMA})')
+    if not isinstance(data, dict) or data.get('schema') not in (1, 2, 3):
+        raise ValueError(f'Not a {DEVICE_FAMILY} backup (schema 1-{SCHEMA})')
     if 'profiles' not in data or 'lighting' not in data:
         raise ValueError('Backup is missing profiles/lighting')
     return data
@@ -168,16 +217,21 @@ def _writes_from(data):
             writes.append((led.LED_BANK, int(addr_s, 16), list(byts)))
         writes.append((led.LED_BANK, 0x0000, list(lighting['selector'])))
     else:
-        # schema 2: labelled entries {name: {addr, bytes}}; addr is authoritative
+        # schema 2/3: labelled entries {name: {addr, bytes}}; addr is authoritative.
+        # Lighting is model-shaped: Cyclone has slots+power+active_slot, the 8K has
+        # a flat 'fields' block — write whichever the file carries (all bank 0x20).
         for prof_s, fields in data['profiles'].items():
             for ent in fields.values():
                 writes.append((int(prof_s), int(ent['addr'], 16), list(ent['bytes'])))
-        for ent in lighting['slots'].values():
+        for ent in lighting.get('slots', {}).values():
             writes.append((led.LED_BANK, int(ent['addr'], 16), list(ent['bytes'])))
-        for ent in lighting['power'].values():
+        for ent in lighting.get('power', {}).values():
             writes.append((led.LED_BANK, int(ent['addr'], 16), list(ent['bytes'])))
-        sel = lighting['active_slot']
-        writes.append((led.LED_BANK, int(sel['addr'], 16), list(sel['bytes'])))
+        for ent in lighting.get('fields', {}).values():
+            writes.append((led8k.BANK, int(ent['addr'], 16), list(ent['bytes'])))
+        if 'active_slot' in lighting:
+            sel = lighting['active_slot']
+            writes.append((led.LED_BANK, int(sel['addr'], 16), list(sel['bytes'])))
     return writes
 
 
@@ -199,6 +253,38 @@ def _expand_units(writes):
     return units
 
 
+def _allowed_addrs():
+    """bank -> set of writable register addresses for the ACTIVE controller,
+    derived from the very read plan a snapshot is built from. A restore may only
+    write registers a snapshot could have read, so the map is authoritative."""
+    allowed = {}
+    for bank, addr, ln in _all_requests():
+        allowed.setdefault(bank, set()).update(range(addr, addr + ln))
+    return allowed
+
+
+def _validate_writes(writes):
+    """Reject a restore plan that targets a bank/address outside the active
+    controller's known register map, or a value outside 0..255 — so importing a
+    hand-crafted or corrupt backup can only ever restore real settings, never
+    drive register writes to arbitrary banks/addresses. Raises ValueError on the
+    first violation (the whole restore is refused; nothing is written)."""
+    allowed = _allowed_addrs()
+    for bank, addr, byts in writes:
+        ok = allowed.get(bank)
+        if ok is None:
+            raise ValueError(f'backup targets unknown register bank 0x{bank:02x} '
+                             '(not part of this controller)')
+        if any(not isinstance(b, int) or isinstance(b, bool) or not (0 <= b <= 255)
+               for b in byts):
+            raise ValueError(f'backup has a non-byte value at bank 0x{bank:02x} '
+                             f'addr 0x{addr:04x}')
+        if not all((addr + i) in ok for i in range(len(byts))):
+            raise ValueError('backup writes outside the known register map '
+                             f'(bank 0x{bank:02x} addr 0x{addr:04x}, '
+                             f'{len(byts)} bytes)')
+
+
 def apply_backup(data, on_progress=None, on_done=None):
     """Write a loaded snapshot back to the controller on a daemon thread, then
     READ IT BACK and re-write whatever didn't take - the controller silently
@@ -208,17 +294,27 @@ def apply_backup(data, on_progress=None, on_done=None):
 
     Banks 0x02-0x04 are the stored (non-active) profiles, which the controller
     appears to expose read-only; they're written best-effort but not required to
-    confirm, so they don't mask a genuine failure in the active profile/lighting."""
-    units = _expand_units(_writes_from(data))
+    confirm, so they don't mask a genuine failure in the active profile/lighting.
+
+    Raises ValueError (before spawning the worker) on a backup whose write plan
+    escapes the controller's known register map -- see _validate_writes."""
+    writes = _writes_from(data)
+    _validate_writes(writes)
+    units = _expand_units(writes)
     total = len(units)
 
     def run():
+        style = ctrl.active().write_style   # capture once: consistent framing
+        gen = control.generation()          # pin to this device session
         pending = list(units)
         confirmed = []
         for _pass in range(MAX_PASSES):
-            # 1. (re)write the not-yet-confirmed units (write_reg paces ~20ms each)
+            # 1. (re)write the not-yet-confirmed units (write_reg paces ~20ms each).
+            #    write_reg refuses once the handle is rebound, so a controller
+            #    switch mid-restore leaves the new unit untouched -- the pass then
+            #    fails to verify and the restore is reported as incomplete.
             for bank, addr, byts in pending:
-                control.write_reg(bank, addr, byts)
+                control.write_reg(bank, addr, byts, write_style=style, gen=gen)
 
             # 2. read them all back through the reader thread's request/poll layer
             control.request_regs([(b, a, len(by)) for b, a, by in pending])

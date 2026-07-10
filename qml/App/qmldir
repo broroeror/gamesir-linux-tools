@@ -3,12 +3,19 @@ singleton Theme 1.0 Theme.qml
 Card 1.0 Card.qml
 NavTab 1.0 NavTab.qml
 ProfileBar 1.0 ProfileBar.qml
+ControllerPicker 1.0 ControllerPicker.qml
 StatusPill 1.0 StatusPill.qml
 ControllerView 1.0 ControllerView.qml
 AccentSlider 1.0 AccentSlider.qml
 ToggleSwitch 1.0 ToggleSwitch.qml
 ColorPicker 1.0 ColorPicker.qml
+ColorField 1.0 ColorField.qml
+FitScroll 1.0 FitScroll.qml
 LightsPage 1.0 LightsPage.qml
+Lights8kPage 1.0 Lights8kPage.qml
+MotionPage 1.0 MotionPage.qml
+MacroPage 1.0 MacroPage.qml
+TargetPicker 1.0 TargetPicker.qml
 RangeSlider 1.0 RangeSlider.qml
 CurveEditor 1.0 CurveEditor.qml
 PillButton 1.0 PillButton.qml
@@ -18,3 +25,6 @@ AxisConfigPage 1.0 AxisConfigPage.qml
 ButtonsPage 1.0 ButtonsPage.qml
 VibrationPage 1.0 VibrationPage.qml
 BackupPanel 1.0 BackupPanel.qml
+FirmwarePanel 1.0 FirmwarePanel.qml
+HelpIcon 1.0 HelpIcon.qml
+AxisSide 1.0 AxisSide.qml

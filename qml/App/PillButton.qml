@@ -7,7 +7,7 @@ Rectangle {
     property bool highlight: false
     signal clicked()
     implicitWidth: t.implicitWidth + 22; implicitHeight: 30; radius: 7
-    color: highlight ? Theme.accent : (hh.hovered ? Theme.cardHover : "#20232B")
+    color: highlight ? Theme.accent : (hh.hovered ? Theme.buttonHover : Theme.button)
     border.color: highlight ? Qt.lighter(Theme.accent, 1.2) : Theme.cardBorder
     border.width: 1
     Behavior on color { ColorAnimation { duration: 100 } }

@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls as QQC
 import QtQuick.Layouts
 
 // Front page: live controller render, per-profile button remap (master-detail:
@@ -9,105 +10,178 @@ Item {
     property string sel: "A"
     property var localRemap: ({})        // staged overrides shown before Save
 
-    function targetOf(src) {
+    function targetCode(src) {                    // -1 = unmapped (Default)
         if (localRemap[src] !== undefined) return localRemap[src]
         var r = bridge.config.remap
-        return (r && r[src] !== undefined) ? r[src] : "Default"
+        return (r && r[src] !== undefined) ? r[src] : -1
     }
-    function assign(src, target) {
-        var m = Object.assign({}, localRemap); m[src] = target; localRemap = m
-        bridge.setRemap(src, target)
+    function targetLabel(src) {
+        var c = targetCode(src)
+        return c < 0 ? "Default" : bridge.targetLabel(c)
+    }
+    function assignCode(src, code) {
+        var m = Object.assign({}, localRemap); m[src] = code; localRemap = m
+        bridge.setRemapCode(src, code)
     }
     Connections { target: bridge; function onConfigLoaded() { page.localRemap = ({}) } }
 
-    ColumnLayout {
+    // Scroll fallback: fills the viewport in a tall window (content stretches to
+    // height via the Math.max below), and scrolls vertically once the stacked
+    // cards no longer fit — so nothing clips at small window sizes.
+    QQC.ScrollView {
+        id: scroller
         anchors.fill: parent
-        anchors.margins: 20
-        anchors.bottomMargin: pbar.visible ? pbar.height + 30 : 20
+        anchors.bottomMargin: pbar.height + 30   // reserve bar space always (no reflow)
+        contentWidth: availableWidth
+        QQC.ScrollBar.horizontal.policy: QQC.ScrollBar.AlwaysOff
+        clip: true
+        topPadding: 20; bottomPadding: 20; leftPadding: 20; rightPadding: 20
+
+    ColumnLayout {
+        width: scroller.availableWidth
+        height: Math.max(implicitHeight, scroller.availableHeight)
         spacing: 14
 
         RowLayout {
             Layout.fillWidth: true; Layout.fillHeight: true
             spacing: 16
 
-            // -------- controller + reset --------
+            // -------- LEFT: source list + reset --------
             ColumnLayout {
-                Layout.preferredWidth: 300; Layout.maximumWidth: 300
+                visible: bridge.profile > 0
+                Layout.fillWidth: true
+                Layout.minimumWidth: 250; Layout.preferredWidth: 290; Layout.maximumWidth: 340
                 Layout.fillHeight: true
                 spacing: 14
-                ControllerView {
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.preferredWidth: 290
-                    Layout.preferredHeight: 290 / aspect
-                }
+
                 Card {
-                    title: "Default profile"; Layout.fillWidth: true
+                    title: "Button Mapping"
+                    Layout.fillWidth: true; Layout.fillHeight: true
+                    Grid {
+                        width: parent.width; columns: 2; spacing: 6
+                        Repeater {
+                            model: bridge.remapSources
+                            delegate: Rectangle {
+                                required property string modelData
+                                width: (parent.width - 6) / 2; height: 30; radius: 6
+                                color: page.sel === modelData ? Theme.cardHover : Theme.button
+                                border.color: page.sel === modelData ? Theme.accent : Theme.cardBorder
+                                border.width: 1
+                                Text {
+                                    anchors.left: parent.left; anchors.leftMargin: 8
+                                    anchors.right: parent.right; anchors.rightMargin: 8
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    elide: Text.ElideRight
+                                    text: modelData + "  →  " + page.targetLabel(modelData)
+                                    color: page.targetCode(modelData) < 0 ? Theme.textDim : Theme.text
+                                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                                }
+                                TapHandler { onTapped: page.sel = modelData }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // -------- CENTER: controller + remap indicator --------
+            Item {
+                id: centerArea
+                Layout.fillWidth: true; Layout.fillHeight: true
+                Layout.horizontalStretchFactor: 2
+                implicitHeight: centerCol.implicitHeight
+                Column {
+                    id: centerCol
+                    width: parent.width
+                    y: Math.max(0, (parent.height - implicitHeight) / 2)
+                    spacing: 12
+
+                    ControllerView {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: Math.min(implicitWidth, centerArea.width - 24)
+                        height: width / aspect
+                        highlightSource: bridge.profile > 0 ? page.sel : ""
+                        highlightTarget: bridge.profile > 0 ? page.targetLabel(page.sel) : ""
+                    }
+
+                    // "<source> → <target>" caption under the pad.
+                    Rectangle {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        visible: bridge.profile > 0
+                        width: capRow.implicitWidth + 28; height: 34; radius: 8
+                        color: Theme.card; border.color: Theme.cardBorder; border.width: 1
+                        Row {
+                            id: capRow; anchors.centerIn: parent; spacing: 8
+                            Text {
+                                text: page.sel; color: Theme.text; font.bold: true
+                                font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                            Text {
+                                text: "→"; color: Theme.textDim
+                                font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                            Text {
+                                text: page.targetCode(page.sel) < 0 ? "unmapped" : page.targetLabel(page.sel)
+                                color: page.targetCode(page.sel) < 0 ? Theme.textDim : Theme.accent
+                                font.bold: page.targetCode(page.sel) >= 0
+                                font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                        }
+                    }
+
                     Text {
-                        width: parent.width; wrapMode: Text.WordWrap
-                        text: bridge.profile > 0
-                              ? "Reset Profile " + bridge.profile + " to its out-of-box factory " +
-                                "state — buttons, sticks, triggers, vibration, default lighting."
-                              : "Select a profile (1–4) above to enable editing."
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        visible: bridge.profile === 0
+                        width: Math.min(implicitWidth, centerArea.width - 24)
+                        horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap
+                        text: "Select a profile (1–4) above to remap buttons."
                         color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
                     }
-                    ConfirmButton {
-                        visible: bridge.profile > 0
-                        label: "Reset to default"
-                        confirmLabel: "Reset Profile " + bridge.profile + "?"
-                        onConfirmed: bridge.resetProfileToDefault()
+                }
+            }
+
+            // -------- RIGHT: assign target (+ reset when compact) --------
+            ColumnLayout {
+                visible: bridge.profile > 0
+                Layout.fillWidth: true
+                Layout.minimumWidth: 200; Layout.preferredWidth: 240; Layout.maximumWidth: 300
+                Layout.fillHeight: true
+                spacing: 14
+
+                Card {
+                    title: "Assign — " + page.sel; Layout.fillWidth: true
+                    Flow {
+                        width: parent.width; spacing: 6
+                        PillButton {
+                            label: "Default"
+                            highlight: page.targetCode(page.sel) < 0
+                            onClicked: page.assignCode(page.sel, -1)
+                        }
+                        Repeater {
+                            model: bridge.buttonTargets
+                            delegate: PillButton {
+                                required property var modelData
+                                label: modelData.name
+                                highlight: page.targetCode(page.sel) === modelData.code
+                                onClicked: page.assignCode(page.sel, modelData.code)
+                            }
+                        }
+                    }
+                    Text { text: "Keyboard & mouse"; color: Theme.textDim; topPadding: 6
+                           font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
+                    Row {
+                        width: parent.width; spacing: 6
+                        PillButton { label: "⌨ Keyboard"; onClicked: rebindPicker.open("keyboard") }
+                        PillButton { label: "🖱 Mouse";    onClicked: rebindPicker.open("mouse") }
                     }
                 }
+
                 Item { Layout.fillHeight: true }
             }
-
-            // -------- source list --------
-            Card {
-                title: "Button Mapping"; Layout.fillWidth: true; Layout.fillHeight: true
-                visible: bridge.profile > 0
-                Grid {
-                    width: parent.width; columns: 2; spacing: 6
-                    Repeater {
-                        model: bridge.remapSources
-                        delegate: Rectangle {
-                            required property string modelData
-                            width: (parent.width - 6) / 2; height: 30; radius: 6
-                            color: page.sel === modelData ? Theme.cardHover : "#1A1C22"
-                            border.color: page.sel === modelData ? Theme.accent : Theme.cardBorder
-                            border.width: 1
-                            Text {
-                                anchors.left: parent.left; anchors.leftMargin: 8
-                                anchors.right: parent.right; anchors.rightMargin: 8
-                                anchors.verticalCenter: parent.verticalCenter
-                                elide: Text.ElideRight
-                                text: modelData + "  →  " + page.targetOf(modelData)
-                                color: page.targetOf(modelData) === "Default" ? Theme.textDim : Theme.text
-                                font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
-                            }
-                            TapHandler { onTapped: page.sel = modelData }
-                        }
-                    }
-                }
-            }
-
-            // -------- assign target --------
-            Card {
-                title: "Assign — " + page.sel; Layout.preferredWidth: 230; Layout.maximumWidth: 230
-                Layout.fillHeight: true
-                visible: bridge.profile > 0
-                Flow {
-                    width: parent.width; spacing: 6
-                    Repeater {
-                        model: bridge.remapTargets
-                        delegate: PillButton {
-                            required property string modelData
-                            label: modelData
-                            highlight: page.targetOf(page.sel) === modelData
-                            onClicked: page.assign(page.sel, modelData)
-                        }
-                    }
-                }
-            }
         }
+    }
     }
 
     PendingBar {
@@ -115,5 +189,13 @@ Item {
         anchors.left: parent.left; anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.leftMargin: 20; anchors.rightMargin: 20; anchors.bottomMargin: 20
+    }
+
+    // popout keyboard / mouse picker for rebinds
+    TargetPicker {
+        id: rebindPicker
+        current: page.targetCode(page.sel)
+        function open(m) { mode = m }
+        onPicked: function (code) { page.assignCode(page.sel, code) }
     }
 }

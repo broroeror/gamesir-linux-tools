@@ -18,7 +18,7 @@ Item {
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 20
-        anchors.bottomMargin: pbar.visible ? pbar.height + 30 : 20
+        anchors.bottomMargin: pbar.height + 30   // reserve bar space always (no reflow)
         spacing: 14
 
         Card {

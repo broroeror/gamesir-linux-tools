@@ -23,9 +23,21 @@ vendor (hidraw) interface, reverse-engineered from scratch. It covers:
 **Version:** `0.1.0-alpha.2` — the full Qt/QML app (lighting + keyframe editor,
 config editor, button remap, backup/restore, one-command install). Known-good
 snapshot (git tag `v0.1.0-alpha.2`).
-Remaining bugs, proposed changes, and open reverse-engineering questions live in
-**[TODO.md](TODO.md)** — a living checklist. This is a hobby reverse-engineering
-project; fork it and customize it however you like.
+**Going deeper?** The **[Manual](MANUAL.md)** is the user guide — how to use each
+feature, troubleshooting & recovery, and an FAQ. **[RESEARCH.md](RESEARCH.md)** is the
+developer side — protocol, architecture, the diagnostic tools, and per-controller
+findings. See also **[CONTROLLER_MAP.md](CONTROLLER_MAP.md)** (what each control
+reports to Linux) and **[TODO.md](TODO.md)** (roadmap + open questions).
+
+This is a hobby reverse-engineering project; fork it and customize it however you like.
+
+> ### ⚠️ Tested hardware
+> Everything here has only been developed and verified on a **GameSir Cyclone 2**
+> and a **GameSir G7 Pro** — **nothing else.** Other GameSir controllers, other
+> dongles, and firmware revisions we haven't seen are **unsupported and untested**
+> and may misbehave. The app won't send config writes to a device it can't
+> positively recognize, but please don't treat it as proven-safe on hardware it has
+> never seen. Use it at your own risk.
 
 ## The app
 
@@ -48,12 +60,20 @@ cd gamesir-PenGUIcken
 ```
 
 `install.sh` installs into your home (`~/.local`), so the only step that needs
-`sudo` is the one-time udev rule that lets you open the controller without root.
-Afterwards **GameSir Cyclone 2** appears in your app launcher (or run
-`gamesir-cyclone2`). Remove it with `./uninstall.sh`.
+`sudo` is the one-time udev rule that lets you open the controller without root —
+and it **prompts before running anything privileged**, showing the exact commands
+first. You can decline the udev step; the app still installs and launches, it just
+can't reach the controller until the rule is in place. Afterwards **GameSir
+Cyclone 2** appears in your app launcher (or run `gamesir-cyclone2`). Remove it
+with `./uninstall.sh`.
 
 Prefer the Arch-native route? A [`packaging/PKGBUILD`](packaging/PKGBUILD) is
-included to publish to the AUR (`yay -S gamesir-cyclone2-git`).
+included. It is **not published to the AUR yet**, so `yay`/`paru` can't find it by
+name — build it from the included file instead (no AUR account needed):
+
+```sh
+cd packaging && makepkg -si
+```
 
 ## Requirements
 
@@ -73,7 +93,7 @@ pip install hidapi PySide6
 
 ## Running
 
-The controller must be in **Xbox / XInput mode (hold the green button ~2s)** —
+The controller must be in **Xbox / XInput mode (use the Start / pause buttons)** —
 the vendor protocol is inert in PS4/DS4 and Switch modes. The app warns you in
 the header when the controller isn't in Xbox mode.
 
@@ -113,174 +133,95 @@ sudo python3 gamesir_gui.py
 Note that under `sudo`, `~` resolves to `/root`, so the default Backup path lands
 in `/root/` — another reason to prefer the udev-rule route.
 
-## How it works (protocol notes)
+## Safety
 
-The controller exposes a **vendor HID interface** (USB VID `0x3537`) carrying a
-64-byte command/report channel. Everything below requires **Xbox mode** and a
-**sustained heartbeat** (`0x0F 0xF2` every ~0.5s).
+Short version: this app changes controller **settings**, not firmware, and
+everything it does is **reversible** and stays **on your machine**. The specifics:
 
-- **Input**: enhanced report `0x12` streams sticks, triggers, IMU, battery
-  (byte 36 %, byte 35 bit0 = charging), and the extra buttons (L4/R4/M/Home/
-  Share in byte 60) that the standard PS4 report can't see.
-- **Commands** (output report `0x0F`, padded to 64):
-  - Heartbeat `0F F2`
-  - Get/Set profile `0F 0B` → `10 0C <p>` / `0F 07 <p>`
-  - Rumble `0F 20 66 55 <L> <R>`
-  - Read register `0F 04 <bank> <addrHi> <addrLo> <len>` → `10 05 <bank> <hi> <lo> <len> <data…>`
-  - Write register `0F 03 <bank> <addrHi> <addrLo> <len> <data…>`
-- **Lighting** lives in register **bank `0x20`**:
-  - `0x0000` = active slot selector (0–3; also a reliable live readback of the
-    M+stick gesture)
-  - slot record at `0x0001 + slot*0x7c` (124 bytes): `[type, 05, param, brightness]`
-    then a palette of RGB triplets rendered as repeated **5-triplet frames**
-  - Frame position → light: **0=Left grip, 1=Right grip, 2=(no LED), 3=Profile,
-    4=Home**. A solid/per-light color = type `0x01`, tile one identical frame
-    across the whole record (zeroing the tail drops the Profile LED).
-  - Animated **effect presets** are distinct `type` bytes captured from the app
-    (`rgb_profiles_test.pcapng`): `0x05` Flow, `0x08` Rainbow, `0x02` Pulse,
-    `0x06` Alarm, `0x01`+palette Standoff. Stored verbatim in `gamesir_led.py`
-    (`PATTERNS`); `set_pattern` writes one to the active slot, overriding the
-    brightness byte from the slider.
-  - **Custom keyframe animations** reuse the `0x05` palette engine: the record
-    header is `[count, 0x05, speed, brightness]` — **byte 0 is the keyframe
-    count** (1–8), so the editor recovers it on readback. Each keyframe is one
-    5-triplet frame; `decode_record` is the inverse of `set_keyframes`.
-    `gamesir_kf_cache.py` keeps a local copy of the exact colors/count so a slot
-    we wrote round-trips perfectly even though the device only stores 8 tiled
-    frames.
-  - **Play / pause** the running animation is vendor command `0F 0D <state>
-    <frame>` (captured from the app): byte 2 = `1` play / `0` pause, byte 3 = the
-    **1-based keyframe to freeze on** — so Pause holds the frame you're viewing
-    instead of snapping to frame 1.
-- **Firmware version** comes straight from the USB device descriptor's
-  `bcdDevice` (hidapi `release_number`), BCD-encoded `JJ.MN` — no USB command or
-  network call. The official app's Info button reads the same field.
-- **Mode switching** (Xbox ↔ Switch ↔ PlayStation) is a hardware button combo
-  that triggers a full USB **re-enumeration**, not a sendable command. Only Xbox
-  mode exposes the vendor channel; outside it the `0x12` stream goes all-zero,
-  which the app detects as "not in Xbox mode."
+- **What it writes.** Edits go to the controller's *config* registers — deadzones,
+  curves, button remaps, vibration, poll rate, and lighting — over the vendor
+  channel, the same settings the official app changes. Writes **auto-persist** to
+  the controller (there's no separate "commit" step), but they're ordinary config,
+  not firmware — nothing here touches the bootloader.
+- **Back up before you experiment.** **Backup / Restore → Export** snapshots all
+  four profiles + lighting to a JSON file; **Restore** writes it back. Take one
+  before you start changing things and you can always return to a known-good state.
+  Restore is write-verify-retry and reports a clear pass/fail. Imported backups are
+  **validated against the controller's known register map before any write**, so a
+  hand-edited or corrupt file can't drive writes to arbitrary registers.
+- **Reversibility.** Every setting the editor exposes can be set back the same way
+  it was changed. The worst realistic outcome of experimenting is a profile that
+  feels wrong — fixed by Restore, re-editing, or the controller's own factory-default
+  reset.
+- **Xbox / XInput mode only.** The vendor protocol is inert in PS4/DS4 and Switch
+  modes — there the app can't reach the controller, so it can't change anything.
+  Use the Start / pause buttons for Xbox mode (the header warns you when you're not in
+  it).
+- **No network.** No telemetry, no account, no phone-home — it's all local USB. Even
+  the firmware *version* is read straight from the USB descriptor, not fetched
+  online.
+- **Permissions.** Prefer the udev rule (per-user `uaccess`) over running as root —
+  see [Running](#running). Under `sudo`, `~` is `/root`, so backups land there.
+- **Tested hardware.** Only the Cyclone 2 and G7 Pro (see the note up top). Treat
+  anything else as unproven and use it at your own risk.
 
-Gotcha: the controller **drops a command sent immediately after another** —
-space out periodic queries (the GUI alternates them).
+## How it works
 
-Full hardware notes live in the assistant memory file
-`gamesir-vendor-interface-findings.md`.
+The controller exposes a **vendor HID interface** (USB VID `0x3537`) with a 64-byte
+command channel. In **Xbox mode**, with a sustained heartbeat, it streams input
+(enhanced report `0x12` — sticks, triggers, IMU, battery, and the L4/R4/M paddles the
+standard report can't see) and accepts **register read/write** commands for config and
+lighting. The firmware *version* is read from the USB `bcdDevice` descriptor — no
+command, no network.
+
+For what each control reports to Linux as a normal gamepad, see
+**[CONTROLLER_MAP.md](CONTROLLER_MAP.md)**. The full command set, the lighting/keyframe
+register encoding, the app's architecture, and the per-controller findings (including
+the G7 Pro) live in **[RESEARCH.md](RESEARCH.md)**.
 
 ## File layout
 
-**App (runtime)** — the GUI is split into focused modules:
-- `gamesir_gui.py` — the view layer: panel construction, per-frame updates, callbacks
-- `gs_state.py` — the shared live `state` dict (dependency-free)
-- `gamesir_reader.py` — background connect/read loop that fills `state`
-- `gamesir_control.py` — command channel: `send_cmd`, profile, rumble, register read/write
-- `gamesir_led.py` — lighting domain (bank `0x20`): `set_lights`, slot select, keyframes, factory restore
-- `gamesir_config.py` — per-profile config register map (deadzones / curves / vibration / poll rate …)
-- `gamesir_backup.py` — full-setup export/restore: read every profile + lighting, (de)serialize JSON
-- `gamesir_kf_cache.py` — local cache of exact keyframe colors/count per slot (authoritative across profile switches)
-- `gamesir_mousegrab.py` — suppresses the emulated mouse/keyboard (EVIOCGRAB) for the mouse-mode fix
-- `gamesir_window.py` — viewport placement (xrandr primary-monitor geometry; X11/XWayland)
-- `gs_common.py` — vendor-interface discovery + helpers (incl. firmware/`bcdDevice` read)
-- `gamesir_enhanced.py` — `0x12` enhanced-report parser
-- `gamesir_led_factory.py` — captured lighting baseline for "Restore presets"
+The app is split into focused modules — the connect/read loop, the shared `state`,
+the command channel, and the lighting/config/backup domains. That structure and the
+`research/` diagnostic scripts are documented in **[RESEARCH.md](RESEARCH.md)**
+(Architecture + Methodology & tools). One-off probes and the pre-refactor monolith
+live in **`archive/`**.
 
-**Tools:**
-- `gamesir_regdump.py` — dump/diff a register range (`sudo python3 gamesir_regdump.py <bank-decimal> <start-hex> <end-hex>`; bank 0x20 = `32`)
-- `gamesir_regread.py` — read a single register
-- `gamesir_regwrite_test.py` — safe write-register validator (read-modify-readback-restore on one byte)
-- `gamesir_profile_axis.py` — read-only probe of how profiles map to banks
-- `gamesir_parse_capture.py` — decode a USBPcap `.pcapng` into vendor commands (no deps). `--writes` filters to WRITE-REG only and prints a per-address summary — ideal for noisy setting-change captures
-- `gamesir_input_diag.py` — mouse-mode isolator: grabs the controller's evdev nodes one at a time so you can see which one (the joystick node) the compositor is reading to drive the cursor (`sudo python3 gamesir_input_diag.py`)
+## Status
 
-**`USBPcap Controller  Tests/`** — the official-app captures the config map was
-reverse-engineered from (connect-sync, persistence, remap, deadzones, curves,
-poll rate, vibration). Parse any with `gamesir_parse_capture.py`.
+**Working:** live input, battery, firmware readout, Xbox-mode warning, profile
+read/switch, rumble, full per-light RGB + effect presets + lighting power settings, a
+**custom keyframe animation editor** (1–8 frames, play/pause), a **config editor**
+(deadzones, anti-deadzones, stick trajectory + sensitivity curves incl. a draggable
+custom-curve editor, trigger tuning, vibration, poll rate), **button remap**, and
+**backup / restore** — all verified end-to-end on hardware. Restore is
+write-verify-retry; only the active profile + lighting are guaranteed (banks
+`0x02`–`0x04`, the stored profiles, appear read-only on this controller).
 
-**`archive/`** — one-off probes, button/LED discovery scripts, the original
-PS4-mode reader, the pre-refactor monolithic GUI (`gamesir_gui_monolithic.py`),
-the outdated handoff doc, and the LED USB capture (`gamesir_led.pcapng`). Kept
-for reference; these expect the repo root on the import path
-(`from gs_common import …`).
-
-## Status & next steps
-
-Working: live input, battery, firmware readout, Xbox-mode warning, profile
-read/switch, rumble, full per-light RGB, **effect presets**, lighting power
-settings (audio-reactive / pick-up-to-wake / sleep), a **custom keyframe
-animation editor** (per-slot, add/remove 1–8 frames, randomize, play/pause), a
-**config editor** (deadzones, anti-deadzones, stick trajectory + sensitivity
-curve incl. a **draggable custom-curve editor**, trigger deadzones +
-hair-trigger + response curve, vibration L/R, poll rate), and **button remap** —
-all reading the active profile's current values and writing edits live.
-
-**Backup / Restore:** Export snapshots all 4 profiles + lighting to a labelled
-JSON file; Restore writes it back. Both are **verified end-to-end on hardware.**
-Restore is **write-verify-retry**: every block is read back after writing and
-re-sent if it didn't take (the controller silently drops back-to-back commands,
-so a blind write loses blocks - e.g. the first lighting record), retrying up to a
-few passes and reporting a clear pass/fail status. Picking a restore file reveals
-an inline **"Write loaded backup to controller"** button (no modal popup - those
-proved unreliable across window managers). Note: banks `0x02`-`0x04` (the stored,
-non-active profiles) appear read-only on this controller, so only the **active
-profile + lighting** are guaranteed to restore; the status line says so if the
-stored profiles can't be confirmed.
-
-**Mouse-mode fix (KDE/KWin Game Controller plugin):** after the 2.4GHz dongle
-re-pairs/replugs, moving the sticks starts driving the desktop cursor (and the
-buttons click). This is **not** the controller emulating a mouse — it's **KWin's
-"Game Controller" plugin** (Plasma 6.7, a 2025 GSoC feature) mapping sticks →
-pointer and triggers → clicks, reading the joystick evdev node **directly**.
-(Diagnosed by grabbing the controller's evdev nodes one at a time — only the
-*joystick* node stops the cursor; the emulated mouse/keyboard nodes read zero.
-`fuser` confirms `kwin_wayland` holds the joystick node, and a
-`LIBINPUT_IGNORE_DEVICE` rule was tested and does **not** help — KWin reads it
-out-of-band, not through libinput.)
-
-**Recommended fix — disable the plugin** (permanent, and games are unaffected
-because they read evdev directly; the plugin even auto-disables when another app
-uses the pad):
+**Mouse-mode gotcha (KDE Plasma 6.7):** after a dongle replug, the sticks may start
+driving the desktop cursor — that's **KWin's Game Controller plugin** reading the
+joystick node directly, not the controller emulating a mouse. Turn it off:
 
 ```sh
 kwriteconfig6 --file kwinrc --group Plugins --key gamecontrollerEnabled false
-qdbus6 org.kde.KWin /KWin reconfigure   # or just log out/in
+qdbus6 org.kde.KWin /KWin reconfigure   # or log out/in
 ```
 
-`gamecontrollerEnabled true/false` is effectively the mouse-mode on/off switch
-(there's also a **System Settings → Game Controller** toggle).
+The app also has an in-app **Stop mouse mode** toggle (desktop-agnostic fallback);
+see [Troubleshooting](MANUAL.md#troubleshooting--recovery) for the full picture.
 
-**In-app fallback (non-KDE / on-demand):** the **Stop mouse mode** toggle takes an
-exclusive `EVIOCGRAB` on the joystick node so the compositor can't read it, and
-re-applies the grab across replugs. It's desktop-agnostic, but while it's on,
-evdev games (Steam/SDL) won't see the pad either (the legacy `/dev/input/jsN`
-node and the hidraw app still work) — so prefer the plugin toggle on KDE. (Run
-`gamesir_input_diag.py` to reproduce the one-node-at-a-time isolation yourself.)
+**The config register map** (banks, offsets, remap records, the inferred RT block)
+and the **open items** — verifying the RT block, some remap target codes,
+profile-switch sync, PS4/Switch input parsing — live in
+**[RESEARCH.md](RESEARCH.md)** and **[TODO.md](TODO.md)**.
 
-**Config architecture (settled by USB capture):** byte 2 of the read/write command
-is a **bank** selector. Edits target **bank `0x01`, a live working copy of the
-*active* profile** — the official app writes every config/remap change there
-regardless of profile number. Banks `0x02`–`0x05` are stores/aux the app only reads
-(`0x02`–`0x04` are the default profile stores; `0x05` is a different aux bank), and
-`0x20` is lighting. The register offsets (vibration `0x20`/`0x21`, poll rate `0x2e`,
-trigger block `~0x1f1`, stick block `~0x227`, remap records below) live in
-`gamesir_config.py` and the assistant memory file. **Writes auto-persist to flash —
-no commit command needed.**
+## Firmware
 
-**Remap:** each input has a 7-byte record; only `[enabled, target_code]` matter
-(clear = `[00 00]`). Source addresses and target codes are mapped in
-`gamesir_config.py` (`REMAP_SLOTS` / `REMAP_TARGETS`).
-
-The **right-stick block** is **captured** (`15_rs_testing.pcapng`): it's the
-left-stick block mirrored at `+0x20` (trajectory `0x0247`, deadzone min/max
-`0x0249`/`0x024a`, anti-dz min/max `0x024b`/`0x024c`, curve `0x024e`). That
-capture also revealed the **left stick has a deadzone *max*** at `0x022a` we'd
-been missing — the editor now shows deadzone min+max for both sticks.
-
-The **RT trigger block** is exposed as LT mirrored at `+0x1c` (the RT remap
-address confirms that stride) — **inferred, pending verification** against a
-capture of an RT-setting change.
-
-Open items: verify the inferred RT block; View/Menu/L4/R4 *target* codes (not
-yet captured as targets); how a profile switch syncs bank `0x01` to a store (a
-`SET-PROFILE` + re-read test); and PS4/Switch-mode input parsing.
+The Cyclone 2's firmware can be **backed up and restored** from Linux — an advanced,
+opt-in, Cyclone-2-only feature (wired connection only, never over the 2.4 GHz dongle).
+It's a backup/restore tool, **not** a firmware updater, and it needs the external
+[jl-uboot-tool](https://github.com/kagaimiq/jl-uboot-tool) (not bundled). See
+**[FIRMWARE.md](FIRMWARE.md)**.
 
 ## License & disclaimer
 
@@ -290,7 +231,6 @@ freely.
 This is an independent, hobby reverse-engineering project. It is **not
 affiliated with, endorsed by, or supported by GameSir**, and "GameSir" and
 "Cyclone 2" are trademarks of their respective owners. The protocol was
-reverse-engineered for interoperability; the repository contains only original
-code (no vendor firmware, USB captures, or third-party assets). Provided **as
-is, without warranty** — you use it, and poke at your controller's registers,
-at your own risk.
+reverse-engineered for interoperability, and the repository contains **no vendor
+firmware or USB captures**. Provided **as is, without warranty** — you use it, and
+poke at your controller, at your own risk.

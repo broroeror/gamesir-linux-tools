@@ -23,3 +23,18 @@ SUBSYSTEM=="hidraw", ATTRS{idVendor}=="3537", TAG+="uaccess"
 # (fixes the post-reconnect mouse-mode). The gamepad/joystick node is grabbed
 # only while you enable the toggle; nothing here changes normal input.
 SUBSYSTEM=="input", ATTRS{idVendor}=="3537", TAG+="uaccess"
+
+# Firmware flashing: when the controller is in its JieLi BR23 UBOOT loader it
+# re-enumerates as a USB mass-storage device (4c4a:2342 "BR23UBOOT1.00"). Grant
+# the local user access to its SCSI generic node so the firmware flasher
+# (gamesir_flash.py / jl-uboot-tool) can talk to it over SG_IO WITHOUT sudo. The
+# sg char device is permission-gated (no CAP_SYS_RAWIO needed), so a uaccess ACL
+# is sufficient.
+#
+# IMPORTANT: 0x4c4a is JieLi's SHARED vendor id (unrelated cheap audio dongles and
+# flash drives use it too), so we ALSO match the BR23 UBOOT product id 0x2342 --
+# a uaccess ACL on the raw SG_IO node bypasses filesystem permissions on whatever
+# it points at, so it must be scoped to the loader specifically, not to every
+# JieLi device the user might plug in. No block-node rule: the loader presents no
+# media, so only the sg node appears, and granting raw block access is unneeded.
+SUBSYSTEM=="scsi_generic", ATTRS{idVendor}=="4c4a", ATTRS{idProduct}=="2342", TAG+="uaccess"

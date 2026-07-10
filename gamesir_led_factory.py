@@ -8,7 +8,7 @@ Used by the GUI's "Restore presets" button to undo edits.
 Layout: selector at 0x0000; record M at 0x0001 + M*0x7c (124 bytes each). This
 covers records 0..3 = addresses 0x0001..0x01f0.
 
-To regenerate on another unit: run `sudo python3 gamesir_regdump.py 32 0x0000
+To regenerate on another unit: run `sudo python3 research/gamesir_regdump.py 32 0x0000
 0x0200` and paste the rows below.
 """
 

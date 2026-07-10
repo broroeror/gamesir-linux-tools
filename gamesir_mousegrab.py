@@ -3,7 +3,7 @@ GameSir Cyclone 2 - "mouse mode" suppressor
 ===========================================
 After the 2.4GHz dongle re-pairs/replugs, moving the sticks drives the desktop
 cursor ("mouse mode"). We chased this all the way down (see the diagnostics in
-gamesir_input_diag.py): it is NOT the controller's emulated interface-1
+research/gamesir_input_diag.py): it is NOT the controller's emulated interface-1
 mouse/keyboard - those evdev nodes stay silent. The cursor is driven by **KDE's
 KWin compositor (Plasma 6 Wayland) reading the gamepad's joystick evdev node
 directly** via its built-in game-controller-to-pointer support. libinput would
