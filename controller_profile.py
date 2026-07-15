@@ -399,7 +399,9 @@ G7_8K = ControllerProfile(
     dz_wide=True, stick_curve_npts=5,       # 16-bit ×10 deadzones; 5-point stick curves
     LT_DZ_MIN=0x0357, LT_DZ_MAX=0x0359,
     LT_ADZ_MIN=0x035b, LT_ADZ_MAX=0x035d,
-    LT_HAIR=None, LT_CURVE=0x0368, RT_OFFSET=0x20,   # trigger curve = 3-point (like Cyclone)
+    LT_HAIR=0x0364, LT_CURVE=0x0368, RT_OFFSET=0x20,  # hair mode @0x0364 (off/adaptive/
+                                                      # fixed, same codes+block as Cyclone,
+                                                      # cap 50); trigger curve = 3-point
     ST_TRAJ=0x0395, ST_DZ_MIN=0x0397, ST_DZ_MAX=0x0399,
     ST_ADZ_MIN=0x039b, ST_ADZ_MAX=0x039d,
     ST_CURVE=0x03a0, RS_OFFSET=0x24,        # LS→RS stride 0x24 (Cyclone is 0x20)
