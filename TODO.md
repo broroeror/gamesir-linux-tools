@@ -21,6 +21,12 @@ them into the CHANGELOG so this file doesn't grow stale.
       `RenderLoop::activeWindowControlsVrrRefreshRate()` during compositor teardown,
       on multi-output + hybrid NVIDIA/AMD. Workaround: System Settings → Display →
       Adaptive Sync → *Never*. Worth reporting upstream to KDE.
+- [ ] **8K `reload_on_apply` nudge may be unnecessary** *(2026-07-14)*. The
+      profile-reselect after Save was added while chasing the 8K analog bug; the real
+      fix was the correct register addresses, so the 8K likely applies writes live
+      without it (motion did). Test with `G7_8K.reload_on_apply = False`; if stick/
+      trigger edits still take effect live, remove the nudge — it was the likely cause
+      of the transient "triggers 0–0 after a page switch" re-reads.
 
 ## ✨ Enhancements / proposed changes
 
@@ -36,6 +42,18 @@ them into the CHANGELOG so this file doesn't grow stale.
       `research/` is already done — see the CHANGELOG.)*
 - [ ] **Restore: per-block verify detail.** The write-verify-retry already reports
       pass/fail; could add a "verify only" action or a list of any unconfirmed blocks.
+- [ ] **Expose the 8K's fine deadzone precision** *(2026-07-14)*. The 8K stores
+      stick/trigger deadzones as 16-bit (0.1% steps) and the official app shows one
+      decimal; our sliders are whole-percent (0–100), so we round it off. Optionally
+      give the 8K 0.1% sliders (Cyclone stays integer %).
+- [ ] **Hair-trigger min/max thresholds** *(2026-07-14)*. Mode presets bake in min/max
+      (Off 10/90, Adaptive 1/100). The adjustable thresholds are mapped (8K LT
+      `0x0365`/`0x0366`, RT `+0x20`; Cyclone equivalents TBD) — could expose min/max
+      sliders when Adaptive/Fixed is selected, for both controllers.
+- [ ] **8K lighting hue accuracy** *(parked)*. The home-ring / controller-light hue
+      reads "a little off" vs the physical LED on some colours (the `0xFF` sentinel is
+      already capped at 246 = blue). Needs a live hue-sweep calibration or LED-vs-monitor
+      gamma compensation, not just the cap.
 - [ ] **Couch-cursor / stick-to-mouse as a *feature* on Windows & macOS** *(2026-07-08)*.
       Note this is the **inverse** of the Linux mouse-mode toggle: on KDE the app
       *suppresses* KWin's built-in stick→pointer plugin (`gamesir_kwin.py`); Windows
