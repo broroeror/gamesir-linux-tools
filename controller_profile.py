@@ -65,10 +65,6 @@ class ControllerProfile:
     usb_products: tuple                    # USB product ids that identify it
     write_style: str = 'cyclone'           # 'cyclone' bare 0f03 / 'g7' enveloped
     input_style: str = 'cyclone_0x12'      # 'cyclone_0x12' (vendor hidraw) / 'evdev'
-    reload_on_apply: bool = False          # re-select the profile after a config
-                                           # write so the firmware reloads it into
-                                           # LIVE output (8K latches the active
-                                           # profile; the Cyclone applies writes live)
     dz_wide: bool = False                   # analog stick/trigger deadzones are
                                            # 16-bit big-endian = percent×10 (0..1000,
                                            # the 8K high-rate block) vs 8-bit % (Cyclone)
@@ -374,9 +370,6 @@ G7_8K = ControllerProfile(
     usb_products=(0x10c7, 0x10c8),          # 10c7 wired / 10c8 wireless dongle
     write_style='cyclone',                  # bare 0f03 writes (NOT the g7 envelope)
     input_style='cyclone_0x12',             # live 0x12 on the vendor hidraw
-    reload_on_apply=True,                    # EXPERIMENT: 8K writes read back OK but
-                                             # don't hit live output; nudge a reload
-                                             # via profile-reselect after Save
     profile_banks=(1, 2, 3, 4),             # 4 profiles, confirmed via the app
     can_flash=False,                        # loader identity + flash geometry unknown
     factory_reset=False,

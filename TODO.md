@@ -21,12 +21,6 @@ them into the CHANGELOG so this file doesn't grow stale.
       `RenderLoop::activeWindowControlsVrrRefreshRate()` during compositor teardown,
       on multi-output + hybrid NVIDIA/AMD. Workaround: System Settings → Display →
       Adaptive Sync → *Never*. Worth reporting upstream to KDE.
-- [ ] **8K `reload_on_apply` nudge may be unnecessary** *(2026-07-14)*. The
-      profile-reselect after Save was added while chasing the 8K analog bug; the real
-      fix was the correct register addresses, so the 8K likely applies writes live
-      without it (motion did). Test with `G7_8K.reload_on_apply = False`; if stick/
-      trigger edits still take effect live, remove the nudge — it was the likely cause
-      of the transient "triggers 0–0 after a page switch" re-reads.
 
 ## ✨ Enhancements / proposed changes
 

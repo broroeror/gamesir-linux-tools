@@ -1761,16 +1761,6 @@ class GamesirBridge(QObject):
                                    # commands (a multi-byte curve block right after
                                    # another edit is the classic casualty); pace
                                    # each write like the reset path already does
-            # Reload nudge: some models (8K) latch the ACTIVE profile's shaping and
-            # only re-read it from the bank on a profile (re)select -- a bare
-            # register write updates storage (read-back confirms) but not the LIVE
-            # output. Re-select the current profile to force that reload. The
-            # Cyclone applies writes live regardless, so this is a harmless no-op
-            # there. Gated to models that ask for it via `reload_on_apply`.
-            if (written and getattr(self._prof, 'reload_on_apply', False)
-                    and state['profile'] and gen == control.generation()):
-                control.set_profile(state['profile'])
-                time.sleep(0.06)
             self._verify_applied(bank, written, gen)
         threading.Thread(target=run, daemon=True).start()
         self._pending = {}
