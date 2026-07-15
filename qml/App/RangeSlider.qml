@@ -7,9 +7,12 @@ Item {
     property real to: 100
     property real lo: 0
     property real hi: 100
+    // Snap increment. 1 = whole units (Cyclone %); 0.1 lets the 8K expose its finer
+    // (16-bit) deadzone resolution.
+    property real step: 1
     // Handles can never collapse onto each other: the firmware bricks a stick
     // when deadzone min == max, and equal handles can't be pulled back apart.
-    property int minGap: 1
+    property real minGap: 1
     signal moved(real lo, real hi)
 
     implicitHeight: 18
@@ -40,7 +43,8 @@ Item {
         property int active: -1
         function val(mx) { return r.from + Math.max(0, Math.min(1, mx / track.width)) * (r.to - r.from) }
         function apply(v) {
-            v = Math.round(v)
+            v = Math.round(v / r.step) * r.step
+            v = Math.round(v * 10) / 10          // kill float drift at 0.1 steps
             // Enforce the gap so the handles can never sit on top of each other.
             if (active === 0) r.lo = Math.max(r.from, Math.min(v, r.hi - r.minGap))
             else r.hi = Math.min(r.to, Math.max(v, r.lo + r.minGap))

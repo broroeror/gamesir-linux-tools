@@ -600,7 +600,7 @@ class GamesirBridge(QObject):
         for key, (addr, _lbl) in self._scalars.items():
             b = vals[addr]
             if p.dz_wide and key in _WIDE_SCALAR_KEYS and len(b) >= 2:
-                out[key] = round(((b[0] << 8) | b[1]) / 10.0)   # 16-bit percent×10 -> %
+                out[key] = round(((b[0] << 8) | b[1]) / 10.0, 1)   # 16-bit ×10 -> % (0.1)
             else:
                 out[key] = b[0]
         remap = {}
@@ -1582,6 +1582,12 @@ class GamesirBridge(QObject):
         seeds its controls from this on configLoaded."""
         return dict(self._config)
 
+    @Property(float, notify=controllerChanged)
+    def deadzoneStep(self):
+        """Deadzone/anti-deadzone slider snap increment: 0.1 on models that store
+        them at 16-bit resolution (8K exposes 0.1% steps), else 1 (whole %)."""
+        return 0.1 if self._prof.dz_wide else 1.0
+
     @Property('QVariantList', notify=controllerChanged)
     def pollRates(self):
         return list(self._prof.POLL_RATES)
@@ -1621,18 +1627,19 @@ class GamesirBridge(QObject):
     # (its address map omits it), mirroring the read side (_build_config): without
     # them a partially-mapped model would KeyError in the Qt slot, and setPoll
     # would stage a None address that crashes the Apply worker at `addr + i`.
-    @Slot(str, int)
+    @Slot(str, float)
     def setScalar(self, key, value):
         if key not in self._scalars:
             return
         addr, label = self._scalars[key]
-        v = int(value)
         if self._prof.dz_wide and key in _WIDE_SCALAR_KEYS:
-            w = max(0, min(1000, v * 10))            # percent -> 16-bit big-endian ×10
+            w = max(0, min(1000, int(round(value * 10))))   # percent (0.1 steps) -> 16-bit ×10
             data = [(w >> 8) & 0xFF, w & 0xFF]
+            disp = '%.1f' % (w / 10.0)
         else:
-            data = [max(0, min(255, v))]
-        self._queue(addr, data, label, str(v))
+            data = [max(0, min(255, int(round(value))))]
+            disp = str(data[0])
+        self._queue(addr, data, label, disp)
 
     @Slot(str, int)
     def setTraj(self, side, index):

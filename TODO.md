@@ -36,10 +36,6 @@ them into the CHANGELOG so this file doesn't grow stale.
       `research/` is already done — see the CHANGELOG.)*
 - [ ] **Restore: per-block verify detail.** The write-verify-retry already reports
       pass/fail; could add a "verify only" action or a list of any unconfirmed blocks.
-- [ ] **Expose the 8K's fine deadzone precision** *(2026-07-14)*. The 8K stores
-      stick/trigger deadzones as 16-bit (0.1% steps) and the official app shows one
-      decimal; our sliders are whole-percent (0–100), so we round it off. Optionally
-      give the 8K 0.1% sliders (Cyclone stays integer %).
 - [ ] **Hair-trigger min/max thresholds** *(2026-07-14)*. Mode presets bake in min/max
       (Off 10/90, Adaptive 1/100). The adjustable thresholds are mapped (8K LT
       `0x0365`/`0x0366`, RT `+0x20`; Cyclone equivalents TBD) — could expose min/max

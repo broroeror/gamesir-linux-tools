@@ -25,6 +25,10 @@ Item {
     // gentle floor so they stay legible — so FitScroll can actually make them fit.
     readonly property real lvScale: Math.max(0.62, Theme.vComp)
 
+    // Header formatting for deadzone values: one decimal on a 0.1-step model (the
+    // 8K's 16-bit deadzones), whole percent otherwise.
+    function fmtDz(v) { return bridge.deadzoneStep < 1 ? v.toFixed(1) : Math.round(v).toString() }
+
     // Warp a preset's standard points to an intensity, mirroring gamesir_config
     // .warp_points so the graph updates live as the slider drags (blend between
     // the preset points P and their y=x reflection).
@@ -155,9 +159,10 @@ Item {
 
             Card {
                 title: "Deadzone"; Layout.fillWidth: true
-                headerValue: dz.lo + "–" + dz.hi; spacing: 8
+                headerValue: root.fmtDz(dz.lo) + "–" + root.fmtDz(dz.hi); spacing: 8
                 RangeSlider {
                     id: dz; width: parent.width; from: 0; to: 100; lo: 0; hi: 100
+                    step: bridge.deadzoneStep
                     onMoved: { bridge.setScalar(root.side + "_dz_min", lo)
                                bridge.setScalar(root.side + "_dz_max", hi) }
                 }
@@ -165,9 +170,10 @@ Item {
 
             Card {
                 title: "Anti-Deadzone"; Layout.fillWidth: true
-                headerValue: adz.lo + "–" + adz.hi; spacing: 8
+                headerValue: root.fmtDz(adz.lo) + "–" + root.fmtDz(adz.hi); spacing: 8
                 RangeSlider {
                     id: adz; width: parent.width; from: 0; to: 100; lo: 0; hi: 100
+                    step: bridge.deadzoneStep
                     onMoved: { bridge.setScalar(root.side + "_adz_min", lo)
                                bridge.setScalar(root.side + "_adz_max", hi) }
                 }
