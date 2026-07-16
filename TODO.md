@@ -12,11 +12,6 @@ them into the CHANGELOG so this file doesn't grow stale.
 
 ## 🐞 Known bugs / rough edges
 
-- [ ] **Restore only covers the active profile + lighting.** Banks `0x02`–`0x04`
-      (the stored, non-active profiles) appear read-only when written directly, so
-      Restore can't push them. Likely fix: switch to profile N so it loads into
-      bank `0x01`, write there, repeat — depends on the profile-switch→bank-sync
-      question below.
 - [ ] *(environment, not this app)* **KWin 6.7 logout SIGSEGV** in
       `RenderLoop::activeWindowControlsVrrRefreshRate()` during compositor teardown,
       on multi-output + hybrid NVIDIA/AMD. Workaround: System Settings → Display →
@@ -84,8 +79,6 @@ and a **GameSir G7 Pro**. *(Full per-controller findings in **[RESEARCH.md](RESE
       clears). Remaining: capture the **Cyclone** applying an L4/R4 + View/Menu remap
       to confirm those *source*-slot addresses on the Cyclone specifically (the G7 slot
       bases may differ) and that it accepts the writes.
-- [ ] **Profile-switch → bank sync:** how a `SET-PROFILE` syncs bank `0x01` to a store.
-      Unlocks restoring profiles 2–4 (above).
 - [ ] **PS4 / Switch-mode input parsing** — the vendor channel is Xbox-only; other
       modes need their own report parser.
 

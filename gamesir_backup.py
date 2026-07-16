@@ -32,6 +32,7 @@ import gamesir_control as control
 import gamesir_config as cfg
 import controller_profile as ctrl
 import gamesir_led as led
+from gs_state import state
 import gamesir_led8k as led8k
 import gamesir_motion as motion
 import gamesir_macro as macro
@@ -240,7 +241,6 @@ def _writes_from(data):
 # around 56 bytes, so a 124-byte lighting record can't be verified in one read.
 WRITE_CHUNK = 48
 MAX_PASSES = 3                 # write -> verify -> re-write dropped, up to N times
-CRITICAL_BANKS = (0x01, led.LED_BANK)   # active profile + lighting: must verify
 
 
 def _expand_units(writes):
@@ -285,6 +285,9 @@ def _validate_writes(writes):
                              f'{len(byts)} bytes)')
 
 
+PROFILE_SETTLE = 0.2       # let a SET-PROFILE land before writing its bank
+
+
 def apply_backup(data, on_progress=None, on_done=None):
     """Write a loaded snapshot back to the controller on a daemon thread, then
     READ IT BACK and re-write whatever didn't take - the controller silently
@@ -292,9 +295,11 @@ def apply_backup(data, on_progress=None, on_done=None):
     record). on_progress(done, total) fires as blocks confirm; on_done(ok, message)
     fires once.
 
-    Banks 0x02-0x04 are the stored (non-active) profiles, which the controller
-    appears to expose read-only; they're written best-effort but not required to
-    confirm, so they don't mask a genuine failure in the active profile/lighting.
+    A profile bank (0x01-0x04) only accepts writes/reads while THAT profile is the
+    active one (confirmed from official-app captures: it sends `SET-PROFILE N` then
+    writes bank 0x0N). So we restore one profile at a time - switch to N, write +
+    verify bank N - then restore whichever profile was active before. Lighting
+    (bank 0x20) is global and needs no switch.
 
     Raises ValueError (before spawning the worker) on a backup whose write plan
     escapes the controller's known register map -- see _validate_writes."""
@@ -302,58 +307,72 @@ def apply_backup(data, on_progress=None, on_done=None):
     _validate_writes(writes)
     units = _expand_units(writes)
     total = len(units)
+    prof = ctrl.active()
 
     def run():
-        style = ctrl.active().write_style   # capture once: consistent framing
+        style = prof.write_style            # capture once: consistent framing
         gen = control.generation()          # pin to this device session
-        pending = list(units)
+        original = state.get('profile') or (prof.profile_banks[0] if prof.profile_banks else 1)
+
+        by_bank = {}
+        for u in units:
+            by_bank.setdefault(u[0], []).append(u)
+
         confirmed = []
-        for _pass in range(MAX_PASSES):
-            # 1. (re)write the not-yet-confirmed units (write_reg paces ~20ms each).
-            #    write_reg refuses once the handle is rebound, so a controller
-            #    switch mid-restore leaves the new unit untouched -- the pass then
-            #    fails to verify and the restore is reported as incomplete.
-            for bank, addr, byts in pending:
-                control.write_reg(bank, addr, byts, write_style=style, gen=gen)
 
-            # 2. read them all back through the reader thread's request/poll layer
-            control.request_regs([(b, a, len(by)) for b, a, by in pending])
-            keys = [(b, a) for b, a, _by in pending]
-            deadline = time.time() + READ_TIMEOUT
-            while time.time() < deadline:
-                got = sum(control.reg_result(b, a) is not None for b, a in keys)
+        def verify_group(group):
+            """Write + read-back-verify one bank's units (up to MAX_PASSES). Returns
+            the units that still couldn't be confirmed. Assumes the right profile is
+            already active for a profile bank."""
+            pend = list(group)
+            for _pass in range(MAX_PASSES):
+                for bank, addr, byts in pend:
+                    control.write_reg(bank, addr, byts, write_style=style, gen=gen)
+                control.request_regs([(b, a, len(by)) for b, a, by in pend])
+                keys = [(b, a) for b, a, _by in pend]
+                deadline = time.time() + READ_TIMEOUT
+                while time.time() < deadline:
+                    got = sum(control.reg_result(b, a) is not None for b, a in keys)
+                    if on_progress:
+                        on_progress(min(total, len(confirmed) + got), total)
+                    if got >= len(keys):
+                        break
+                    time.sleep(0.1)
+                still = []
+                for bank, addr, byts in pend:
+                    back = control.reg_result(bank, addr)
+                    if back is not None and list(back) == byts:
+                        confirmed.append((bank, addr, byts))
+                    else:
+                        still.append((bank, addr, byts))
+                pend = still
                 if on_progress:
-                    on_progress(len(confirmed) + got, total)
-                if got >= len(keys):
+                    on_progress(len(confirmed), total)
+                if not pend:
                     break
-                time.sleep(0.1)
+            return pend
 
-            # 3. keep only the units whose read-back doesn't match what we wrote
-            still = []
-            for bank, addr, byts in pending:
-                back = control.reg_result(bank, addr)
-                if back is not None and list(back) == byts:
-                    confirmed.append((bank, addr, byts))
-                else:
-                    still.append((bank, addr, byts))
-            pending = still
-            if on_progress:
-                on_progress(len(confirmed), total)
-            if not pending:
-                break
+        pending = []
+        # profile banks: switch to each profile before writing/verifying its bank.
+        for n in prof.profile_banks:
+            if n in by_bank:
+                control.set_profile(n)
+                time.sleep(PROFILE_SETTLE)
+                pending += verify_group(by_bank[n])
+        # non-profile banks (lighting 0x20): global, no switch needed.
+        for bank, group in by_bank.items():
+            if bank not in prof.profile_banks:
+                pending += verify_group(group)
+        # leave the controller on whichever profile the user had active.
+        control.set_profile(original)
+        time.sleep(PROFILE_SETTLE)
 
         if on_done:
-            crit_fail = [u for u in pending if u[0] in CRITICAL_BANKS]
             if not pending:
-                on_done(True, f'Restored and verified all {total} register blocks.')
-            elif not crit_fail:
-                on_done(True, f'Restored & verified the active profile + lighting '
-                              f'({len(confirmed)}/{total}). The {len(pending)} '
-                              'unconfirmed blocks are the stored profiles 2-4 '
-                              '(read-only on this controller) - not used live.')
+                on_done(True, f'Restored and verified all {total} register blocks '
+                              'across every profile + lighting.')
             else:
-                on_done(False, f'Restored {len(confirmed)}/{total}; {len(crit_fail)} '
-                               'active-profile/lighting blocks were dropped and '
-                               'could not be confirmed - click Restore again.')
+                on_done(False, f'Restored {len(confirmed)}/{total}; {len(pending)} '
+                               'blocks could not be confirmed - click Restore again.')
 
     threading.Thread(target=run, daemon=True).start()
