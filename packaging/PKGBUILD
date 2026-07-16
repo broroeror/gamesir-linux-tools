@@ -15,7 +15,7 @@ pkgdesc="Configure the GameSir Cyclone 2 controller (lighting, sticks, triggers,
 arch=('any')
 url="https://github.com/broroeror/gamesir-PenGUIcken"
 license=('MIT')
-depends=('python' 'python-pyside6' 'python-hidapi')
+depends=('python' 'pyside6' 'python-hidapi')
 optdepends=('python-crcmod: firmware flashing (jl-uboot-tool)'
             'python-yaml: firmware flashing (jl-uboot-tool)'
             'python-pycryptodomex: firmware flashing (jl-uboot-tool)'

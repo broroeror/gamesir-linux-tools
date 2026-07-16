@@ -33,16 +33,16 @@ confirm() {
 # 1. dependencies -----------------------------------------------------------
 missing=()
 command -v python3 >/dev/null || missing+=("python")
-python3 -c 'import PySide6' 2>/dev/null || missing+=("python-pyside6")
+python3 -c 'import PySide6' 2>/dev/null || missing+=("pyside6")
 python3 -c 'import hid'     2>/dev/null || missing+=("python-hidapi")
 if [ ${#missing[@]} -ne 0 ]; then
   echo
   echo "==> Missing dependencies: ${missing[*]}"
   if command -v pacman >/dev/null; then
     echo "    These can be installed with (uses sudo):"
-    echo "        sudo pacman -S --needed python python-pyside6 python-hidapi"
+    echo "        sudo pacman -S --needed python pyside6 python-hidapi"
     if confirm "    Run that now?"; then
-      sudo pacman -S --needed python python-pyside6 python-hidapi
+      sudo pacman -S --needed python pyside6 python-hidapi
     else
       echo "    Skipped. Install them yourself, then re-run this script."; exit 1
     fi

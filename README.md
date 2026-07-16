@@ -80,13 +80,13 @@ cd packaging && makepkg -si
 - Python 3
 - [`hidapi`](https://pypi.org/project/hidapi/) (`import hid`)
 - [`PySide6`](https://pypi.org/project/PySide6/) — for the Qt app
-  (Arch: `python-pyside6`)
+  (Arch: `pyside6`)
 - [`dearpygui`](https://pypi.org/project/dearpygui/) — only for the legacy app
 - `xrandr` (optional; legacy app's window placement)
 
 ```sh
 # Arch
-sudo pacman -S --needed python python-pyside6 python-hidapi
+sudo pacman -S --needed python pyside6 python-hidapi
 # or via pip
 pip install hidapi PySide6
 ```
