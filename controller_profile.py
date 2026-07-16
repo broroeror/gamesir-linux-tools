@@ -182,14 +182,16 @@ class ControllerProfile:
         read 2 bytes on a 16-bit model (dz_wide) else 1; curve blocks read their
         format length; other scalars read 1. Skips unsupported (None) fields."""
         dzlen = 2 if self.dz_wide else 1
-        bytes1 = [self.VIB_L, self.VIB_R, self.POLL_RATE,
-                  self.LT_HAIR, self.RT_HAIR, self.ST_TRAJ, self.RS_TRAJ]
+        bytes1 = [self.VIB_L, self.VIB_R, self.POLL_RATE, self.ST_TRAJ, self.RS_TRAJ]
         dz = [self.LT_DZ_MIN, self.LT_DZ_MAX, self.LT_ADZ_MIN, self.LT_ADZ_MAX,
               self.RT_DZ_MIN, self.RT_DZ_MAX, self.RT_ADZ_MIN, self.RT_ADZ_MAX,
               self.ST_DZ_MIN, self.ST_DZ_MAX, self.ST_ADZ_MIN, self.ST_ADZ_MAX,
               self.RS_DZ_MIN, self.RS_DZ_MAX, self.RS_ADZ_MIN, self.RS_ADZ_MAX]
         fields = [(a, 1) for a in bytes1 if a is not None]
         fields += [(a, dzlen) for a in dz if a is not None]
+        # Hair-trigger is a [mode, min, max] block: read all 3 so the editor can show
+        # the adjustable min/max thresholds, not just the mode.
+        fields += [(a, 3) for a in (self.LT_HAIR, self.RT_HAIR) if a is not None]
         for key, base in (('st', self.ST_CURVE), ('rs', self.RS_CURVE),
                           ('lt', self.LT_CURVE), ('rt', self.RT_CURVE)):
             if base is not None:

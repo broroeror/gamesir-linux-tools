@@ -590,8 +590,13 @@ class GamesirBridge(QObject):
         out = {}
         if p.ST_TRAJ is not None:  out['st_traj'] = cfg.enum_index(g(p.ST_TRAJ), cfg.TRAJ)
         if p.RS_TRAJ is not None:  out['rs_traj'] = cfg.enum_index(g(p.RS_TRAJ), cfg.TRAJ)
-        if p.LT_HAIR is not None:  out['lt_hair'] = cfg.enum_index(g(p.LT_HAIR), cfg.HAIR_MODES)
-        if p.RT_HAIR is not None:  out['rt_hair'] = cfg.enum_index(g(p.RT_HAIR), cfg.HAIR_MODES)
+        def hair(side, addr):
+            b = vals[addr]           # [mode, min, max]
+            out[side + '_hair'] = cfg.enum_index(b[0], cfg.HAIR_MODES)
+            out[side + '_hair_min'] = b[1] if len(b) > 1 else 10
+            out[side + '_hair_max'] = b[2] if len(b) > 2 else 90
+        if p.LT_HAIR is not None:  hair('lt', p.LT_HAIR)
+        if p.RT_HAIR is not None:  hair('rt', p.RT_HAIR)
         if p.ST_CURVE is not None: out['st_curve'] = curve('st', p.ST_CURVE)
         if p.RS_CURVE is not None: out['rs_curve'] = curve('rs', p.RS_CURVE)
         if p.LT_CURVE is not None: out['lt_curve'] = curve('lt', p.LT_CURVE)
@@ -803,6 +808,12 @@ class GamesirBridge(QObject):
                 a = getattr(prof, attr, None)
                 if a is not None:
                     regs[(bank, a)] = self._default_curve_bytes(prof, key)
+            # hair-trigger is read as a 3-byte [mode, min, max] block, so give the
+            # demo a real block (Off, default 10/90 thresholds) instead of one byte.
+            for attr in ('LT_HAIR', 'RT_HAIR'):
+                a = getattr(prof, attr, None)
+                if a is not None:
+                    regs[(bank, a)] = [0, 10, 90]
         return regs
 
     def _bind_demo(self, prof):
@@ -1657,6 +1668,32 @@ class GamesirBridge(QObject):
         self._queue(self._hair_addr[side], list(data), side.upper() + ' hair-trigger', name)
 
     @Slot(str, int)
+    def setHairMin(self, side, value):
+        """Hair-trigger min threshold (byte at the hair block +1)."""
+        if side not in self._hair_addr:
+            return
+        v = max(0, min(100, int(value)))
+        self._queue(self._hair_addr[side] + 1, [v], side.upper() + ' hair min', v)
+
+    @Slot(str, int)
+    def setHairMax(self, side, value):
+        """Hair-trigger max threshold (byte at the hair block +2)."""
+        if side not in self._hair_addr:
+            return
+        v = max(0, min(100, int(value)))
+        self._queue(self._hair_addr[side] + 2, [v], side.upper() + ' hair max', v)
+
+    @Property('QVariantList', constant=True)
+    def hairModePresets(self):
+        """Per-mode [min, max] the mode preset writes, or null if the mode keeps the
+        current thresholds (Fixed). Lets the editor snap the min/max sliders when a
+        mode is picked, matching what the device just stored."""
+        out = []
+        for _name, block in cfg.HAIR_MODES:
+            out.append([block[1], block[2]] if len(block) >= 3 else None)
+        return out
+
+    @Slot(str, int)
     def setPoll(self, index):
         if self._prof.POLL_RATE is None:
             return
@@ -1736,7 +1773,15 @@ class GamesirBridge(QObject):
         elif addr in self._addr_to_traj:
             self._config[self._addr_to_traj[addr] + '_traj'] = cfg.enum_index(data[0], cfg.TRAJ)
         elif addr in self._addr_to_hair:
-            self._config[self._addr_to_hair[addr] + '_hair'] = cfg.enum_index(data[0], cfg.HAIR_MODES)
+            side = self._addr_to_hair[addr]
+            self._config[side + '_hair'] = cfg.enum_index(data[0], cfg.HAIR_MODES)
+            if len(data) >= 3:                       # full [mode,min,max] block write
+                self._config[side + '_hair_min'] = data[1]
+                self._config[side + '_hair_max'] = data[2]
+        elif (addr - 1) in self._addr_to_hair:       # individual min-threshold byte
+            self._config[self._addr_to_hair[addr - 1] + '_hair_min'] = data[0]
+        elif (addr - 2) in self._addr_to_hair:       # individual max-threshold byte
+            self._config[self._addr_to_hair[addr - 2] + '_hair_max'] = data[0]
         elif addr == self._prof.POLL_RATE:
             self._config['poll'] = data[0]
         elif addr in self._addr_to_remap:

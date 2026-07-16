@@ -97,6 +97,10 @@ Item {
         intenSlider.value = intensity
         curve.setPoints(cv && cv.points ? cv.points : [[40, 41], [128, 128], [215, 214]])
         typeIdx = isStick ? c[side + "_traj"] : c[side + "_hair"]
+        if (!isStick) {                       // hair-trigger min/max thresholds
+            if (c[side + "_hair_min"] !== undefined) hairRange.lo = c[side + "_hair_min"]
+            if (c[side + "_hair_max"] !== undefined) hairRange.hi = c[side + "_hair_max"]
+        }
         seeded = true
     }
     Component.onCompleted: seed()
@@ -235,9 +239,34 @@ Item {
                             onClicked: {
                                 root.typeIdx = index
                                 if (root.isStick) bridge.setTraj(root.side, index)
-                                else bridge.setHair(root.side, index)
+                                else {
+                                    bridge.setHair(root.side, index)
+                                    // the mode preset also (re)writes min/max; snap the
+                                    // sliders to match what the device just stored.
+                                    var pre = bridge.hairModePresets[index]
+                                    if (pre) { hairRange.lo = pre[0]; hairRange.hi = pre[1] }
+                                }
                             }
                         }
+                    }
+                }
+                // Adjustable min/max thresholds — only meaningful for Adaptive/Fixed.
+                Column {
+                    width: parent.width; spacing: 6; topPadding: 6
+                    visible: !root.isStick && root.typeIdx !== 0
+                    Row {
+                        width: parent.width
+                        Text { text: "Threshold"; color: Theme.textDim
+                               font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
+                        Item { width: parent.width - 110; height: 1 }
+                        Text { text: hairRange.lo + "–" + hairRange.hi; color: Theme.text
+                               font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
+                    }
+                    RangeSlider {
+                        id: hairRange
+                        width: parent.width; from: 0; to: 100; lo: 10; hi: 90
+                        onMoved: { bridge.setHairMin(root.side, lo)
+                                   bridge.setHairMax(root.side, hi) }
                     }
                 }
             }

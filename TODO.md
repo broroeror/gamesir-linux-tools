@@ -36,10 +36,6 @@ them into the CHANGELOG so this file doesn't grow stale.
       `research/` is already done — see the CHANGELOG.)*
 - [ ] **Restore: per-block verify detail.** The write-verify-retry already reports
       pass/fail; could add a "verify only" action or a list of any unconfirmed blocks.
-- [ ] **Hair-trigger min/max thresholds** *(2026-07-14)*. Mode presets bake in min/max
-      (Off 10/90, Adaptive 1/100). The adjustable thresholds are mapped (8K LT
-      `0x0365`/`0x0366`, RT `+0x20`; Cyclone equivalents TBD) — could expose min/max
-      sliders when Adaptive/Fixed is selected, for both controllers.
 - [ ] **8K lighting hue accuracy** *(parked)*. The home-ring / controller-light hue
       reads "a little off" vs the physical LED on some colours (the `0xFF` sentinel is
       already capped at 246 = blue). Needs a live hue-sweep calibration or LED-vs-monitor
