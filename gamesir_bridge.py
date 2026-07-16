@@ -1488,6 +1488,11 @@ class GamesirBridge(QObject):
         the rest (8K) get a field-by-field write of documented default values."""
         return profiles.is_recognized() and self._prof.input_style == 'cyclone_0x12'
 
+    @Property(int, notify=controllerChanged)
+    def profileCount(self):
+        """Number of editable profiles on the active controller (4 on both)."""
+        return len(self._prof.profile_banks)
+
     @Property('QVariantList', notify=fwVersionsChanged)
     def fwVersions(self):
         return [f['version'] for f in flash.list_firmware()
@@ -1955,6 +1960,44 @@ class GamesirBridge(QObject):
                 self._write_generic_defaults(bank, style, gen)
             self._loaded_profile = None     # force config re-read after writes land
             self._loaded_led_slot = None    # and lighting re-read
+        threading.Thread(target=run, daemon=True).start()
+
+    @Slot()
+    def resetAllProfiles(self):
+        """Reset ALL profile banks to defaults. A bank is only writable while its
+        profile is active, so switch to each profile, reset its bank, then restore
+        whichever profile was active. Reports through the backup status channel (it
+        lives in the same Backup & Restore panel)."""
+        if not self.profileResetSupported or self._backup_busy:
+            return
+        prof = self._prof
+        banks = prof.profile_banks
+        if not banks:
+            return
+        self._pending = {}
+        self.pendingChanged.emit()
+        self._backup_busy = True
+        self.backupBusyChanged.emit()
+        style = prof.write_style
+        gen = control.generation()
+        original = state.get('profile') or banks[0]
+        def run():
+            try:
+                for i, n in enumerate(banks):
+                    control.set_profile(n)
+                    time.sleep(0.2)
+                    if prof.factory_reset:
+                        factory.restore_default_profile(n, write_style=style, gen=gen)
+                    else:
+                        self._write_generic_defaults(n, style, gen)
+                    self.backupProgress.emit(i + 1, len(banks))
+                control.set_profile(original)
+                time.sleep(0.2)
+                self._loaded_profile = None
+                self._loaded_led_slot = None
+                self._backup_done(True, 'Reset all %d profiles to defaults.' % len(banks))
+            except Exception as e:
+                self._backup_done(False, 'Reset all profiles failed: %s' % e)
         threading.Thread(target=run, daemon=True).start()
 
     # ------------------------------------------------------------- user actions

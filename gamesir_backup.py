@@ -62,6 +62,7 @@ _LED8K_NAMES = {
 # 4 banks + lighting) and the controller drops back-to-back commands (so some get
 # resent), so allow generous headroom.
 READ_TIMEOUT = 120.0
+PROFILE_SETTLE = 0.2       # let a SET-PROFILE land before reading/writing its bank
 
 
 def _profile_fields():
@@ -114,16 +115,40 @@ def export_async(path, on_progress=None, on_done=None):
     keys = [(bank, addr) for bank, addr, _ln in reqs]
     total = len(keys)
 
+    prof = ctrl.active()
+
     def run():
-        control.request_regs(reqs)
-        deadline = time.time() + READ_TIMEOUT
-        while time.time() < deadline:
-            done = sum(control.reg_result(b, a) is not None for b, a in keys)
-            if on_progress:
-                on_progress(done, total)
-            if done >= total:
-                break
-            time.sleep(0.1)
+        original = state.get('profile') or (prof.profile_banks[0] if prof.profile_banks else 1)
+        by_bank = {}
+        for b, a, ln in reqs:
+            by_bank.setdefault(b, []).append((b, a, ln))
+
+        def read_group(group):
+            """Queue one bank's reads and wait for them. reg_result caches persist
+            across banks, so earlier banks stay captured while we move to the next."""
+            control.request_regs(group)
+            gkeys = [(b, a) for b, a, _ln in group]
+            deadline = time.time() + READ_TIMEOUT
+            while time.time() < deadline:
+                if on_progress:
+                    on_progress(sum(control.reg_result(b, a) is not None for b, a in keys), total)
+                if all(control.reg_result(b, a) is not None for b, a in gkeys):
+                    break
+                time.sleep(0.1)
+
+        # A profile bank is only readable while THAT profile is active (same gate as
+        # writes), so switch to each profile before reading its bank; lighting (bank
+        # 0x20) is global. Restore whatever profile was active afterwards.
+        for n in prof.profile_banks:
+            if n in by_bank:
+                control.set_profile(n)
+                time.sleep(PROFILE_SETTLE)
+                read_group(by_bank[n])
+        for bank, group in by_bank.items():
+            if bank not in prof.profile_banks:
+                read_group(group)
+        control.set_profile(original)
+        time.sleep(PROFILE_SETTLE)
 
         vals = {(b, a): control.reg_result(b, a) for b, a in keys}
         missing = [k for k, v in vals.items() if v is None]
@@ -283,9 +308,6 @@ def _validate_writes(writes):
             raise ValueError('backup writes outside the known register map '
                              f'(bank 0x{bank:02x} addr 0x{addr:04x}, '
                              f'{len(byts)} bytes)')
-
-
-PROFILE_SETTLE = 0.2       # let a SET-PROFILE land before writing its bank
 
 
 def apply_backup(data, on_progress=None, on_done=None):

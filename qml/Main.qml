@@ -181,11 +181,21 @@ Window {
                 // (moved here from the Rebinds page). Hidden for controllers with
                 // no reset path (G7/G7 Pro) or when no profile is selected.
                 ConfirmButton {
+                    id: resetBtn
                     Layout.alignment: Qt.AlignVCenter
                     visible: bridge.profile > 0 && bridge.profileResetSupported
                     label: win.width < 1200 ? "↺" : "↺ Reset profile"
                     confirmLabel: "Reset Profile " + bridge.profile + "?"
                     onConfirmed: bridge.resetProfileToDefault()
+                    HoverHandler { id: resetHover }
+                    QQC.ToolTip {
+                        parent: resetBtn
+                        visible: resetHover.hovered
+                        delay: 400
+                        text: "Resets only the current profile (P" + bridge.profile +
+                              ") to defaults.\nReset all " + bridge.profileCount +
+                              " in Settings → Backup & Restore."
+                    }
                 }
 
                 Item { Layout.fillWidth: true }

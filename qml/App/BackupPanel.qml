@@ -47,6 +47,17 @@ Column {
         }
     }
 
+    // Reset every profile back to defaults — the "all 4" counterpart to the top
+    // bar's single-profile reset. Destructive, so it confirms first.
+    ConfirmButton {
+        visible: bridge.profileResetSupported
+        enabled: !bridge.backupBusy
+        opacity: enabled ? 1 : 0.5
+        label: "Reset all profiles to defaults"
+        confirmLabel: "Reset ALL " + bridge.profileCount + " profiles?"
+        onConfirmed: bridge.resetAllProfiles()
+    }
+
     // progress
     Rectangle {
         visible: bridge.backupBusy || panel.progTotal > 0
