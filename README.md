@@ -53,8 +53,8 @@ mouse-mode toggle.
 On **Arch / KDE**, one command after cloning:
 
 ```sh
-git clone https://github.com/broroeror/gamesir-PenGUIcken.git
-cd gamesir-PenGUIcken
+git clone https://github.com/broroeror/gamesir-linux-tools.git
+cd gamesir-linux-tools
 ./install.sh
 ```
 

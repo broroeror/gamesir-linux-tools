@@ -13,7 +13,7 @@ pkgver=0.2.0dev
 pkgrel=1
 pkgdesc="Configure game controller lighting, sticks, triggers and buttons on Linux"
 arch=('any')
-url="https://github.com/broroeror/gamesir-PenGUIcken"
+url="https://github.com/broroeror/gamesir-linux-tools"
 license=('MIT')
 depends=('python' 'python-pyside6' 'python-hidapi')
 makedepends=('git')
@@ -55,6 +55,10 @@ package() {
 exec python3 /usr/share/deadband/deadband.py "$@"
 EOF
   chmod 755 "$pkgdir/usr/bin/deadband"
+
+  # licence: MIT is not one of Arch's "common" licences, so the package must ship
+  # its own copy under /usr/share/licenses/<pkgname>/
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 
   # udev rule (vendor-scoped uaccess; no replug needed after trigger)
   install -Dm644 70-gamesir.rules "$pkgdir/usr/lib/udev/rules.d/70-gamesir.rules"
