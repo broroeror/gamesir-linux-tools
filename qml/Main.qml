@@ -178,6 +178,10 @@ Window {
                 anchors.fill: parent
                 anchors.leftMargin: 20
                 anchors.rightMargin: 68     // reserve space for the pinned gear (right)
+                // NOTE: do NOT clip this row to stop overflow reaching the gear --
+                // HelpIcon's bubble is a plain child drawn BELOW the 58px bar (not a
+                // Popup), so clipping here cuts the mouse-mode tooltip in half. The
+                // compact thresholds below are what keep the bar inside its bounds.
                 spacing: win.width < 1000 ? 10 : 18
 
                 // Logo — doubles as the DEMO indicator: in demo mode the tile shows
@@ -228,7 +232,12 @@ Window {
                     names: win.controllerNames
                 }
 
-                ProfileBar { compact: win.width < 1200 }
+                // Expand only once the full-width bar actually fits. MEASURED: expanded
+                // row implicitWidth peaks at ~1211 (cozy density, connected controller)
+                // + 20 left margin + 68 gear reserve = 1299, so 1200 overflowed by ~99px
+                // and the status text ran under the gear. 1320 leaves headroom for the
+                // widest live content.
+                ProfileBar { compact: win.width < 1320 }
 
                 // Reset the ACTIVE profile to its factory defaults — lives beside
                 // the profile pills since it acts on whichever profile is selected
@@ -238,7 +247,7 @@ Window {
                     id: resetBtn
                     Layout.alignment: Qt.AlignVCenter
                     visible: bridge.profile > 0 && bridge.profileResetSupported
-                    label: win.width < 1200 ? "↺" : "↺ Reset profile"
+                    label: win.width < 1320 ? "↺" : "↺ Reset profile"
                     confirmLabel: "Reset Profile " + bridge.profile + "?"
                     onConfirmed: bridge.resetProfileToDefault()
                     HoverHandler { id: resetHover }
