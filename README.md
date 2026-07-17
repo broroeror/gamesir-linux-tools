@@ -41,13 +41,10 @@ This is a hobby reverse-engineering project; fork it and customize it however yo
 
 ## The app
 
-There are two frontends over the same reverse-engineered core:
-
-- **`gamesir_qt.py`** — the **Qt/QML app** (PySide6): a polished, KDE-native UI
-  with a live controller render, per-zone RGB + keyframes, stick/trigger curves,
-  button remap, vibration, backup/restore, and a mouse-mode toggle. This is the
-  one you install below.
-- **`gamesir_gui.py`** — the original Dear PyGui app, kept as a lean fallback.
+**`gamesir_qt.py`** — the **Qt/QML app** (PySide6): a polished, KDE-native UI over
+the reverse-engineered core, with a live controller render, per-zone RGB +
+keyframes, stick/trigger curves, button remap, vibration, backup/restore, and a
+mouse-mode toggle.
 
 ## Install (Qt app)
 
@@ -81,8 +78,6 @@ cd packaging && makepkg -si
 - [`hidapi`](https://pypi.org/project/hidapi/) (`import hid`)
 - [`PySide6`](https://pypi.org/project/PySide6/) — for the Qt app
   (Arch: `python-pyside6`)
-- [`dearpygui`](https://pypi.org/project/dearpygui/) — only for the legacy app
-- `xrandr` (optional; legacy app's window placement)
 
 ```sh
 # Arch
@@ -110,7 +105,7 @@ sudo udevadm control --reload-rules && sudo udevadm trigger
 Then run (no replug needed — the trigger re-applies the access ACL):
 
 ```sh
-python3 gamesir_gui.py
+python3 gamesir_qt.py
 ```
 
 The rule uses `TAG+="uaccess"`, which grants access to the user logged in at the
@@ -127,7 +122,7 @@ To confirm it worked, the controller's node should show your ACL:
 nodes are root-owned by default, so:
 
 ```sh
-sudo python3 gamesir_gui.py
+sudo python3 gamesir_qt.py
 ```
 
 Note that under `sudo`, `~` resolves to `/root`, so the default Backup path lands
