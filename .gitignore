@@ -40,3 +40,8 @@ firmware/
 # optional firmware Backup & Restore feature needs. NOT bundled/redistributed:
 # install it here yourself (see FIRMWARE.md). Ignored so it's never committed.
 jl-uboot-tool/
+
+# Superseded/experimental code kept locally for reference, out of the published
+# repo. Nothing here is imported by the app; history for anything moved here is
+# still in git (git log --follow / git show <sha>:<path>).
+attic/
