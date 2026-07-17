@@ -14,7 +14,7 @@ the app's architecture, and reverse-engineering findings, see
 
 ## Using the app
 
-Launch it from your app menu as **GameSir Cyclone 2**, or run `gamesir-cyclone2` from
+Launch it from your app menu as **Deadband**, or run `deadband` from
 a terminal. Everything below assumes the controller is connected and in **Xbox mode**
 (use the Start / pause buttons) — the header shows a warning until it is.
 

@@ -189,7 +189,7 @@ command channel:
         USB  (hidraw, vendor report 0x0F)
           │
           ▼
-   gamesir_reader ──fills──▶ gs_state.state ──reads──▶ GUI (gamesir_qt)
+   gamesir_reader ──fills──▶ gs_state.state ──reads──▶ GUI (deadband)
    (connect/read loop)        (shared dict)                    │
           ▲                                                    │
           └──────────── gamesir_control ◀──────────────────────┘
@@ -204,7 +204,7 @@ command channel:
 - **`gamesir_control`** — the only writer to the device. One hid handle is shared
   across threads behind a lock; every command goes through it, and the handle is
   **rebound on each reconnect**, so nothing caches it.
-- **The GUI** (`gamesir_qt`, Qt/QML) is pure view.
+- **The GUI** (`deadband`, Qt/QML) is pure view.
 
 **Register reads are asynchronous.** The reader owns the handle, so callers **queue**
 reads (`request_regs`); the reader pumps them one-in-flight, resending on timeout (the

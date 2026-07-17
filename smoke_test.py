@@ -41,7 +41,7 @@ def main():
     from gamesir_reader import read_controller, press_select_loop
     from gamesir_bridge import GamesirBridge
 
-    # 1) Start the same daemon threads gamesir_qt.main() starts. A bad import
+    # 1) Start the same daemon threads deadband.main() starts. A bad import
     #    (top-level or lazy) crashes them within milliseconds of the thread start.
     threads = {
         'read_controller': threading.Thread(target=read_controller, daemon=True),

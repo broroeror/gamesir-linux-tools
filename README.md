@@ -1,7 +1,9 @@
-# GameSir Cyclone 2 — Linux control app
+# Deadband — a Linux controller configuration app
 
-A Linux GUI for the GameSir Cyclone 2 controller, driven over the controller's
-vendor (hidraw) interface, reverse-engineered from scratch. It covers:
+A Linux GUI for game controllers, driven over the controller's vendor (hidraw)
+interface, reverse-engineered from scratch. Currently supports the **GameSir
+Cyclone 2** and **G7 Pro 8K** (see Tested hardware); the protocol modules are
+per-vendor, so other manufacturers can be added alongside. It covers:
 
 - **Live input view** — sticks, triggers, all buttons (incl. the L4/R4/M/Home/
   Share extras), D-pad, battery + charging, firmware version, and a mode warning.
@@ -41,7 +43,7 @@ This is a hobby reverse-engineering project; fork it and customize it however yo
 
 ## The app
 
-**`gamesir_qt.py`** — the **Qt/QML app** (PySide6): a polished, KDE-native UI over
+**`deadband.py`** — the **Qt/QML app** (PySide6): a polished, KDE-native UI over
 the reverse-engineered core, with a live controller render, per-zone RGB +
 keyframes, stick/trigger curves, button remap, vibration, backup/restore, and a
 mouse-mode toggle.
@@ -60,9 +62,10 @@ cd gamesir-PenGUIcken
 `sudo` is the one-time udev rule that lets you open the controller without root —
 and it **prompts before running anything privileged**, showing the exact commands
 first. You can decline the udev step; the app still installs and launches, it just
-can't reach the controller until the rule is in place. Afterwards **GameSir
-Cyclone 2** appears in your app launcher (or run `gamesir-cyclone2`). Remove it
-with `./uninstall.sh`.
+can't reach the controller until the rule is in place. Afterwards **Deadband**
+appears in your app launcher (or run `deadband`). Remove it with `./uninstall.sh`.
+Upgrading from the old `gamesir-cyclone2` install? `install.sh` removes it for
+you, and your settings carry over on first run.
 
 Prefer the Arch-native route? A [`packaging/PKGBUILD`](packaging/PKGBUILD) is
 included. It is **not published to the AUR yet**, so `yay`/`paru` can't find it by
@@ -105,7 +108,7 @@ sudo udevadm control --reload-rules && sudo udevadm trigger
 Then run (no replug needed — the trigger re-applies the access ACL):
 
 ```sh
-python3 gamesir_qt.py
+python3 deadband.py
 ```
 
 The rule uses `TAG+="uaccess"`, which grants access to the user logged in at the
@@ -122,7 +125,7 @@ To confirm it worked, the controller's node should show your ACL:
 nodes are root-owned by default, so:
 
 ```sh
-sudo python3 gamesir_qt.py
+sudo python3 deadband.py
 ```
 
 Note that under `sudo`, `~` resolves to `/root`, so the default Backup path lands

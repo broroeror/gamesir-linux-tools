@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Deadband
+GenericName=Controller Configuration
+Comment=Configure game controller lighting, sticks, triggers and buttons
+Exec=deadband
+Icon=deadband
+Terminal=false
+Categories=Settings;HardwareSettings;
+Keywords=controller;gamepad;joystick;rgb;deadzone;gamesir;

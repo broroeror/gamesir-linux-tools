@@ -14,7 +14,7 @@ Window {
     minimumHeight: 620
     visible: true
     color: Theme.bg
-    title: "GameSir Cyclone 2"
+    title: "Deadband"
 
     property int currentTab: 0
     property bool settingsOpen: false
@@ -180,25 +180,39 @@ Window {
                 anchors.rightMargin: 68     // reserve space for the pinned gear (right)
                 spacing: win.width < 1000 ? 10 : 18
 
-                // Logo — doubles as the DEMO indicator: in demo mode the icon shows
+                // Logo — doubles as the DEMO indicator: in demo mode the tile shows
                 // "!" (warn colour) and the wordmark reads "DEMO", so demo state is
                 // obvious without a separate badge crowding the bar.
                 RowLayout {
                     spacing: 8
+                    // The app's own gamepad mark — the launcher icon itself, which is
+                    // already a rounded tile, so it stands in for the old letter tile
+                    // rather than nesting inside one. Vendor-neutral by design.
+                    Image {
+                        visible: !bridge.demoMode
+                        source: assetsDir + "icon-64.png"
+                        Layout.preferredWidth: 26; Layout.preferredHeight: 26
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
+                        mipmap: true            // 64 -> 26 px: avoids aliasing
+                    }
+                    // Demo mode takes the tile's place with a warn-coloured "!".
                     Rectangle {
-                        width: 26; height: 26; radius: 6
-                        color: bridge.demoMode ? Theme.warn : Theme.accent
+                        visible: bridge.demoMode
+                        Layout.preferredWidth: 26; Layout.preferredHeight: 26
+                        radius: 6
+                        color: Theme.warn
                         Text {
                             anchors.centerIn: parent
-                            text: bridge.demoMode ? "!" : "G"; color: "white"
+                            text: "!"; color: "white"
                             font.bold: true; font.pixelSize: 16
                         }
                     }
                     Text {
-                        // "DEMO" is short so it always shows; the longer "GAMESIR"
-                        // wordmark hides when the bar is tight (the icon still brands it).
+                        // "DEMO" is short so it always shows; the longer wordmark
+                        // hides when the bar is tight (the tile still brands it).
                         visible: bridge.demoMode || win.width >= 940
-                        text: bridge.demoMode ? "DEMO" : "GAMESIR"
+                        text: bridge.demoMode ? "DEMO" : "DEADBAND"
                         color: bridge.demoMode ? Theme.warn : Theme.text
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontL
