@@ -304,6 +304,20 @@ def _streams_live_data(devnode, secs=1.0):
     return live
 
 
+def has_live_pad(devnodes):
+    """Is a controller actually BEHIND this USB device, or is it an empty dongle?
+
+    A dongle with nothing paired to it still enumerates and still streams 0x12 —
+    just all-zero — and answers no vendor command at all, so a POPULATED stream is
+    the only reliable signal. Identity is no help: every dongle reports the same
+    firmware-constant USB serial (an 8K's and both Cyclones' read identically), and
+    the pairing address lives in flash, reachable only from the bootloader.
+
+    NOTE a pad in a non-Xbox mode also fails this (the vendor channel is Xbox-only),
+    so callers must not treat False as "definitely no hardware" — see the reader."""
+    return any(_streams_live_data(n) for n in (devnodes or []))
+
+
 def pick_live_node(devnodes):
     """From ONE controller's candidate /dev/hidraw* nodes, return the one that
     carries live enhanced data, or the first if we can't tell. A wired Cyclone

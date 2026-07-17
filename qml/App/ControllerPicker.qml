@@ -16,23 +16,35 @@ Item {
     property var list: bridge.controllers
     property string current: bridge.selectedController
     property bool multi: list.length > 1
+    // {usb port id: friendly name} — user-assigned, owned/persisted by Main.
+    property var names: ({})
+
+    // A user name wins over the model label. Names are keyed by USB PORT (identical
+    // units are indistinguishable over USB — see Main's ctrlNames note), so this is
+    // "what's plugged into that socket", not "which unit".
+    function displayFor(e) {
+        if (!e) return ""
+        var n = names[e.id]
+        return (n && n.length) ? n : e.label
+    }
 
     visible: list.length > 0
     implicitWidth: btn.width
     implicitHeight: btn.height
     onMultiChanged: if (!multi) menu.close()
 
-    function labelFor(id) {
+    function entryFor(id) {
         for (var i = 0; i < list.length; i++)
-            if (list[i].id === id) return list[i].label
-        return list.length > 0 ? list[0].label : ""
+            if (list[i].id === id) return list[i]
+        return list.length > 0 ? list[0] : null
     }
+    function labelFor(id) { return root.displayFor(root.entryFor(id)) }
 
     Rectangle {
         id: btn
         // cap the width so a long controller name elides instead of pushing the
         // rest of the top bar (settings gear) off-screen at narrow widths.
-        readonly property int pad: root.multi ? 56 : 32
+        readonly property int pad: root.multi ? 62 : 38
         width: Math.min(210, Math.max(120, txt.implicitWidth + pad))
         height: 32; radius: 8
         color: (hov.hovered || menu.opened) ? Theme.cardHover : Theme.card
@@ -42,8 +54,14 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             anchors.left: parent.left; anchors.leftMargin: 12
             spacing: 8
-            Rectangle { width: 8; height: 8; radius: 4; color: Theme.accent
-                        anchors.verticalCenter: parent.verticalCenter }
+            // wired/wireless at a glance, in place of the old plain dot
+            ConnIcon {
+                anchors.verticalCenter: parent.verticalCenter
+                property var cur: root.entryFor(root.current)
+                wired: cur ? cur.wired : null
+                live: cur ? cur.live : true
+                tint: (cur && !cur.live) ? Theme.warn : Theme.accent
+            }
             Text {
                 id: txt
                 text: root.labelFor(root.current)
@@ -81,16 +99,40 @@ Item {
                 delegate: Rectangle {
                     required property var modelData
                     width: menu.availableWidth
-                    height: 30; radius: 6
+                    height: 32; radius: 6
                     property bool sel: modelData.id === root.current
                     color: sel ? Theme.accent
                                 : (ihov.hovered ? Theme.cardHover : "transparent")
-                    Text {
+                    Row {
                         anchors.verticalCenter: parent.verticalCenter
                         anchors.left: parent.left; anchors.leftMargin: 10
-                        text: modelData.label
-                        color: parent.sel ? "white" : Theme.text
-                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
+                        anchors.right: parent.right; anchors.rightMargin: 10
+                        spacing: 8
+                        ConnIcon {
+                            anchors.verticalCenter: parent.verticalCenter
+                            wired: modelData.wired
+                            live: modelData.live
+                            tint: parent.parent.sel ? "white"
+                                                    : (modelData.live ? Theme.text : Theme.warn)
+                        }
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: root.displayFor(modelData)
+                            // an empty dongle isn't a controller — de-emphasise it
+                            opacity: modelData.live ? 1 : 0.6
+                            color: parent.parent.sel ? "white" : Theme.text
+                            font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
+                        }
+                        // Only annotate the exceptional case; "Connected" on every
+                        // row would just be noise.
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: !modelData.live
+                            text: "— " + modelData.status
+                            color: parent.parent.sel ? "white" : Theme.warn
+                            opacity: parent.parent.sel ? 0.9 : 1
+                            font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                        }
                     }
                     HoverHandler { id: ihov }
                     TapHandler {

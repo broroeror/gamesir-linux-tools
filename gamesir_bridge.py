@@ -287,7 +287,10 @@ class GamesirBridge(QObject):
             self._status_sig = sig
             self.statusChanged.emit()
 
-        csig = (tuple((c['id'], c['name']) for c in state['controllers']),
+        # live/wired are part of the signature: a pad powering on or off changes
+        # only those, and the picker must repaint its status + icon when it does.
+        csig = (tuple((c['id'], c['name'], c.get('live'), c.get('wired'))
+                      for c in state['controllers']),
                 state['selected'])
         if csig != self._controllers_sig:
             self._controllers_sig = csig
@@ -412,7 +415,8 @@ class GamesirBridge(QObject):
         self._l8 = {
             'mode':        led8k.mode_index(vals[led8k.MODE][0]),
             'bright':      vals[led8k.BRIGHT][0],
-            'quads':       [list(vals[a]) for a in led8k.HOME_Q],  # [hue, byte1] per quadrant
+            # [hue degrees 0..359, saturation 0..100] per quadrant (hue is 16-bit BE)
+            'quads':       [[led8k.quad_hue(vals[a]), vals[a][2]] for a in led8k.HOME_Q],
             'auto':        bool(vals[led8k.AUTO_ONOFF][0]),
             'sleep':       led8k.sleep_index(vals[led8k.SLEEP_TIMER][0]),
             'dock_mode':   min(vals[led8k.DOCK_MODE][0], 1),
@@ -727,9 +731,14 @@ class GamesirBridge(QObject):
 
     @Property('QVariantList', notify=controllersChanged)
     def controllers(self):
-        """All connected controllers for the picker: [{id, name, port, label}].
-        Identical models (serials are empty) get a compact '#n' suffix to keep the
-        top bar tight; the exact USB port stays in `port` for a tooltip / detail."""
+        """Everything plugged in, for the picker:
+        [{id, name, port, label, live, wired, status}].
+
+        Identical models (serials are a shared firmware constant, so they're no help)
+        get a compact '#n' suffix to keep the top bar tight; the exact USB port stays
+        in `port` for a tooltip / detail. `live` is False for a dongle with nothing
+        paired to it — listed as idle rather than hidden, so a plugged-in adapter is
+        visible without pretending to be a controller."""
         clist = state['controllers']
         names = [c['name'] for c in clist]
         out = []
@@ -737,8 +746,11 @@ class GamesirBridge(QObject):
             dup = names.count(c['name']) > 1
             n = sum(1 for j in range(i + 1) if clist[j]['name'] == c['name'])
             label = f"{c['name']} #{n}" if dup else c['name']
+            live = bool(c.get('live'))
             out.append({'id': c['id'], 'name': c['name'],
-                        'port': c['port'], 'label': label})
+                        'port': c['port'], 'label': label,
+                        'live': live, 'wired': c.get('wired'),
+                        'status': 'Connected' if live else 'No controller'})
         return out
 
     @Property(str, notify=controllersChanged)
@@ -847,9 +859,12 @@ class GamesirBridge(QObject):
             state['battery'] = 87
             state['charging'] = False
             state['led_slot'] = 0
+            # Synthetic units are always "a real controller, wired" — demo has no
+            # dongle to be empty, and omitting these would render them all as idle.
             state['controllers'] = [
                 {'id': self._demo_id(p), 'name': p.name, 'port': 'demo',
-                 'pid': p.usb_products[0]} for p in self._DEMO_MODELS]
+                 'pid': p.usb_products[0], 'live': True, 'wired': True}
+                for p in self._DEMO_MODELS]
             self._bind_demo(self._DEMO_MODELS[0])
         else:
             state['demo'] = False
@@ -989,8 +1004,9 @@ class GamesirBridge(QObject):
 
     @Property('QVariantList', notify=light8kLoaded)
     def light8kQuads(self):
-        """Per-quadrant [hue byte 0..255, byte1 0..100]. byte1 is treated as
-        saturation (0 = white). QML renders each as Qt.hsva(hue/360, byte1/100, 1)."""
+        """Per-quadrant [hue DEGREES 0..359, saturation 0..100] (0 = white). QML
+        renders each as Qt.hsva(hue/360, sat/100, 1) — the ring's hue register is
+        the angle in degrees, so no conversion is needed."""
         return [list(q) for q in self._l8.get('quads', [[60, 100]] * 4)]
 
     @Property(bool, notify=light8kLoaded)
@@ -1022,32 +1038,33 @@ class GamesirBridge(QObject):
         self._write8k(led8k.BRIGHT, [v])
 
     @Slot(int, int, int)
-    def setLight8kQuadColor(self, i, hue, byte1):
-        """Set quadrant i to [hue 0..255, byte1 0..100] (byte1 = saturation)."""
-        self.setLight8kQuads([i], hue, byte1)
+    def setLight8kQuadColor(self, i, hue, sat):
+        """Set quadrant i to hue DEGREES (0..359) + saturation (0..100)."""
+        self.setLight8kQuads([i], hue, sat)
 
     @Slot('QVariantList', int, int)
-    def setLight8kQuads(self, indices, hue, byte1):
-        """Set several quadrants to the same [hue, byte1] in ONE paced write — these
-        controllers drop back-to-back vendor commands, so writing each quadrant on
-        its own thread (or with no gap) would silently lose some. Used by the 8K
-        home-ring multi-select."""
+    def setLight8kQuads(self, indices, hue, sat):
+        """Set the given quadrants to the same colour — `hue` in DEGREES (0..359),
+        `sat` 0..100. Used by BOTH the single-quadrant and multi-select home-ring
+        edits. Hue is written as BOTH bytes of the 16-bit register: writing only the
+        low byte leaves a stale high byte that offsets the colour by 256deg."""
         if not self._is_8k_lighting():
             return
-        hue = max(0, min(255, int(hue)))
-        byte1 = max(0, min(100, int(byte1)))
+        hue = max(0, min(led8k.HUE_MAX, int(hue)))
+        sat = max(0, min(100, int(sat)))
         idxs = [int(i) for i in indices if 0 <= int(i) < 4]
         if not idxs:
             return
         q = [list(x) for x in self._l8.get('quads', [[60, 100]] * 4)]
         for i in idxs:
-            q[i] = [hue, byte1]
+            q[i] = [hue, sat]
         self._l8['quads'] = q
+        block = led8k.quad_block(hue, sat)
         style = self._prof.write_style
         gen = control.generation()
         def run():
             for i in idxs:
-                control.write_reg(led8k.BANK, led8k.HOME_Q[i], [hue, byte1],
+                control.write_reg(led8k.BANK, led8k.HOME_Q[i], block,
                                   write_style=style, gen=gen)
                 time.sleep(0.03)      # pace: dropped back-to-back writes otherwise
         threading.Thread(target=run, daemon=True).start()
@@ -1373,6 +1390,20 @@ class GamesirBridge(QObject):
 
     @Slot()
     def restoreLighting(self):
+        """Restore the factory lighting baseline for whichever ring the active
+        controller has: the Cyclone's keyframe records, or the 8K's bank-0x20
+        block (all four quadrants back to yellow). _led_async is keyframe-only, so
+        the 8K needs its own path or the button is a no-op."""
+        if self._is_8k_lighting():
+            style = self._prof.write_style
+            gen = control.generation()
+            def run():
+                control.write_reg(led8k.BANK, led8k.FACTORY_START,
+                                  list(led8k.FACTORY_DATA),
+                                  write_style=style, gen=gen)
+                self._l8_loaded = False     # re-read so the page shows the defaults
+            threading.Thread(target=run, daemon=True).start()
+            return
         _led_async(led.restore_factory)
 
     # ------------------------------------------------------------- mouse mode

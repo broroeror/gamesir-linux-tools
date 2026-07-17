@@ -37,11 +37,46 @@ Window {
         property real   bgDim: 0.55          // 0 = full image .. 1 = full theme bg
         property string bgFill: "crop"       // crop | fit | stretch | tile
     }
+
+    // Friendly per-controller names ("Black", "White"), keyed by USB PORT.
+    //
+    // Port is the ONLY key available: identical models report the same PID, the same
+    // bcdDevice, and a USB serial that is a firmware constant shared across models —
+    // the genuinely unique id (an RF MAC) lives in dongle flash and is readable only
+    // from the bootloader, i.e. never while the device is in use. So a name follows
+    // the PORT, not the hardware: move a dongle to another socket and its name stays
+    // behind. That's a real limitation, surfaced in the UI rather than hidden.
+    Settings {
+        id: ctrlNames
+        category: "controllers"
+        property string namesJson: "{}"     // {usb port id: friendly name}
+    }
     Component.onCompleted: {
         Theme.density = appearance.density
         applyThemeJson()
+        _loadNames()
     }
     function setDensity(d) { Theme.density = d; appearance.density = d }
+
+    // --- controller naming (port-keyed; see the ctrlNames Settings note) ------
+    property var controllerNames: ({})
+    function _loadNames() {
+        try { controllerNames = JSON.parse(ctrlNames.namesJson || "{}") }
+        catch (e) { controllerNames = ({}) }
+    }
+    // friendly name for a port id, or "" when the user hasn't named it
+    function nameFor(id) {
+        var n = controllerNames[id]
+        return (n && n.length) ? n : ""
+    }
+    function setControllerName(id, name) {
+        var o = {}
+        for (var k in controllerNames) o[k] = controllerNames[k]
+        name = (name || "").trim()
+        if (name.length) o[id] = name; else delete o[id]     // blank clears it
+        controllerNames = o                                  // reassign: notifies bindings
+        ctrlNames.namesJson = JSON.stringify(o)
+    }
 
     // --- theme helpers (apply live + persist) --------------------------------
     function _parseTheme() {
@@ -172,7 +207,12 @@ Window {
                     }
                 }
 
-                ControllerPicker { Layout.alignment: Qt.AlignVCenter }
+                // names are port-keyed and live in Main's Settings, so pass the map
+                // down — ControllerPicker is its own file and can't see `win`.
+                ControllerPicker {
+                    Layout.alignment: Qt.AlignVCenter
+                    names: win.controllerNames
+                }
 
                 ProfileBar { compact: win.width < 1200 }
 
@@ -445,6 +485,7 @@ Window {
                 Rectangle { Layout.fillWidth: true; height: 1; color: Theme.cardBorder }
 
                 QQC.ScrollView {
+                    objectName: "settingsScroll"
                     id: scroller
                     Layout.fillWidth: true; Layout.fillHeight: true
                     clip: true
@@ -616,6 +657,72 @@ Window {
                         Divider {}
 
                         // ------------------------------------------ Backup & Restore
+                        SectionHeader { text: "Controllers" }
+                        Text {
+                            width: parent.width; wrapMode: Text.WordWrap
+                            text: "Name each device so the picker shows \"Black\" instead of " +
+                                  "\"Cyclone 2 #1\". Names are remembered per USB port — identical " +
+                                  "models are indistinguishable to the computer, so moving a dongle " +
+                                  "to another port leaves its name behind."
+                            color: Theme.textDim
+                            font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                        }
+                        Column {
+                            width: parent.width
+                            spacing: 8
+                            Text {
+                                visible: bridge.controllers.length === 0
+                                text: "Nothing connected."
+                                color: Theme.textFaint
+                                font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                            }
+                            Repeater {
+                                model: bridge.controllers
+                                delegate: Row {
+                                    required property var modelData
+                                    width: parent.width
+                                    spacing: 10
+                                    ConnIcon {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        wired: modelData.wired
+                                        live: modelData.live
+                                        tint: modelData.live ? Theme.text : Theme.warn
+                                    }
+                                    Column {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 168
+                                        Text {
+                                            text: modelData.label
+                                            color: Theme.text
+                                            font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                                        }
+                                        Text {
+                                            // the port IS the key, so show it rather than
+                                            // implying the name is bound to the hardware
+                                            text: "port " + modelData.port +
+                                                  (modelData.live ? "" : " — " + modelData.status)
+                                            color: modelData.live ? Theme.textFaint : Theme.warn
+                                            font.family: Theme.fontFamily; font.pixelSize: Theme.fontS - 1
+                                        }
+                                    }
+                                    QQC.TextField {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 150
+                                        text: win.nameFor(modelData.id)
+                                        placeholderText: "name…"
+                                        color: Theme.text
+                                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                                        background: Rectangle {
+                                            color: Theme.button; radius: Theme.radiusSm
+                                            border.color: Theme.cardBorder; border.width: 1
+                                        }
+                                        onEditingFinished: win.setControllerName(modelData.id, text)
+                                    }
+                                }
+                            }
+                        }
+
+                        Divider {}
                         SectionHeader { text: "Backup & Restore" }
                         BackupPanel { width: parent.width }
 
@@ -625,13 +732,6 @@ Window {
                         SectionHeader { text: "Firmware Backup & Restore"; visible: bridge.fwSupported }
                         FirmwarePanel { width: parent.width; visible: bridge.fwSupported }
 
-                        Divider {}
-                        SectionHeader { text: "Lighting" }
-                        ConfirmButton {
-                            label: "Restore default lighting"
-                            confirmLabel: "Restore default lighting?"
-                            onConfirmed: bridge.restoreLighting()
-                        }
                     }
                 }
             }

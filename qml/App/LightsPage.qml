@@ -371,6 +371,14 @@ Item {
                 }
             }
 
+            // Rewrites the keyframe records from the factory baseline. Destructive,
+            // so it confirms first.
+            ConfirmButton {
+                label: "Restore default lighting"
+                confirmLabel: "Restore default lighting?"
+                onConfirmed: bridge.restoreLighting()
+            }
+
             Item { Layout.fillHeight: true }
         }
     }

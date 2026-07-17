@@ -17,7 +17,7 @@ import time
 import hid
 
 from gs_common import (find_controllers, pick_live_node, firmware_version,
-                       device_bcd, evdev_port)
+                       device_bcd, evdev_port, has_live_pad)
 from gamesir_enhanced import parse_enhanced
 from gs_state import state
 import gamesir_control as control
@@ -67,14 +67,49 @@ def maintenance_loop(alive):
         time.sleep(0.5)
 
 
+_live_cache = {}       # device identity -> bool (see _probe_live)
+
+
+def _live_key(ctrl):
+    return (ctrl['port'], ctrl['pid'], ctrl.get('product') or '')
+
+
+def _probe_live(ctrl, prof=None):
+    """Is a controller actually behind this device (vs an empty dongle)?
+
+    Probing opens the node for ~1s, so results are CACHED per device identity and
+    only re-probed when that identity changes. That's enough, because a pad powering
+    on/off re-enumerates its dongle (Cyclone 0x0575<->0x100b, 8K 0x0575<->0x10c8),
+    which changes the key on exactly the transitions that matter."""
+    if state.get('driving') == ctrl['id']:
+        return True                       # we're streaming it right now
+    if prof is None:
+        prof = profiles.detect_one(ctrl['pid'], ctrl.get('product'))
+    # The G7 family speaks GIP over evdev and NEVER emits the 0x12 vendor stream,
+    # so the probe can't see it and would brand a perfectly live pad an empty
+    # dongle. We have no empty-vs-live signal for those — assume live.
+    if prof is not None and prof.input_style == 'evdev':
+        return True
+    key = _live_key(ctrl)
+    if key not in _live_cache:
+        _live_cache[key] = has_live_pad(ctrl['nodes'])
+    return _live_cache[key]
+
+
 def _label(ctrl):
     """Public shape of a controller for the UI picker. Uses the product-aware
     detect_one (not PID-only) so the 8K's wireless dongle — which shares the
     Cyclone's 0x0575 PID but reports product 'Gamepad' — is labelled 'G7 Pro 8K',
-    not a third 'Cyclone 2'."""
+    not a third 'Cyclone 2'.
+
+    `live` distinguishes a real controller from a plugged-in but EMPTY dongle (which
+    otherwise shows as a phantom controller); `wired` drives the connection icon."""
     prof = profiles.detect_one(ctrl['pid'], ctrl.get('product'))
+    bcd = device_bcd(ctrl['nodes'][0]) if ctrl['nodes'] else None
     return {'id': ctrl['id'], 'name': prof.short if prof else 'Unknown',
-            'port': ctrl['port'], 'pid': ctrl['pid']}
+            'port': ctrl['port'], 'pid': ctrl['pid'],
+            'live': _probe_live(ctrl, prof),
+            'wired': _is_wired(prof, ctrl['pid'], bcd)}
 
 
 def _publish_controllers(controllers):
@@ -85,12 +120,21 @@ def _publish_controllers(controllers):
 
 def _pick_selected(controllers):
     """Drive the user's selected controller if it's still connected, otherwise
-    default to the first one found."""
+    default to the first one with a real controller behind it.
+
+    An empty dongle is still driveable on purpose: `live` is False both for a dongle
+    with nothing paired AND for a pad in a non-Xbox mode (the vendor channel is
+    Xbox-only), so refusing to drive it would silence the "switch to Xbox mode"
+    warning. Preferring a live unit just means an idle dongle never steals focus
+    from a working controller."""
     sel = state.get('selected')
     for c in controllers:
         if c['id'] == sel:
             return c
-    return controllers[0]
+    return next((c for c in controllers if _probe_live(c)), controllers[0])
+
+
+
 
 
 def read_session(device, driving_id):
@@ -153,10 +197,23 @@ def read_session(device, driving_id):
 
 
 def _rescan():
-    """Re-enumerate controllers and publish the list; returns the controllers."""
+    """Re-enumerate controllers and publish the list; returns the controllers.
+
+    Empty dongles are listed (flagged `live: False`) rather than hidden, so a
+    plugged-in adapter with nothing paired to it is visible AS an idle dongle
+    instead of masquerading as a controller."""
     controllers = find_controllers()
+    _prune_live_cache(controllers)
     _publish_controllers(controllers)
     return controllers
+
+
+def _prune_live_cache(controllers):
+    """Forget probe results for devices that are gone, so the cache can't grow
+    without bound across replugs."""
+    keys = {_live_key(c) for c in controllers}
+    for k in [k for k in _live_cache if k not in keys]:
+        _live_cache.pop(k, None)
 
 
 def read_controller():

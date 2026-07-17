@@ -25,6 +25,7 @@ QtObject {
         navBar:     "#14151A",
         button:     "#20232B",
         track:      "#2C2F38",
+        ringSelect: "#FFFFFF",
         text:       "#F2F3F5",
         textDim:    "#9AA0AC"
     })
@@ -38,6 +39,11 @@ QtObject {
     property color navBar:      _def.navBar
     property color button:      _def.button        // idle button/pill background
     property color track:       _def.track         // slider grooves + toggle off-track
+    // Halo marking a SELECTED item on a colour surface the theme doesn't control —
+    // e.g. the 8K home-ring quadrants, whose own colours are the user's LED choice.
+    // Must contrast the CARD, so light themes need a dark value: a white glow on a
+    // white card is invisible (same trap `track` hit).
+    property color ringSelect:  _def.ringSelect
     property color text:        _def.text
     property color textDim:     _def.textDim
 
@@ -67,6 +73,7 @@ QtObject {
         { key: "cardBorder", label: "Card border" },
         { key: "button",     label: "Button" },
         { key: "track",      label: "Slider" },
+        { key: "ringSelect", label: "Selection glow" },
         { key: "text",       label: "Text" },
         { key: "textDim",    label: "Dim text" }
     ]
@@ -77,19 +84,19 @@ QtObject {
         { name: "GameSir Red",  colors: _def },
         { name: "Cobalt",       colors: { accent: "#3B82F6", bg: "#0B0E14", bgGlow: "#122036",
                                           navBar: "#111521", card: "#161B26", cardBorder: "#232B3A",
-                                          button: "#1E2636", track: "#2C3648", text: "#EEF2F8", textDim: "#94A0B4" } },
+                                          button: "#1E2636", track: "#2C3648", ringSelect: "#FFFFFF", text: "#EEF2F8", textDim: "#94A0B4" } },
         { name: "Emerald",      colors: { accent: "#2FBF71", bg: "#0A0F0C", bgGlow: "#0F2A1C",
                                           navBar: "#101613", card: "#151C18", cardBorder: "#222C27",
-                                          button: "#1D2620", track: "#2B372F", text: "#EDF5F0", textDim: "#93A69C" } },
+                                          button: "#1D2620", track: "#2B372F", ringSelect: "#FFFFFF", text: "#EDF5F0", textDim: "#93A69C" } },
         { name: "Violet",       colors: { accent: "#8B5CF6", bg: "#0E0B14", bgGlow: "#20143A",
                                           navBar: "#15111F", card: "#1A1626", cardBorder: "#2A2340",
-                                          button: "#241E36", track: "#342C4E", text: "#F0ECF8", textDim: "#A198B4" } },
+                                          button: "#241E36", track: "#342C4E", ringSelect: "#FFFFFF", text: "#F0ECF8", textDim: "#A198B4" } },
         { name: "Amber",        colors: { accent: "#F59E0B", bg: "#12100A", bgGlow: "#2E2410",
                                           navBar: "#1A1610", card: "#201C14", cardBorder: "#2E2A20",
-                                          button: "#2A2418", track: "#38321F", text: "#F6F1E8", textDim: "#B0A894" } },
+                                          button: "#2A2418", track: "#38321F", ringSelect: "#FFFFFF", text: "#F6F1E8", textDim: "#B0A894" } },
         { name: "Slate (light)",colors: { accent: "#E03A2F", bg: "#E9ECF1", bgGlow: "#F3D9D6",
                                           navBar: "#DCE0E8", card: "#FFFFFF", cardBorder: "#CDD3DE",
-                                          button: "#E6E9EF", track: "#C2C7D2", text: "#1A1D24", textDim: "#5C636F" } }
+                                          button: "#E6E9EF", track: "#C2C7D2", ringSelect: "#333A47", text: "#1A1D24", textDim: "#5C636F" } }
     ]
 
     // Apply a {key: colorString} map onto the writable primaries. Unknown keys

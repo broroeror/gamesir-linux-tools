@@ -433,10 +433,12 @@ G7_8K = ControllerProfile(
         # --- bank 0x20: lighting + global device settings ---
         'LIGHT_MODE':     0x0000,   # rainbow=00 off=01 colorful=03 static=04
         'LIGHT_BRIGHT':   0x0001,   # 0..100 (levels 0-4 x25)
-        'HOME_Q1':        0x000d,   # 4-quadrant home ring, 2B [hue, intensity]
-        'HOME_Q2':        0x0011,
-        'HOME_Q3':        0x0015,
-        'HOME_Q4':        0x0019,
+        # 4-quadrant home ring, 4B each: [hue_hi, hue_lo, sat, bright]. Hue is
+        # 16-bit BE and holds the angle in DEGREES (0..359) — linear, no correction.
+        'HOME_Q1':        0x000c,
+        'HOME_Q2':        0x0010,
+        'HOME_Q3':        0x0014,
+        'HOME_Q4':        0x0018,
         'AUTO_ONOFF':     0x00a0,   # 0/1
         'SLEEP_TIMER':    0x00a1,   # minutes (0=off)
         'DOCK_LED_MODE':  0x00a2,   # 0=follow battery, 1=follow animation

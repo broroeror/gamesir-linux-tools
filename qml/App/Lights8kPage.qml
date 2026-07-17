@@ -37,9 +37,12 @@ Item {
     Connections { target: bridge; function onLight8kLoaded() { page.seed() } }
     onVisibleChanged: if (visible) seed()
 
-    // hue byte = hue in DEGREES (0..255), so the ring tops out around violet and
-    // can't reach magenta/pink (>255deg). Display with /360 so the app matches the
-    // physical ring. byte1 is saturation; brightness is the global slider.
+    // The ring's hue register holds the angle in DEGREES (0..359) directly — it is
+    // linear, with no colour correction (verified in cap 52: H=30/60/../240 wrote
+    // exactly 30/60/../240). It's 16-BIT though, and the bridge writes both bytes;
+    // treating it as one byte caps the ring at 255deg (purple) and strands a stale
+    // high byte that offsets later edits by 256deg. So: no conversion here at all.
+    readonly property int hueMaxDeg: 359
     function quadColor(q) { return Qt.hsva(Math.min(1, q[0] / 360), q[1] / 100, 1, 1) }
     function seedPicker() { quadPicker.setColor(quadColor(quads[primary])) }
     function isSel(i) { return sel.indexOf(i) >= 0 }
@@ -52,13 +55,10 @@ Item {
         primary = (sel.indexOf(i) >= 0) ? i : sel[0]
         seedPicker()
     }
-    // 0xFF (255) is a glitch/sentinel on the ring (renders magenta) — the official
-    // app never wrote above 246 (=blue). Cap there so hue stays in verified range.
-    readonly property int hueByteMax: 246
     // apply the picked colour to ALL selected quadrants: update the ring preview
     // immediately, and debounce the (paced) device write so a drag doesn't flood.
     function applyQuad(c) {
-        var hue = c.hsvHue >= 0 ? Math.min(hueByteMax, Math.round(c.hsvHue * 360))
+        var hue = c.hsvHue >= 0 ? Math.min(hueMaxDeg, Math.round(c.hsvHue * 360))
                                 : quads[primary][0]
         var sat = Math.round(c.hsvSaturation * 100)
         var q = quads.slice()
@@ -147,6 +147,10 @@ Item {
                                     property var selRef: page.sel
                                     onQChanged: requestPaint()
                                     onSelRefChanged: requestPaint()
+                                    // Canvas can't bind Theme inside onPaint, so mirror
+                                    // the token and repaint when it changes.
+                                    property color glowCol: Theme.ringSelect
+                                    onGlowColChanged: requestPaint()
                                     onPaint: {
                                         var ctx = getContext('2d'); ctx.clearRect(0, 0, width, height)
                                         var cx = width / 2, cy = height / 2, ro = width / 2 - 4, ri = ro * 0.52
@@ -155,23 +159,42 @@ Item {
                                             ctx.beginPath(); ctx.arc(cx, cy, ro, a0, a1)
                                             ctx.arc(cx, cy, ri, a1, a0, true); ctx.closePath()
                                         }
-                                        for (var i = 0; i < 4; i++) {
+                                        function fillQuad(i) {
                                             wedge(i); ctx.fillStyle = page.quadColor(page.quads[i]); ctx.fill()
                                         }
-                                        // selected wedges: a drop shadow lifts them off the ring and a
-                                        // bright inner glow rims them — visible on ANY theme/colour combo,
-                                        // unlike the old thin accent outline.
+                                        for (var i = 0; i < 4; i++) fillQuad(i)
+
+                                        // Selected wedges get a bright OUTER GLOW + an INNER drop shadow.
+                                        // The glow is its own themeable token (Theme.ringSelect) because it
+                                        // sits against wedges whose colours are the USER's LED choice, so no
+                                        // palette colour is reliably safe — the old outer shadow was
+                                        // black-on-dark (invisible), which is why selection didn't read.
                                         for (var i = 0; i < 4; i++) {
                                             if (page.sel.indexOf(i) < 0) continue
                                             ctx.save()
-                                            ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 8
-                                            ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 2
-                                            wedge(i); ctx.fillStyle = page.quadColor(page.quads[i]); ctx.fill()
+                                            ctx.shadowColor = ring.glowCol
+                                            ctx.shadowBlur = 14
+                                            ctx.fillStyle = page.quadColor(page.quads[i])
+                                            // stack fills: shadow alpha accumulates into a real halo
+                                            wedge(i); ctx.fill(); ctx.fill(); ctx.fill()
                                             ctx.restore()
+                                        }
+                                        // Punch the hub back out — the glow spills inward too, and there it
+                                        // reads as a lopsided smudge rather than a halo.
+                                        ctx.save()
+                                        ctx.globalCompositeOperation = 'destination-out'
+                                        ctx.beginPath(); ctx.arc(cx, cy, ri, 0, 2 * Math.PI); ctx.fill()
+                                        ctx.restore()
+                                        // Repaint every wedge opaque so the halo survives only OUTSIDE the
+                                        // ring instead of bleeding over its neighbours.
+                                        for (var i = 0; i < 4; i++) fillQuad(i)
+
+                                        for (var i = 0; i < 4; i++) {
+                                            if (page.sel.indexOf(i) < 0) continue
                                             ctx.save()
-                                            wedge(i); ctx.clip()
-                                            ctx.shadowColor = 'rgba(255,255,255,0.95)'; ctx.shadowBlur = 11
-                                            ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.9)'
+                                            wedge(i); ctx.clip()          // inset: clipped to its own wedge
+                                            ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 7
+                                            ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(0,0,0,0.5)'
                                             wedge(i); ctx.stroke()
                                             ctx.restore()
                                         }
@@ -205,11 +228,19 @@ Item {
                             ColorPicker {
                                 id: quadPicker
                                 width: Math.min(190, parent.width - 110)
-                                hueMax: page.hueByteMax / 360   // cap at blue (246); 0xFF glitches to magenta
+                                hueMax: 1.0   // full wheel: the ring covers all 360deg
                                 anchors.verticalCenter: parent.verticalCenter
                                 onEdited: page.applyQuad(c)
                             }
                         }
+                    }
+
+                    // Puts the whole ring back to the factory baseline (all four
+                    // quadrants yellow). Destructive, so it confirms first.
+                    ConfirmButton {
+                        label: "Restore default lighting"
+                        confirmLabel: "Restore default lighting?"
+                        onConfirmed: bridge.restoreLighting()
                     }
                     Item { Layout.fillHeight: true }
                 }

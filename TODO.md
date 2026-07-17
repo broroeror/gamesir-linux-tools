@@ -31,10 +31,12 @@ them into the CHANGELOG so this file doesn't grow stale.
       `research/` is already done — see the CHANGELOG.)*
 - [ ] **Restore: per-block verify detail.** The write-verify-retry already reports
       pass/fail; could add a "verify only" action or a list of any unconfirmed blocks.
-- [ ] **8K lighting hue accuracy** *(parked)*. The home-ring / controller-light hue
-      reads "a little off" vs the physical LED on some colours (the `0xFF` sentinel is
-      already capped at 246 = blue). Needs a live hue-sweep calibration or LED-vs-monitor
-      gamma compensation, not just the cap.
+- [x] **8K lighting hue accuracy** *(DONE 2026-07-17 → CHANGELOG)*. Root cause: the ring's
+      hue register is **16-bit big-endian** (`[hue_hi, hue_lo, sat, bright]` per quadrant at
+      `0x000c/0x0010/0x0014/0x0018`) holding the angle in **degrees 0..359, perfectly linear**
+      — there was never a colour-correction curve. We wrote only the low byte, which capped
+      the ring at 255° (purple) and left a stale high byte offsetting later edits by 256°.
+      Fixed + live-verified (0/300/120/359 all round-trip exact).
 - [ ] **Couch-cursor / stick-to-mouse as a *feature* on Windows & macOS** *(2026-07-08)*.
       Note this is the **inverse** of the Linux mouse-mode toggle: on KDE the app
       *suppresses* KWin's built-in stick→pointer plugin (`gamesir_kwin.py`); Windows
