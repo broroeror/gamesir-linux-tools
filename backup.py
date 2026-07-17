@@ -28,14 +28,14 @@ import threading
 import time
 from datetime import datetime
 
-import gamesir_control as control
-import gamesir_config as cfg
+import vendors.gamesir.control as control
+import vendors.gamesir.config as cfg
 import controller_profile as ctrl
-import gamesir_led as led
+import vendors.gamesir.models.cyclone2.led as led
 from gs_state import state
-import gamesir_led8k as led8k
-import gamesir_motion as motion
-import gamesir_macro as macro
+import vendors.gamesir.models.g7_8k.led as led8k
+import vendors.gamesir.motion as motion
+import vendors.gamesir.macro as macro
 
 SCHEMA = 3          # 3 adds motion + macros to profiles and model-aware lighting
                     # (8K = flat 'fields'); restore still reads schema 1 and 2.

@@ -9,7 +9,7 @@ shared across profiles). Reset = replay these verbatim. DO NOT hand-edit; these
 are device-truth bytes.
 """
 
-from gamesir_control import write_reg
+from vendors.gamesir.control import write_reg
 
 # (addr, bytes) within a profile bank - the factory default profile image.
 DEFAULT_PROFILE = [

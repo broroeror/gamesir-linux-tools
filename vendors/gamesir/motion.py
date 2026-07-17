@@ -16,7 +16,7 @@ motion map keys (section = Aim; Tilt = same fields + `tilt_offset`):
   xaxis_gates_inverts                       : bool (Roll/Yaw inverts gated by X-axis mode)
   tilt_offset                               : int, or None if the model has no Tilt
 """
-import gamesir_config as cfg
+import vendors.gamesir.config as cfg
 
 ACT_METHODS = [("Off", 0x00), ("Hold", 0x01), ("Press to switch", 0x02), ("Always on", 0x03)]
 OUTPUTS     = [("Left Stick", 0x01), ("Right Stick", 0x02),

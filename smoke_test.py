@@ -38,8 +38,8 @@ def main():
     from PySide6.QtCore import QUrl
     from PySide6.QtGui import QGuiApplication
     from PySide6.QtQml import QQmlApplicationEngine
-    from gamesir_reader import read_controller, press_select_loop
-    from gamesir_bridge import GamesirBridge
+    from reader import read_controller, press_select_loop
+    from bridge import GamesirBridge
 
     # 1) Start the same daemon threads deadband.main() starts. A bad import
     #    (top-level or lazy) crashes them within milliseconds of the thread start.

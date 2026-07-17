@@ -17,8 +17,8 @@ the tail leaves a broken frame that drops the Profile LED, so we tile an IDENTIC
 frame across the whole record -> static, fully lit, no animation.
 """
 
-from gamesir_control import write_reg, send_cmd
-from gamesir_led_factory import FACTORY_START, FACTORY_DATA
+from vendors.gamesir.control import write_reg, send_cmd
+from vendors.gamesir.models.cyclone2.led_factory import FACTORY_START, FACTORY_DATA
 from gs_state import state
 
 LED_BANK = 0x20

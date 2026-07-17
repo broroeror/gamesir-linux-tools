@@ -19,19 +19,19 @@ from datetime import datetime
 from PySide6.QtCore import QObject, Signal, Property, Slot, QTimer
 
 from gs_state import state, EXTRA_BTNS
-import gamesir_control as control
-import gamesir_led as led
-import gamesir_led8k as led8k
-import gamesir_motion as motion
-import gamesir_macro as macro
-import gamesir_config as cfg
+import vendors.gamesir.control as control
+import vendors.gamesir.models.cyclone2.led as led
+import vendors.gamesir.models.g7_8k.led as led8k
+import vendors.gamesir.motion as motion
+import vendors.gamesir.macro as macro
+import vendors.gamesir.config as cfg
 import controller_profile as profiles
-import gamesir_kf_cache as kf_cache
-import gamesir_kwin as kwin
-import gamesir_factory as factory
-import gamesir_backup as backup
-import gamesir_flash as flash
-from gamesir_led import LIGHTS
+import kf_cache
+import kwin
+import vendors.gamesir.models.cyclone2.factory as factory
+import backup
+import vendors.gamesir.flash as flash
+from vendors.gamesir.models.cyclone2.led import LIGHTS
 
 from PySide6.QtCore import QUrl
 

@@ -29,7 +29,7 @@ the data + detection foundation and is safe to import without touching Cyclone.
 from dataclasses import dataclass, field
 from typing import Optional
 
-import gamesir_config as _cy
+import vendors.gamesir.config as _cy
 
 
 # --- shared enums / block formats (identical across the vendor family) -------

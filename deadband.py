@@ -20,10 +20,10 @@ from PySide6.QtCore import QUrl, QSettings
 from PySide6.QtGui import QGuiApplication, QIcon
 from PySide6.QtQml import QQmlApplicationEngine
 
-from gamesir_reader import read_controller, press_select_loop
-from gamesir_bridge import GamesirBridge
-import gamesir_kwin as kwin
-import gamesir_mousegrab as mousegrab
+from reader import read_controller, press_select_loop
+from bridge import GamesirBridge
+import kwin
+import mousegrab
 
 __version__ = '0.2.0-dev'
 

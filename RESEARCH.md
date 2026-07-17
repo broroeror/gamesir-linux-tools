@@ -189,19 +189,19 @@ command channel:
         USB  (hidraw, vendor report 0x0F)
           │
           ▼
-   gamesir_reader ──fills──▶ gs_state.state ──reads──▶ GUI (deadband)
-   (connect/read loop)        (shared dict)                    │
-          ▲                                                    │
-          └──────────── gamesir_control ◀──────────────────────┘
+   reader ──────fills──▶ gs_state.state ──reads──▶ GUI (deadband)
+   (connect/read loop)     (shared dict)                  │
+          ▲                                                │
+          └────── vendors.gamesir.control ◀───────────────┘
                     (send_cmd / write_reg, thread-safe)
 ```
 
-- **`gamesir_reader`** — the background loop: finds the controller, keeps it open,
+- **`reader`** — the background loop: finds the controller, keeps it open,
   sustains the heartbeat, polls profile + lighting, parses the `0x12` stream into
   `state`, and survives unplugs, mode switches, and hidraw node renumbering.
 - **`gs_state.state`** — a dependency-free dict, the single source of truth the GUI
   renders. The reader writes it; the GUI reads it each frame.
-- **`gamesir_control`** — the only writer to the device. One hid handle is shared
+- **`vendors.gamesir.control`** — the only writer to the device. One hid handle is shared
   across threads behind a lock; every command goes through it, and the handle is
   **rebound on each reconnect**, so nothing caches it.
 - **The GUI** (`deadband`, Qt/QML) is pure view.
@@ -219,15 +219,29 @@ rather than land on the wrong unit.
 
 **One recognized model at a time.** `controller_profile.py` holds a `ControllerProfile`
 per model (register map, write framing, input style, USB product ids) and tracks the
-**active** one by USB product id. `gamesir_control` refuses state-changing writes to an
+**active** one by USB product id. `vendors.gamesir.control` refuses state-changing writes to an
 **unrecognized** device — the map falls back to the Cyclone's, and firing
 Cyclone-framed writes at an unknown device could corrupt it. One guard behind every
 write path, and the seam that makes adding controllers an extension, not a rewrite.
 
-**Domains:** `gamesir_led` (bank `0x20` lighting; `gamesir_kf_cache` keeps exact
-keyframe colours for perfect round-trips), `gamesir_config` (per-profile register
-map), `gamesir_backup` (JSON export/restore, validated + write-verify-retry),
-`gs_common` (vendor-interface discovery + the `bcdDevice` firmware-version read).
+**Layout.** The core is vendor-neutral and lives at the root — `bridge`, `reader`,
+`backup`, `controller_profile`, `gs_state`, `gs_common` (vendor-interface discovery
++ the `bcdDevice` firmware read), plus `kwin`/`mousegrab` (desktop integration, no
+controller content) and `kf_cache`. Everything that speaks a manufacturer's protocol
+sits under `vendors/<vendor>/`, so adding a maker is a new sibling package rather than
+edits to the core:
+
+```
+vendors/gamesir/
+    control  config  enhanced  motion  macro   — shared across GameSir models;
+    flash                                        per-model differences are DATA,
+                                                 carried by ControllerProfile
+    models/cyclone2/  led  led_factory  factory  — keyframe RGB + captured baselines
+    models/g7_8k/     led                        — bank-0x20 home ring
+```
+
+Only what genuinely differs per model gets a `models/` entry — in practice that's
+lighting and captured factory images; addresses and capabilities are profile data.
 
 ---
 

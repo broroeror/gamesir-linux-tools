@@ -15,7 +15,7 @@ write-style + session generation like every other vendor write. The whole macro
 also shares the paddle block with the remap record, so enabling a macro and
 remapping the same paddle are mutually exclusive in the UI.
 """
-import gamesir_config as cfg
+import vendors.gamesir.config as cfg
 
 ENABLE_OFF = 0x05
 COUNT_OFF  = 0x08

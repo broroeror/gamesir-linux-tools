@@ -34,9 +34,13 @@ package() {
   cd "$pkgname"
   local share="$pkgdir/usr/share/deadband"
 
-  # app: entry point, vendor protocol modules, qml tree, assets
+  # app core (vendor-neutral) + entry point
   install -d "$share"
-  install -Dm644 deadband.py gamesir_*.py gs_*.py controller_profile.py "$share"/
+  install -Dm644 deadband.py bridge.py reader.py backup.py controller_profile.py \
+                 kf_cache.py kwin.py mousegrab.py gs_common.py gs_state.py "$share"/
+  # per-vendor protocol packages (vendors/gamesir/..., incl. models/)
+  cp -r vendors "$share"/
+  find "$share/vendors" -name '__pycache__' -type d -prune -exec rm -rf {} +
   cp -r qml "$share"/
   install -d "$share/assets"
   install -Dm644 assets/icon.png assets/icon-64.png assets/icon-48.png "$share"/assets/

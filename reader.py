@@ -18,9 +18,9 @@ import hid
 
 from gs_common import (find_controllers, pick_live_node, firmware_version,
                        device_bcd, evdev_port, has_live_pad)
-from gamesir_enhanced import parse_enhanced
+from vendors.gamesir.enhanced import parse_enhanced
 from gs_state import state
-import gamesir_control as control
+import vendors.gamesir.control as control
 import controller_profile as profiles
 
 
