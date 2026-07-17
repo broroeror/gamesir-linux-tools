@@ -189,24 +189,32 @@ Window {
                 // obvious without a separate badge crowding the bar.
                 RowLayout {
                     spacing: 8
-                    // The app's own gamepad mark — the launcher icon itself, which is
-                    // already a rounded tile, so it stands in for the old letter tile
-                    // rather than nesting inside one. Vendor-neutral by design.
-                    Image {
-                        visible: !bridge.demoMode
-                        source: assetsDir + "icon-64.png"
-                        Layout.preferredWidth: 26; Layout.preferredHeight: 26
-                        fillMode: Image.PreserveAspectFit
-                        smooth: true
-                        mipmap: true            // 64 -> 26 px: avoids aliasing
-                    }
-                    // Demo mode takes the tile's place with a warn-coloured "!".
+                    // The app's gamepad mark on a THEMED tile. The launcher icon can't
+                    // follow the theme (it's a static PNG the desktop renders), but this
+                    // one can, so it's drawn as accent + a bare white glyph rather than
+                    // the launcher art — which bakes in the default red and would clash
+                    // once the user picks another palette. White on accent stays legible
+                    // on every preset, since accent is always a saturated colour.
                     Rectangle {
-                        visible: bridge.demoMode
                         Layout.preferredWidth: 26; Layout.preferredHeight: 26
                         radius: 6
-                        color: Theme.warn
+                        color: bridge.demoMode ? Theme.warn : Theme.accent
+                        Image {
+                            visible: !bridge.demoMode
+                            // Two pre-tinted glyphs rather than a runtime colour
+                            // overlay: recolouring an Image needs QtQuick.Effects,
+                            // and the app deliberately avoids optional QML modules
+                            // that may not be installed (see VideoBackground).
+                            source: assetsDir + (Theme.accentIsLight ? "glyph-pad-dark.png"
+                                                                     : "glyph-pad.png")
+                            anchors.centerIn: parent
+                            width: 17; height: 17
+                            fillMode: Image.PreserveAspectFit
+                            smooth: true; mipmap: true
+                        }
+                        // Demo mode swaps the glyph for a "!" on the warn tile.
                         Text {
+                            visible: bridge.demoMode
                             anchors.centerIn: parent
                             text: "!"; color: "white"
                             font.bold: true; font.pixelSize: 16

@@ -63,6 +63,19 @@ QtObject {
     readonly property color ok:          _lightBg ? "#1E9E57" : "#3CCB7F"
     readonly property color warn:        _lightBg ? "#B07600" : "#E0B23A"
 
+    // What reads on top of `accent`. Accent is user-settable and the presets span
+    // deep red to light amber, where white collapses to a 2.15 contrast ratio —
+    // below the 3.0 minimum even for large marks. Measured white-vs-accent:
+    // red 4.36, violet 4.23, cobalt 3.68, but emerald 2.38 and amber 2.15.
+    //
+    // Must use WCAG RELATIVE LUMINANCE, not hslLightness: by HSL, red (0.53) reads
+    // as *lighter* than amber (0.50), yet white is fine on red and unreadable on
+    // amber — because luminance weights green ~10x blue and HSL ignores that.
+    function _chan(v) { return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4) }
+    function _lum(c)  { return 0.2126 * _chan(c.r) + 0.7152 * _chan(c.g) + 0.0722 * _chan(c.b) }
+    readonly property bool accentIsLight: _lum(accent) > 0.30
+    readonly property color onAccent:     accentIsLight ? "#1A1D24" : "#FFFFFF"
+
     // Ordered list of themeable tokens for the Settings UI (key + label).
     readonly property var themeKeys: [
         { key: "accent",     label: "Accent" },

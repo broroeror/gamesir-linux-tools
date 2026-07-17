@@ -43,7 +43,10 @@ package() {
   find "$share/vendors" -name '__pycache__' -type d -prune -exec rm -rf {} +
   cp -r qml "$share"/
   install -d "$share/assets"
-  install -Dm644 assets/icon.png assets/icon-64.png assets/icon-48.png "$share"/assets/
+  # icon-*.png are the launcher art; glyph-pad*.png are the in-app themed logo mark
+  # (two pre-tinted variants: light accents need the dark glyph -- see Theme.onAccent)
+  install -Dm644 assets/icon.png assets/icon-64.png assets/icon-48.png \
+                 assets/glyph-pad.png assets/glyph-pad-dark.png "$share"/assets/
 
   # launcher
   install -dm755 "$pkgdir/usr/bin"
