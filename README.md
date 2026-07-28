@@ -20,11 +20,11 @@ per-vendor, so other manufacturers can be added alongside. It covers:
   off (normal gamepad) or on (sticks-as-cursor "couch mode") from the app, plus a
   non-KDE EVIOCGRAB fallback (Wayland; see Status).
 
-![status: input, battery, profiles, RGB + keyframes, full config editor, remap, and JSON backup/restore working]
-
-**Version:** `0.1.0-alpha.2` — the full Qt/QML app (lighting + keyframe editor,
-config editor, button remap, backup/restore, one-command install). Known-good
-snapshot (git tag `v0.1.0-alpha.2`).
+**Version:** `0.2.0-dev` — Deadband: multi-controller (Cyclone 2 + G7 Pro 8K), the full
+Qt/QML app (lighting + keyframe editor, config editor, button remap, backup/restore),
+one-command install, and an [AUR package](https://aur.archlinux.org/packages/deadband-git).
+Tracks `main` (the AUR `-git` package builds from the latest commit); last tagged
+snapshot is `v0.1.0-alpha.2`.
 **Going deeper?** The **[Manual](MANUAL.md)** is the user guide — how to use each
 feature, troubleshooting & recovery, and an FAQ. **[RESEARCH.md](RESEARCH.md)** is the
 developer side — protocol, architecture, the diagnostic tools, and per-controller
@@ -35,11 +35,13 @@ This is a hobby reverse-engineering project; fork it and customize it however yo
 
 > ### ⚠️ Tested hardware
 > Everything here has only been developed and verified on a **GameSir Cyclone 2**
-> and a **GameSir G7 Pro** — **nothing else.** Other GameSir controllers, other
-> dongles, and firmware revisions we haven't seen are **unsupported and untested**
-> and may misbehave. The app won't send config writes to a device it can't
-> positively recognize, but please don't treat it as proven-safe on hardware it has
-> never seen. Use it at your own risk.
+> and a **GameSir G7 Pro 8K** — **nothing else.** (A regular, non-8K **G7 Pro** was
+> also tested but does **not** work: it's an Xbox-only pad whose config channel Linux
+> doesn't expose — input works, config is blocked. See [RESEARCH.md](RESEARCH.md).)
+> Other GameSir controllers, other dongles, and firmware revisions we haven't seen are
+> **unsupported and untested** and may misbehave. The app won't send config writes to a
+> device it can't positively recognize, but please don't treat it as proven-safe on
+> hardware it has never seen. Use it at your own risk.
 
 ## The app
 
@@ -67,9 +69,16 @@ appears in your app launcher (or run `deadband`). Remove it with `./uninstall.sh
 Upgrading from the old `gamesir-cyclone2` install? `install.sh` removes it for
 you, and your settings carry over on first run.
 
-Prefer the Arch-native route? A [`packaging/PKGBUILD`](packaging/PKGBUILD) is
-included. It is **not published to the AUR yet**, so `yay`/`paru` can't find it by
-name — build it from the included file instead (no AUR account needed):
+Prefer the Arch-native route? Deadband is on the **AUR** as
+[`deadband-git`](https://aur.archlinux.org/packages/deadband-git):
+
+```sh
+yay -S deadband-git      # or: paru -S deadband-git
+```
+
+It's a VCS (`-git`) package, so it always builds from the latest commit. Or build
+the included [`packaging/PKGBUILD`](packaging/PKGBUILD) directly, no AUR helper
+needed:
 
 ```sh
 cd packaging && makepkg -si
@@ -80,11 +89,11 @@ cd packaging && makepkg -si
 - Python 3
 - [`hidapi`](https://pypi.org/project/hidapi/) (`import hid`)
 - [`PySide6`](https://pypi.org/project/PySide6/) — for the Qt app
-  (Arch: `python-pyside6`)
+  (Arch: `pyside6`)
 
 ```sh
 # Arch
-sudo pacman -S --needed python python-pyside6 python-hidapi
+sudo pacman -S --needed python pyside6 python-hidapi
 # or via pip
 pip install hidapi PySide6
 ```
@@ -160,7 +169,7 @@ everything it does is **reversible** and stays **on your machine**. The specific
   online.
 - **Permissions.** Prefer the udev rule (per-user `uaccess`) over running as root —
   see [Running](#running). Under `sudo`, `~` is `/root`, so backups land there.
-- **Tested hardware.** Only the Cyclone 2 and G7 Pro (see the note up top). Treat
+- **Tested hardware.** Only the Cyclone 2 and G7 Pro 8K (see the note up top). Treat
   anything else as unproven and use it at your own risk.
 
 ## How it works
