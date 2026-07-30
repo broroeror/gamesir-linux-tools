@@ -45,3 +45,6 @@ jl-uboot-tool/
 # repo. Nothing here is imported by the app; history for anything moved here is
 # still in git (git log --follow / git show <sha>:<path>).
 attic/
+
+# local mouse onboard-profile backups (user data)
+mouse-backups/
