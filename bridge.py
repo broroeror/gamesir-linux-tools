@@ -1433,7 +1433,18 @@ class GamesirBridge(QObject):
 
     @Property(str, constant=True)
     def defaultBackupName(self):
-        return 'gamesir_backup_' + datetime.now().strftime('%Y%m%d') + '.json'
+        # Model-aware, Deadband-branded name so backups from 2-3 controllers don't
+        # collide or look interchangeable. Slug the active profile's short name
+        # ("G7 Pro 8K" -> "g7-pro-8k") from the SAME source backup.py stamps into the
+        # file's `device` field (profiles.active()), so the name always matches what
+        # import validates against. active() defaults to the Cyclone and is never
+        # None. The timestamp carries H:M:S so two same-day backups of one controller
+        # don't propose the same name (the Save dialog would offer to overwrite).
+        # Read imperatively on each button click (not bound), so constant=True holds.
+        short = profiles.active().short or 'controller'
+        slug = '-'.join(filter(None,
+            ''.join(c if c.isalnum() else '-' for c in short.lower()).split('-')))
+        return f'deadband_{slug or "controller"}_{datetime.now():%Y%m%d-%H%M%S}.json'
 
     def _backup_done(self, ok, msg):
         self._backup_busy = False
