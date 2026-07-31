@@ -39,6 +39,7 @@ class MouseBridge(QObject):
     bindingsChanged = Signal()   # the per-button binding map changed
     statusChanged = Signal()     # last action result text changed
     busyChanged = Signal()       # a device write is in flight
+    pendingChanged = Signal()    # the staged (unsaved) change set changed
 
     # Private carriers from the worker thread back to the GUI thread. Emitting a
     # signal from another thread to this (GUI-thread) object is delivered as a
@@ -46,6 +47,7 @@ class MouseBridge(QObject):
     # touch the exposed state there.
     _refreshDone = Signal(bool, str, int, int, 'QVariantMap')   # present, perm, active, count, binds
     _remapDone = Signal(bool, str, 'QVariantMap')               # ok, status, binds
+    _applyDone = Signal(bool, str, 'QVariantMap')               # ok, status, binds
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -56,10 +58,12 @@ class MouseBridge(QObject):
         self._button_count = 0
         self._status = ''
         self._busy = False
+        self._pending = {}              # {int button: str spec} — staged, unsaved
         self._io = threading.Lock()     # serialize device access (worker threads)
 
         self._refreshDone.connect(self._on_refresh)
         self._remapDone.connect(self._on_remap)
+        self._applyDone.connect(self._on_apply)
 
         # light hotplug poll: enumerate (no open) every few seconds; a full read
         # happens only on a connect transition or an explicit refresh().
@@ -127,6 +131,21 @@ class MouseBridge(QObject):
     def busy(self):
         return self._busy
 
+    @Property(int, notify=pendingChanged)
+    def pendingCount(self):
+        return len(self._pending)
+
+    @Property('QVariantMap', notify=pendingChanged)
+    def pending(self):
+        """Staged (unsaved) targets, as {str(button): label} for the UI to preview."""
+        out = {}
+        for b, spec in self._pending.items():
+            try:
+                out[str(b)] = logi_config.binding_from_spec(spec).detail
+            except Exception:
+                out[str(b)] = spec
+        return out
+
     # ------------------------------------------------------------- worker thread
     def _refresh_worker(self):
         with self._io:
@@ -177,6 +196,9 @@ class MouseBridge(QObject):
         self._button_count = count
         if present:
             self._bindings = binds
+        elif self._pending:
+            self._pending = {}          # device gone -> staged edits are stale
+            self.pendingChanged.emit()
         self.presenceChanged.emit()
         if present:
             self.bindingsChanged.emit()
@@ -200,11 +222,86 @@ class MouseBridge(QObject):
 
     @Slot(int, str)
     def remap(self, button, spec):
-        """Apply a binding to `button` on the active profile (off-thread). spec
+        """Apply a single binding to `button` immediately (off-thread). spec
         vocabulary: key:<char|name> | mouse:<n> | sniper | dpi-up | dpi-down |
-        dpi-cycle | disabled."""
+        dpi-cycle | disabled. Prefer stage()+apply() for multi-button edits."""
         if self._busy:
             return
         self._busy = True
         self.busyChanged.emit()
         threading.Thread(target=self._remap_worker, args=(button, spec), daemon=True).start()
+
+    # ------------------------------------------------- staged (batched) editing
+    @Slot(int, str)
+    def stage(self, button, spec):
+        """Queue a binding change for `button` (no device I/O). Validates the spec
+        now so a bad target is rejected before Apply. Call apply() to write them all
+        in one profile write."""
+        try:
+            logi_config.binding_from_spec(spec)      # validate only
+        except ValueError as e:
+            self._set_status(f'unsupported target: {e}')
+            return
+        self._pending[int(button)] = spec
+        self.pendingChanged.emit()
+
+    @Slot(int)
+    def unstage(self, button):
+        """Drop a single staged change."""
+        if self._pending.pop(int(button), None) is not None:
+            self.pendingChanged.emit()
+
+    @Slot()
+    def discard(self):
+        """Drop all staged changes."""
+        if self._pending:
+            self._pending = {}
+            self.pendingChanged.emit()
+
+    @Slot()
+    def apply(self):
+        """Write every staged change to the active profile in ONE gated,
+        read-back-verified write (off-thread)."""
+        if self._busy or not self._pending:
+            return
+        self._busy = True
+        self.busyChanged.emit()
+        changes_spec = dict(self._pending)           # snapshot for the worker
+        threading.Thread(target=self._apply_worker, args=(changes_spec,), daemon=True).start()
+
+    def _apply_worker(self, changes_spec):
+        try:
+            changes = {int(b): logi_config.binding_from_spec(s)
+                       for b, s in changes_spec.items()}
+        except ValueError as e:
+            self._applyDone.emit(False, f'unsupported target: {e}', {})
+            return
+        with self._io:
+            dev = hidpp.find_device()
+            if dev is None:
+                self._applyDone.emit(False, 'mouse not accessible — connected and permitted?', {})
+                return
+            try:
+                with dev:
+                    info = dev.onboard_info()
+                    headers = dev.profile_headers()
+                    active = dev.current_profile()
+                    active_hdr = [h for h in headers if h[0] == active] or [(active, 1)]
+                    ok, msg = logi_config.apply_bindings(
+                        dev, info, headers, active, changes, backup_headers=active_hdr)
+                    binds = self._labels(dev, active, info['sector_size']) if ok else {}
+                self._applyDone.emit(ok, msg, binds)
+            except Exception as e:
+                self._applyDone.emit(False, f'error: {e}', {})
+
+    def _on_apply(self, ok, status, binds):
+        self._busy = False
+        self.busyChanged.emit()
+        self._status = status
+        self.statusChanged.emit()
+        if ok:
+            self._pending = {}                       # committed -> clear the queue
+            self.pendingChanged.emit()
+            if binds:
+                self._bindings = binds
+                self.bindingsChanged.emit()

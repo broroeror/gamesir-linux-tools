@@ -25,19 +25,25 @@ def profile_bindings(dev, sector, size):
     return {i: {'kind': b.kind, 'detail': b.detail} for i, b in enumerate(prof.buttons)}
 
 
-def apply_binding(dev, info, headers, sector, button, new_binding, backup_headers=None):
-    """Gated, reversible write of ONE button binding to `sector`. Returns
-    (ok: bool, message: str). Backs up first; aborts unless the change touches ONLY
-    the button's 4 bytes + the CRC; read-back-verifies; restores the original bytes
-    on any failure so a partial/failed write never persists.
+def apply_bindings(dev, info, headers, sector, changes, backup_headers=None):
+    """Gated, reversible write of MANY button bindings to `sector` in ONE profile
+    write — the batch the GUI's "Apply" uses. `changes` = {button_index:
+    onboard.Button}. Returns (ok, message). Backs up first; aborts unless the change
+    touches ONLY the edited buttons' 4-byte slots + the CRC; read-back-verifies;
+    restores the original on any failure so a partial/failed write never persists.
 
-    `backup_headers` limits what the pre-write backup captures (default: all
-    profiles). Since a single-button edit only ever mutates ONE profile, the GUI
-    passes just that profile — far fewer HID++ round-trips, which matters over the
-    wireless link."""
+    Batching matters: the whole 255-byte sector is rewritten regardless of how many
+    buttons change, so N staged edits cost ONE backup + write + read-back (~50 HID++
+    round-trips) instead of N times that — a big deal over the wireless link.
+
+    `backup_headers` limits the pre-write backup (default: all profiles); the GUI
+    passes just the edited profile."""
     size = info['sector_size']
-    if not (0 <= button < info['button_count']):
-        return False, f'button {button} out of range (0..{info["button_count"] - 1})'
+    if not changes:
+        return False, 'nothing to apply'
+    for button in changes:
+        if not (0 <= button < info['button_count']):
+            return False, f'button {button} out of range (0..{info["button_count"] - 1})'
     if sector not in {s for s, _ in headers}:
         return False, f'sector 0x{sector:04x} is not a profile'
 
@@ -47,12 +53,15 @@ def apply_binding(dev, info, headers, sector, button, new_binding, backup_header
     if not prof.crc_ok:
         return False, 'profile CRC not OK on read — aborting'
 
-    prof.set_button(button, new_binding)
+    for button, binding in changes.items():
+        prof.set_button(button, binding)
     new_bytes = prof.to_bytes()
 
     offs = remap.diff_offsets(raw, new_bytes)
-    bslice = 32 + button * 4
-    expected = set(range(bslice, bslice + 4)) | {size - 2, size - 1}
+    expected = {size - 2, size - 1}
+    for button in changes:
+        b = 32 + button * 4
+        expected |= set(range(b, b + 4))
     safe = (onboard.OnboardProfile.decode(new_bytes).crc_ok
             and set(offs).issubset(expected)
             and onboard.OnboardProfile.decode(raw).to_bytes() == raw
@@ -72,7 +81,14 @@ def apply_binding(dev, info, headers, sector, button, new_binding, backup_header
             return False, (f'write failed ({e}) AND restore failed ({e2}) — '
                            f'restore manually from {os.path.basename(path)}')
         return False, f'write failed ({e}) — reverted to original'
-    return True, f'applied (backup {os.path.basename(path)})'
+    n = len(changes)
+    return True, f'applied {n} change{"" if n == 1 else "s"} (backup {os.path.basename(path)})'
+
+
+def apply_binding(dev, info, headers, sector, button, new_binding, backup_headers=None):
+    """Single-button convenience wrapper over apply_bindings (see it for the gate
+    and safety details). Kept for callers that change one button at a time."""
+    return apply_bindings(dev, info, headers, sector, {button: new_binding}, backup_headers)
 
 
 # Binding constructors the UI offers, expressed as onboard.Button factories.

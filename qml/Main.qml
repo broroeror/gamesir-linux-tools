@@ -329,7 +329,7 @@ Window {
                     width: 1; height: 24; color: Theme.cardBorder
                 }
 
-                StatusPill { compact: win.width < 1000 }
+                StatusPill { compact: win.width < 1000; visible: win.activeDevice === "controller" }
             }
 
             // Settings gear — pinned to the bar's right edge, OUTSIDE the RowLayout,

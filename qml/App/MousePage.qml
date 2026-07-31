@@ -11,11 +11,17 @@ Item {
     property int selIndex: -1
     property string selName: ""
 
-    function bindLabel(i) {
+    function committedLabel(i) {
         var b = mouse.bindings[String(i)]
         return (b === undefined || b === "" || b === "(empty)") ? "unset" : b
     }
-    function apply(spec) { if (page.selIndex >= 0) mouse.remap(page.selIndex, spec) }
+    function isStaged(i) { return mouse.pending[String(i)] !== undefined }
+    // what to show for a button: the staged target if any, else the committed one
+    function bindLabel(i) {
+        return page.isStaged(i) ? mouse.pending[String(i)] : page.committedLabel(i)
+    }
+    // assign = STAGE (no device write until Apply)
+    function stage(spec) { if (page.selIndex >= 0) mouse.stage(page.selIndex, spec) }
 
     // ---------------------------------------------- not connected / no access
     ColumnLayout {
@@ -55,7 +61,9 @@ Item {
 
     // ---------------------------------------------- connected: master-detail
     RowLayout {
-        anchors.fill: parent; anchors.margins: 20; spacing: 16
+        anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
+        anchors.bottom: pbar.visible ? pbar.top : parent.bottom
+        anchors.margins: 20; spacing: 16
         visible: mouse.present
 
         // -------- LEFT: button list --------
@@ -77,8 +85,10 @@ Item {
                             anchors.right: parent.right; anchors.rightMargin: 9
                             anchors.verticalCenter: parent.verticalCenter
                             elide: Text.ElideRight
-                            text: modelData.name + "  →  " + page.bindLabel(modelData.i)
-                            color: page.bindLabel(modelData.i) === "unset" ? Theme.textDim : Theme.text
+                            text: (page.isStaged(modelData.i) ? "• " : "")
+                                  + modelData.name + "  →  " + page.bindLabel(modelData.i)
+                            color: page.isStaged(modelData.i) ? Theme.accent
+                                   : (page.bindLabel(modelData.i) === "unset" ? Theme.textDim : Theme.text)
                             font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                         }
                         TapHandler {
@@ -116,11 +126,11 @@ Item {
 
                 Flow {
                     width: parent.width; spacing: 6
-                    PillButton { label: "Disabled";  onClicked: page.apply("disabled") }
-                    PillButton { label: "Sniper";    onClicked: page.apply("sniper") }
-                    PillButton { label: "DPI +";     onClicked: page.apply("dpi-up") }
-                    PillButton { label: "DPI −";     onClicked: page.apply("dpi-down") }
-                    PillButton { label: "DPI cycle"; onClicked: page.apply("dpi-cycle") }
+                    PillButton { label: "Disabled";  onClicked: page.stage("disabled") }
+                    PillButton { label: "Sniper";    onClicked: page.stage("sniper") }
+                    PillButton { label: "DPI +";     onClicked: page.stage("dpi-up") }
+                    PillButton { label: "DPI −";     onClicked: page.stage("dpi-down") }
+                    PillButton { label: "DPI cycle"; onClicked: page.stage("dpi-cycle") }
                 }
                 Text {
                     width: parent.width; text: "Mouse buttons"; color: Theme.textDim
@@ -133,7 +143,7 @@ Item {
                         delegate: PillButton {
                             required property int index
                             label: "M" + (index + 1)
-                            onClicked: page.apply("mouse:" + (index + 1))
+                            onClicked: page.stage("mouse:" + (index + 1))
                         }
                     }
                 }
@@ -156,16 +166,45 @@ Item {
                     }
                     PillButton {
                         id: setBtn; label: "Set"
-                        onClicked: if (keyField.text.length) page.apply("key:" + keyField.text.trim())
+                        onClicked: if (keyField.text.length) page.stage("key:" + keyField.text.trim())
                     }
                 }
                 Text {
                     width: parent.width; wrapMode: Text.WordWrap; topPadding: 4
-                    visible: mouse.busy || mouse.status.length > 0
-                    text: mouse.busy ? "Applying…" : mouse.status
-                    color: mouse.busy ? Theme.accent : Theme.textDim
+                    visible: !mouse.busy && mouse.status.length > 0
+                    text: mouse.status
+                    color: Theme.textDim
                     font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                 }
+            }
+        }
+    }
+
+    // -------- staged-changes bar: apply all pending edits in one write --------
+    Rectangle {
+        id: pbar
+        visible: mouse.present && mouse.pendingCount > 0
+        anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+        anchors.leftMargin: 20; anchors.rightMargin: 20; anchors.bottomMargin: 20
+        height: 52; radius: Theme.radius
+        color: Theme.card; border.color: Theme.accent; border.width: 1
+        Text {
+            anchors.left: parent.left; anchors.leftMargin: 16
+            anchors.verticalCenter: parent.verticalCenter
+            text: mouse.busy ? "Applying…"
+                  : mouse.pendingCount + (mouse.pendingCount === 1 ? " unsaved change"
+                                                                   : " unsaved changes")
+            color: mouse.busy ? Theme.accent : Theme.text
+            font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
+        }
+        Row {
+            anchors.right: parent.right; anchors.rightMargin: 14
+            anchors.verticalCenter: parent.verticalCenter; spacing: 8
+            PillButton { label: "Discard"; enabled: !mouse.busy; onClicked: mouse.discard() }
+            PillButton {
+                label: "Apply " + mouse.pendingCount
+                highlight: !mouse.busy; enabled: !mouse.busy
+                onClicked: mouse.apply()
             }
         }
     }
