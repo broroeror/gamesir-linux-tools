@@ -11,6 +11,7 @@ MouseView 1.0 MouseView.qml
 MousePage 1.0 MousePage.qml
 MouseDpiPage 1.0 MouseDpiPage.qml
 MouseKeyPicker 1.0 MouseKeyPicker.qml
+MouseMacroEditor 1.0 MouseMacroEditor.qml
 MousePendingBar 1.0 MousePendingBar.qml
 MouseConnectState 1.0 MouseConnectState.qml
 AccentSlider 1.0 AccentSlider.qml

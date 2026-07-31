@@ -25,6 +25,12 @@ Item {
     }
     // assign = STAGE on the current layer (no device write until Apply)
     function stage(spec) { if (page.selIndex >= 0) mouse.stage(page.editLayer, page.selIndex, spec) }
+    // open the macro editor for the selected button (primary bank only, v1)
+    function openMacro() {
+        if (page.selIndex < 0) return
+        mouse.probeMacroSlots()          // refresh the free-slot count for the editor
+        macroEd.open(page.selName)
+    }
     // ---------------------------------------------- not connected / no access
     MouseConnectState {}
 
@@ -144,6 +150,24 @@ Item {
                     label: "⌨  Choose a key…"
                     onClicked: keyPicker.active = true
                 }
+                // Macro — primary bank only for now (G-Shift macros come later)
+                Text {
+                    width: parent.width; text: "Macro"; color: Theme.textDim
+                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                    visible: page.editLayer === "default"
+                }
+                PillButton {
+                    label: "⚡  Macro…"; visible: page.editLayer === "default"
+                    onClicked: page.openMacro()
+                }
+                Text {
+                    width: parent.width; wrapMode: Text.WordWrap
+                    visible: page.editLayer === "default" && mouse.macroSlotsFree >= 0
+                    text: mouse.macroSlotsFree + " macro slot" + (mouse.macroSlotsFree === 1 ? "" : "s")
+                          + " free" + (mouse.macroSlotsFree === 0 ? " — clear a macro to free one" : "")
+                    color: mouse.macroSlotsFree === 0 ? Theme.warn : Theme.textFaint
+                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                }
                 Text {
                     width: parent.width; wrapMode: Text.WordWrap; topPadding: 4
                     visible: !mouse.busy && mouse.status.length > 0
@@ -166,5 +190,13 @@ Item {
     MouseKeyPicker {
         id: keyPicker
         onPicked: function (spec) { page.stage(spec) }
+    }
+
+    // modal macro editor, opened by the assign panel's "Macro…"
+    MouseMacroEditor {
+        id: macroEd
+        onSaved: function (json) {
+            if (page.selIndex >= 0) mouse.stageMacro(page.selIndex, json)
+        }
     }
 }

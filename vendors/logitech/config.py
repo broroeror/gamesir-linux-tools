@@ -52,9 +52,120 @@ def friendly_binding(b):
         return 'Mouse %d' % (b.mouse_mask.bit_length() if b.mouse_mask else 0)
     if b.kind == 'function' and b.function == 0x0B:
         return 'G-Shift'
+    if b.kind == 'macro':
+        return 'Macro'
     if b.kind == 'unset':
         return 'unset'
     return b.detail
+
+
+# --- macro definitions (structured steps <-> bytecode + labels) ---------------
+# A macro definition is {'steps': [step, ...], 'repeat': bool}. Steps:
+#   {'t':'combo','combo':'ctrl+c'}  a key or shortcut ('a' / 'enter' / 'f5' too)
+#   {'t':'text','text':'hello'}     type a string (auto-shift)
+#   {'t':'delay','ms':100}          pause
+#   {'t':'click','button':1}        click a mouse button (1=left…)
+def _macro_steps(macrodef):
+    return macrodef.get('steps', []) if isinstance(macrodef, dict) else (macrodef or [])
+
+
+def build_macro_body(macrodef):
+    """Structured macro def -> macro bytecode (terminated with END). Raises
+    ValueError on an unknown step or an empty macro."""
+    m = macros.Macro()
+    n = 0
+    for s in _macro_steps(macrodef):
+        if not isinstance(s, dict):
+            raise ValueError(f'bad macro step (not an object): {s!r}')
+        t = s.get('t')
+        # Convert any malformed-field error (missing/wrong-typed operand) into a
+        # ValueError so callers' `except ValueError` catches every bad macro — the
+        # def comes from untrusted JSON, not just the well-formed editor output.
+        try:
+            if t == 'combo':
+                combo = s.get('combo')
+                if not isinstance(combo, str) or not combo:
+                    raise ValueError('combo step needs a non-empty "combo" string')
+                m.combo(combo)
+            elif t == 'text':
+                text = s.get('text')
+                if not text:
+                    continue                      # empty text step = no-op
+                if not isinstance(text, str):
+                    raise ValueError('text step "text" must be a string')
+                m.type(text)
+            elif t == 'delay':
+                m.pause(int(s.get('ms', 0) or 0))
+            elif t == 'click':
+                m.click(int(s.get('button', 1) or 1))
+            else:
+                raise ValueError(f'unknown macro step: {t!r}')
+        except (KeyError, TypeError, AttributeError) as e:
+            raise ValueError(f'bad macro step {t!r}: {e}')
+        n += 1
+    if n == 0:
+        raise ValueError('macro has no steps')
+    if isinstance(macrodef, dict) and macrodef.get('repeat'):
+        m.repeat_until_release()          # loop while the button is held
+    return m.build()
+
+
+def _combo_label(combo):
+    return '+'.join(p[:1].upper() + p[1:] for p in str(combo).split('+') if p)
+
+
+def macro_summary(macrodef):
+    """Short human label for a macro def (chips / button preview)."""
+    parts = []
+    for s in _macro_steps(macrodef):
+        t = s.get('t')
+        if t == 'combo':
+            parts.append(_combo_label(s.get('combo', '')))
+        elif t == 'text':
+            parts.append('"%s"' % s.get('text', ''))
+        elif t == 'delay':
+            parts.append('%dms' % int(s.get('ms', 0)))
+        elif t == 'click':
+            parts.append('click%d' % int(s.get('button', 1)))
+    label = ' · '.join(parts) or 'empty'
+    if isinstance(macrodef, dict) and macrodef.get('repeat'):
+        label += ' ⟳'
+    return label
+
+
+def free_macro_sectors(dev, info, headers):
+    """Every ERASED (all-0xFF) sector in the free/macro region that is not a listed
+    profile (nor the directory). These are the slots a new macro can be written to."""
+    listed = {s for s, _ in headers} | {0x0000}
+    size = info['sector_size']
+    out = []
+    for s in range(info['profile_count'] + 1, info['sector_count']):
+        if s in listed:
+            continue
+        if all(b == 0xFF for b in dev.read_sector(s, size)):
+            out.append(s)
+    return out
+
+
+def _macro_body_at(dev, size, sector, offset):
+    """Read the macro bytecode at (sector, offset): bytes from offset up to and
+    including the first END, via the opcode-length walk. b'' on any issue."""
+    try:
+        raw = dev.read_sector(sector, size)
+        i = offset
+        for _ in range(512):
+            if i >= len(raw):
+                return b''
+            op = raw[i]
+            n = macros.opcode_len(op)
+            if n is None or i + n > len(raw):
+                return b''
+            i += n
+            if op == macros.OP_END:
+                return bytes(raw[offset:i])
+        return b''
+    except Exception:
+        return b''
 
 
 def profile_bindings(dev, sector, size):
@@ -181,6 +292,75 @@ def apply_binding(dev, info, headers, sector, button, new_binding, backup_header
     gate + safety). Kept for callers that change one button at a time."""
     return apply_bindings(dev, info, headers, sector, {button: new_binding},
                           backup_headers=backup_headers)
+
+
+def apply_edits(dev, info, headers, sector, button_changes=None, gshift_changes=None,
+                sensor=None, macro_changes=None, backup_headers=None):
+    """Full staged Apply, macros included. `macro_changes` = {button: macrodef|None}
+    (None clears -> disabled). For each NEW macro this writes its bytecode into a
+    free ERASED sector (the proven full-sector no-CRC write + read-back), then folds
+    the resulting macro pointer into `button_changes` so the profile is written ONCE,
+    gated, by apply_bindings (buttons + gshift + sensor together). A macro byte-
+    identical to what the button already runs is skipped (no slot burned). Returns
+    (ok, message).
+
+    Batch macros are PLANNED before any flash write: every button index, macro body,
+    and size is validated and total free-slot capacity is checked up front, so a
+    doomed batch (bad index, empty/oversized macro, not enough slots) fails BEFORE
+    touching flash and never orphans a slot. v1: one sector per macro (no cross-
+    sector chaining); reassigning/clearing a macro orphans its old sector (harmless;
+    flash can't be erased here yet). If a macro write's read-back fails mid-batch (a
+    hardware hiccup) the profile is never written and any already-written sectors are
+    harmless orphans."""
+    button_changes = dict(button_changes or {})
+    macro_changes = macro_changes or {}
+    size = info['sector_size']
+    if macro_changes:
+        try:
+            cur = onboard.OnboardProfile.decode(dev.read_sector(sector, size), sector=sector)
+        except Exception as e:
+            return False, f'profile read failed: {e}'
+        # --- plan (no writes): validate + build bodies + resolve skips/clears ---
+        to_write = []                                  # [(button, body)] needing a sector
+        for btn, macrodef in macro_changes.items():
+            if not (0 <= btn < info['button_count']):
+                return False, f'macro button {btn} out of range (0..{info["button_count"] - 1})'
+            if macrodef is None:
+                button_changes[btn] = onboard.Button.disabled()
+                continue
+            try:
+                body = build_macro_body(macrodef)
+            except ValueError as e:
+                return False, f'button {btn}: {e}'
+            if len(body) > size:
+                return False, (f'macro on button {btn} is {len(body)} bytes — too large '
+                               f'for one {size}-byte sector')
+            curb = cur.buttons[btn]
+            if curb.kind == 'macro' and \
+                    _macro_body_at(dev, size, curb.macro_sector, curb.macro_address) == body:
+                continue                               # already runs this exact macro
+            to_write.append((btn, body))
+        # --- capacity check up front, then write ---
+        if to_write:
+            free = free_macro_sectors(dev, info, headers)
+            if len(free) < len(to_write):
+                return False, (f'not enough free macro slots — {len(free)} free, '
+                               f'need {len(to_write)} (clear a macro to free a slot)')
+            for (btn, body), macro_sector in zip(to_write, free):
+                image = macros.to_sector(body, size, crc=False, offset=0)
+                try:
+                    dev.write_full_sector_no_crc(macro_sector, image)
+                    if dev.read_sector(macro_sector, size) != image:
+                        return False, f'macro sector 0x{macro_sector:04x} read-back mismatch — not committed'
+                except Exception as e:
+                    return False, f'macro write failed: {e}'
+                button_changes[btn] = onboard.Button.macro_ptr(macro_sector, 0)
+
+    if not button_changes and not gshift_changes and not sensor:
+        return True, 'no changes needed'          # all staged edits were no-ops
+    return apply_bindings(dev, info, headers, sector,
+                          button_changes=button_changes, gshift_changes=gshift_changes,
+                          sensor=sensor, backup_headers=backup_headers)
 
 
 # Binding constructors the UI offers, expressed as onboard.Button factories.

@@ -21,6 +21,7 @@ packaging/udev (no sudo). Until that rule is installed the device shows up but
 isn't openable, which we surface as permission == "no-access".
 """
 
+import json
 import os
 import sys
 import threading
@@ -65,6 +66,7 @@ class MouseBridge(QObject):
     _refreshDone = Signal(bool, str, int, int, int, bool, 'QVariantMap')  # present, perm, active, count, battery, wireless, binds
     _remapDone = Signal(bool, str, 'QVariantMap')               # ok, status, binds
     _applyDone = Signal(bool, str, 'QVariantMap')               # ok, status, binds
+    _macroSlotsDone = Signal(int)                              # free macro sector count
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -88,11 +90,14 @@ class MouseBridge(QObject):
         self._dpi_step = DPI_FALLBACK['step']
         self._pending = {}              # {'<layer>:<button>': spec} — staged buttons
         self._pending_sensor = {}       # {'dpi:<i>'|'dpi_default'|'dpi_shift'|'report_rate': int}
+        self._pending_macros = {}       # {button:int -> macrodef dict} — staged macros (primary bank)
+        self._macro_slots_free = -1     # erased macro sectors available; -1 = not probed
         self._io = threading.Lock()     # serialize device access (worker threads)
 
         self._refreshDone.connect(self._on_refresh)
         self._remapDone.connect(self._on_remap)
         self._applyDone.connect(self._on_apply)
+        self._macroSlotsDone.connect(self._on_macro_slots)
 
         # light hotplug poll: enumerate (no open) every few seconds; a full read
         # happens only on a connect transition or an explicit refresh().
@@ -140,6 +145,10 @@ class MouseBridge(QObject):
             return {str(i): (b['label'] or b['kind']) for i, b in d.items()}
         return {'buttons': mk(raw['buttons']), 'gbuttons': mk(raw['gbuttons']),
                 'sensor': raw['sensor']}
+
+    def _set_status(self, msg):
+        self._status = msg
+        self.statusChanged.emit()
 
     def _set_binds(self, binds):
         self._bindings = binds.get('buttons', {})
@@ -235,18 +244,21 @@ class MouseBridge(QObject):
 
     @Property(int, notify=pendingChanged)
     def pendingCount(self):
-        return len(self._pending) + len(self._pending_sensor)
+        return len(self._pending) + len(self._pending_sensor) + len(self._pending_macros)
 
     @Property('QVariantMap', notify=pendingChanged)
     def pending(self):
         """Staged (unsaved) BUTTON targets, {'<layer>:<button>': label}, for the
-        Buttons page to preview per-button (list + diagram)."""
+        Buttons page to preview per-button (list + diagram). Includes staged macros
+        (primary bank) so a macro'd button shows in the list too."""
         out = {}
         for b, spec in self._pending.items():
             try:
                 out[str(b)] = logi_config.friendly_binding(logi_config.binding_from_spec(spec))
             except Exception:
                 out[str(b)] = spec
+        for btn, mdef in self._pending_macros.items():
+            out[f'default:{btn}'] = 'Macro: ' + logi_config.macro_summary(mdef)
         return out
 
     @Property('QVariantMap', notify=pendingChanged)
@@ -286,7 +298,15 @@ class MouseBridge(QObject):
         for key, value in self._pending_sensor.items():
             name, label = self._sensor_chip(key, value)
             out.append({'group': 'sensor', 'key': key, 'name': name, 'label': label})
+        for btn, mdef in self._pending_macros.items():
+            out.append({'group': 'macro', 'key': f'macro:{btn}',
+                        'name': BUTTON_NAMES.get(btn, f'Button {btn}'),
+                        'label': 'Macro: ' + logi_config.macro_summary(mdef)})
         return out
+
+    @Property(int, notify=sensorChanged)
+    def macroSlotsFree(self):
+        return self._macro_slots_free       # erased macro sectors available, -1=unknown
 
     # ------------------------------------------------------------- worker thread
     def _refresh_worker(self):
@@ -345,9 +365,10 @@ class MouseBridge(QObject):
         self._wireless = wireless
         if present:
             self._set_binds(binds)      # updates both banks + sensor state
-        elif self._pending or self._pending_sensor:
+        elif self._pending or self._pending_sensor or self._pending_macros:
             self._pending = {}          # device gone -> staged edits are stale
             self._pending_sensor = {}
+            self._pending_macros = {}
             self.pendingChanged.emit()
         self.presenceChanged.emit()
 
@@ -358,6 +379,10 @@ class MouseBridge(QObject):
         self.statusChanged.emit()
         if ok and binds:
             self._set_binds(binds)
+
+    def _on_macro_slots(self, free):
+        self._macro_slots_free = free
+        self.sensorChanged.emit()
 
     # -------------------------------------------------------------------- slots
     @Slot()
@@ -389,7 +414,48 @@ class MouseBridge(QObject):
             self._set_status(f'unsupported target: {e}')
             return
         self._pending[f'{layer}:{int(button)}'] = spec
+        if layer == 'default':
+            self._pending_macros.pop(int(button), None)   # a plain bind supersedes a staged macro
         self.pendingChanged.emit()
+
+    @Slot(int, str)
+    def stageMacro(self, button, macro_json):
+        """Queue a MACRO for `button` (primary bank). `macro_json` is the editor's
+        JSON: {"steps":[...], "repeat":bool}. Validated (built) here so a bad macro
+        is caught before Apply. Supersedes any plain bind staged on this button."""
+        if not (0 <= int(button) < (self._button_count or 16)):
+            return                                       # ignore an out-of-range button
+        try:
+            mdef = json.loads(macro_json)
+            logi_config.build_macro_body(mdef)           # validate only (raises ValueError)
+        except (ValueError, TypeError, json.JSONDecodeError) as e:
+            self._set_status(f'bad macro: {e}')
+            return
+        self._pending_macros[int(button)] = mdef
+        self._pending.pop(f'default:{int(button)}', None)
+        self.pendingChanged.emit()
+
+    @Slot()
+    def probeMacroSlots(self):
+        """Count the free (erased) macro sectors off-thread; updates macroSlotsFree.
+        Called when the macro editor opens so the UI can warn when slots run low."""
+        if self._busy:
+            return
+        threading.Thread(target=self._probe_macro_worker, daemon=True).start()
+
+    def _probe_macro_worker(self):
+        with self._io:
+            dev = hidpp.find_device()
+            if dev is None:
+                return
+            try:
+                with dev:
+                    info = dev.onboard_info()
+                    headers = dev.profile_headers()
+                    free = len(logi_config.free_macro_sectors(dev, info, headers))
+                self._macroSlotsDone.emit(free)
+            except Exception:
+                pass
 
     @Slot(str, int)
     def unstage(self, layer, button):
@@ -399,18 +465,23 @@ class MouseBridge(QObject):
 
     @Slot(str)
     def unstageItem(self, key):
-        """Drop one staged change by its pendingList key — button OR sensor (the
-        keyspaces don't collide: 'default:'/'gshift:' vs 'dpi'/'report_rate')."""
-        if self._pending.pop(key, None) is not None or \
+        """Drop one staged change by its pendingList key — button, sensor, or macro.
+        Keyspaces are distinct: 'default:'/'gshift:' vs 'dpi'/'report_rate' vs
+        'macro:<n>'."""
+        if key.startswith('macro:'):
+            if self._pending_macros.pop(int(key[6:]), None) is not None:
+                self.pendingChanged.emit()
+        elif self._pending.pop(key, None) is not None or \
                 self._pending_sensor.pop(key, None) is not None:
             self.pendingChanged.emit()
 
     @Slot()
     def discard(self):
-        """Drop all staged changes (buttons + sensor)."""
-        if self._pending or self._pending_sensor:
+        """Drop all staged changes (buttons + sensor + macros)."""
+        if self._pending or self._pending_sensor or self._pending_macros:
             self._pending = {}
             self._pending_sensor = {}
+            self._pending_macros = {}
             self.pendingChanged.emit()
 
     # --------------------------------------------- sensor (DPI / rate) staging
@@ -449,18 +520,20 @@ class MouseBridge(QObject):
 
     @Slot()
     def apply(self):
-        """Write every staged change (both button banks + sensor header) to the
-        active profile in ONE gated, read-back-verified write (off-thread)."""
-        if self._busy or (not self._pending and not self._pending_sensor):
+        """Write every staged change (button banks + sensor header + macros) to the
+        active profile in ONE gated, read-back-verified write (off-thread). Macro
+        bytecode is written to a free sector first, then the profile once."""
+        if self._busy or not (self._pending or self._pending_sensor or self._pending_macros):
             return
         self._busy = True
         self.busyChanged.emit()
         snapshot = dict(self._pending)               # {'<layer>:<button>': spec}
         sensor_snapshot = dict(self._pending_sensor)
+        macro_snapshot = dict(self._pending_macros)  # {button:int -> macrodef}
         threading.Thread(target=self._apply_worker,
-                         args=(snapshot, sensor_snapshot), daemon=True).start()
+                         args=(snapshot, sensor_snapshot, macro_snapshot), daemon=True).start()
 
-    def _apply_worker(self, snapshot, sensor_snapshot):
+    def _apply_worker(self, snapshot, sensor_snapshot, macro_snapshot):
         try:
             button_changes, gshift_changes = {}, {}
             for key, spec in snapshot.items():
@@ -480,6 +553,7 @@ class MouseBridge(QObject):
                 sensor['report_rate_hz'] = int(v)
         if dpi:
             sensor['dpi'] = dpi
+        macro_changes = {int(b): m for b, m in macro_snapshot.items()}
         with self._io:
             dev = hidpp.find_device()
             if dev is None:
@@ -491,12 +565,16 @@ class MouseBridge(QObject):
                     headers = dev.profile_headers()
                     active = dev.current_profile()
                     active_hdr = [h for h in headers if h[0] == active] or [(active, 1)]
-                    ok, msg = logi_config.apply_bindings(
+                    ok, msg = logi_config.apply_edits(
                         dev, info, headers, active,
                         button_changes=button_changes, gshift_changes=gshift_changes,
-                        sensor=sensor, backup_headers=active_hdr)
+                        sensor=sensor, macro_changes=macro_changes, backup_headers=active_hdr)
                     binds = self._read_both(dev, active, info['sector_size']) if ok else {}
+                    # macro slots may have changed; refresh the count for the editor
+                    free = len(logi_config.free_macro_sectors(dev, info, headers)) if ok else -1
                 self._applyDone.emit(ok, msg, binds)
+                if ok:
+                    self._macroSlotsDone.emit(free)
             except Exception as e:
                 self._applyDone.emit(False, f'error: {e}', {})
 
@@ -508,6 +586,7 @@ class MouseBridge(QObject):
         if ok:
             self._pending = {}                       # committed -> clear the queue
             self._pending_sensor = {}
+            self._pending_macros = {}
             self.pendingChanged.emit()
             if binds:
                 self._set_binds(binds)
