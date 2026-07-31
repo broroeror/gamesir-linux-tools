@@ -882,4 +882,44 @@ Window {
             }
         }
     }
+
+    // Same, for the MOUSE Apply — read-back result of the last staged write. Sits
+    // above the mouse pending bar so a failed apply is no longer a silent no-op.
+    Rectangle {
+        id: mouseToast
+        property bool ok: mouse.applyStatus.indexOf("✓") >= 0
+        property bool busy: mouse.applyStatus === "Applying…"
+        visible: win.activeDevice === "mouse" && mouse.applyStatus.length > 0
+        z: 9999
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 92
+        radius: Theme.radius
+        implicitWidth: Math.min(win.width - 60, mouseToastText.implicitWidth + 34)
+        implicitHeight: 40
+        color: Theme.card
+        border.width: 1
+        border.color: mouseToast.busy ? Theme.cardBorder
+                                      : (mouseToast.ok ? Theme.ok : Theme.warn)
+        Text {
+            id: mouseToastText
+            anchors.centerIn: parent; width: parent.width - 24
+            horizontalAlignment: Text.AlignHCenter; elide: Text.ElideRight
+            text: mouse.applyStatus
+            color: mouseToast.busy ? Theme.textDim
+                                   : (mouseToast.ok ? Theme.ok : Theme.warn)
+            font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
+            font.weight: Font.DemiBold
+        }
+        Timer { id: mouseToastTimer; interval: 4500; onTriggered: mouse.clearApplyStatus() }
+        Connections {
+            target: mouse
+            function onApplyStatusChanged() {
+                if (mouse.applyStatus.length > 0 && !mouseToast.busy)
+                    mouseToastTimer.restart()
+                else
+                    mouseToastTimer.stop()
+            }
+        }
+    }
 }

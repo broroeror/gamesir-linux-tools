@@ -66,6 +66,7 @@ class MouseBridge(QObject):
     bindingsChanged = Signal()   # the per-button binding map changed
     sensorChanged = Signal()     # DPI stages / indices / report rate / range changed
     statusChanged = Signal()     # last action result text changed
+    applyStatusChanged = Signal()  # the Apply toast text ("Applying…" / ✓ / ⚠)
     busyChanged = Signal()       # a device write is in flight
     pendingChanged = Signal()    # the staged (unsaved) change set changed
 
@@ -87,6 +88,7 @@ class MouseBridge(QObject):
         self._battery = -1              # state-of-charge %, -1 = unknown
         self._wireless = False
         self._status = ''
+        self._apply_status = ''         # Apply toast text ('' = hidden)
         self._busy = False
         self._bindings = {}             # primary-bank labels {str(i): label}
         self._gbindings = {}            # G-Shift (alternate) bank labels
@@ -247,6 +249,16 @@ class MouseBridge(QObject):
     @Property(str, notify=statusChanged)
     def status(self):
         return self._status
+
+    @Property(str, notify=applyStatusChanged)
+    def applyStatus(self):
+        return self._apply_status       # '' hidden | 'Applying…' | '✓ …' | '⚠ …'
+
+    @Slot()
+    def clearApplyStatus(self):
+        if self._apply_status:
+            self._apply_status = ''
+            self.applyStatusChanged.emit()
 
     @Property(bool, notify=busyChanged)
     def busy(self):
@@ -560,6 +572,8 @@ class MouseBridge(QObject):
             return
         self._busy = True
         self.busyChanged.emit()
+        self._apply_status = 'Applying…'
+        self.applyStatusChanged.emit()
         snapshot = dict(self._pending)               # {'<layer>:<button>': spec}
         sensor_snapshot = dict(self._pending_sensor)
         macro_snapshot = dict(self._pending_macros)  # {button:int -> macrodef}
@@ -616,6 +630,8 @@ class MouseBridge(QObject):
         self.busyChanged.emit()
         self._status = status
         self.statusChanged.emit()
+        self._apply_status = ('✓ ' if ok else '⚠ ') + status
+        self.applyStatusChanged.emit()
         if ok:
             self._pending = {}                       # committed -> clear the queue
             self._pending_sensor = {}
