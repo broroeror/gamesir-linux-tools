@@ -18,11 +18,17 @@ Window {
 
     property int currentTab: 0
     property bool settingsOpen: false
-    readonly property var tabs: ["Rebinds", "Sticks", "Motion", "Triggers", "Vibration", "Lights", "Macros"]
+    // Which device the app drives: the controller shell or the G502 X mouse. The
+    // device picker flips this, which swaps the nav tabs + content below.
+    property string activeDevice: "controller"       // "controller" | "mouse"
+    readonly property var controllerTabs: ["Rebinds", "Sticks", "Motion", "Triggers", "Vibration", "Lights", "Macros"]
+    readonly property var mouseTabs: ["Buttons"]
+    readonly property var tabs: activeDevice === "mouse" ? mouseTabs : controllerTabs
     // Card vertical-compression is global (only one page shows at a time); reset it
     // to full on every tab switch so the newly-shown page's FitScroll re-fits from
     // scratch and a page never inherits another's compression.
     onCurrentTabChanged: Theme.vComp = 1
+    onActiveDeviceChanged: { currentTab = 0; Theme.vComp = 1 }
 
     // Persisted appearance prefs, applied to the Theme singleton on load and
     // whenever the user changes them in Settings → Appearance. Theme colors are
@@ -55,6 +61,14 @@ Window {
         Theme.density = appearance.density
         applyThemeJson()
         _loadNames()
+    }
+    // If the mouse is unplugged while it's the active device, fall back to controller.
+    Connections {
+        target: mouse
+        function onPresenceChanged() {
+            if (!mouse.present && win.activeDevice === "mouse")
+                win.activeDevice = "controller"
+        }
     }
     function setDensity(d) { Theme.density = d; appearance.density = d }
 
@@ -238,6 +252,12 @@ Window {
                 ControllerPicker {
                     Layout.alignment: Qt.AlignVCenter
                     names: win.controllerNames
+                    mousePresent: mouse.present
+                    mouseActive: win.activeDevice === "mouse"
+                    onPickController: function (id) {
+                        bridge.selectController(id); win.activeDevice = "controller"
+                    }
+                    onPickMouse: win.activeDevice = "mouse"
                 }
 
                 // Expand only once the full-width bar actually fits. MEASURED: expanded
@@ -245,7 +265,7 @@ Window {
                 // + 20 left margin + 68 gear reserve = 1299, so 1200 overflowed by ~99px
                 // and the status text ran under the gear. 1320 leaves headroom for the
                 // widest live content.
-                ProfileBar { compact: win.width < 1320 }
+                ProfileBar { compact: win.width < 1320; visible: win.activeDevice === "controller" }
 
                 // Reset the ACTIVE profile to its factory defaults — lives beside
                 // the profile pills since it acts on whichever profile is selected
@@ -255,6 +275,7 @@ Window {
                     id: resetBtn
                     Layout.alignment: Qt.AlignVCenter
                     visible: bridge.profile > 0 && bridge.profileResetSupported
+                             && win.activeDevice === "controller"
                     label: win.width < 1320 ? "↺" : "↺ Reset profile"
                     confirmLabel: "Reset Profile " + bridge.profile + "?"
                     onConfirmed: bridge.resetProfileToDefault()
@@ -275,7 +296,7 @@ Window {
                 // sticks drive the desktop cursor. Labelled by what it does, with
                 // a help icon spelling out the plugin + on/off behaviour.
                 Row {
-                    visible: bridge.mouseModeAvailable
+                    visible: bridge.mouseModeAvailable && win.activeDevice === "controller"
                     Layout.alignment: Qt.AlignVCenter
                     spacing: 8
                     Text {
@@ -303,7 +324,7 @@ Window {
                 }
 
                 Rectangle {
-                    visible: bridge.mouseModeAvailable
+                    visible: bridge.mouseModeAvailable && win.activeDevice === "controller"
                     Layout.alignment: Qt.AlignVCenter
                     width: 1; height: 24; color: Theme.cardBorder
                 }
@@ -358,6 +379,11 @@ Window {
         Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
+
+          Item {                                    // ---- controller content ----
+            id: ctrlContent
+            anchors.fill: parent
+            visible: win.activeDevice === "controller"
 
             // Buttons tab (front page): live controller + remap + reset.
             ButtonsPage {
@@ -463,6 +489,13 @@ Window {
                     }
                 }
             }
+          }                                         // ---- end controller content ----
+
+          Item {                                    // ---- mouse content ----
+              anchors.fill: parent
+              visible: win.activeDevice === "mouse"
+              MousePage { anchors.fill: parent; visible: win.currentTab === 0 }
+          }
         }
     }
 

@@ -2,36 +2,43 @@ import QtQuick
 import QtQuick.Controls as QQC
 import App 1.0
 
-// Top-bar selector for WHICH connected controller the app drives. Lists
-// bridge.controllers and switches via bridge.selectController(id). Shows the
-// current controller's name always; the dropdown is only interactive when more
-// than one controller is connected (identical models are labelled by USB port).
+// Top-bar selector for WHICH device the app drives: any connected controller
+// (bridge.controllers) and — when present — the Logitech G502 X mouse. Emits
+// pickController(id) / pickMouse() so the parent (Main) owns the active-device
+// state and the controller switch; this component only presents the choices.
 //
-// The dropdown is a QQC.Popup so it renders in the window's overlay and receives
-// taps correctly — a plain child Rectangle overflows the 58px top bar's bounds
-// and, though it renders, never gets the tap (input hit-testing is bounded by the
-// ancestor, so the click falls through to the content panel below).
+// The dropdown is a QQC.Popup so it renders in the window overlay and receives
+// taps correctly (a plain child would overflow the 58px bar and never get the tap).
 Item {
     id: root
     property var list: bridge.controllers
     property string current: bridge.selectedController
-    property bool multi: list.length > 1
     // {usb port id: friendly name} — user-assigned, owned/persisted by Main.
     property var names: ({})
 
+    // Mouse device (driven by MouseBridge via Main).
+    property bool mousePresent: false
+    property bool mouseActive: false
+    property string mouseName: "G502 X"
+
+    signal pickController(string id)
+    signal pickMouse()
+
+    readonly property bool multi: list.length > 1
+    readonly property bool canPick: multi || mousePresent   // dropdown worth opening?
+
     // A user name wins over the model label. Names are keyed by USB PORT (identical
-    // units are indistinguishable over USB — see Main's ctrlNames note), so this is
-    // "what's plugged into that socket", not "which unit".
+    // units are indistinguishable over USB — see Main's ctrlNames note).
     function displayFor(e) {
         if (!e) return ""
         var n = names[e.id]
         return (n && n.length) ? n : e.label
     }
 
-    visible: list.length > 0
+    visible: list.length > 0 || mousePresent
     implicitWidth: btn.width
     implicitHeight: btn.height
-    onMultiChanged: if (!multi) menu.close()
+    onCanPickChanged: if (!canPick) menu.close()
 
     function entryFor(id) {
         for (var i = 0; i < list.length; i++)
@@ -42,9 +49,7 @@ Item {
 
     Rectangle {
         id: btn
-        // cap the width so a long controller name elides instead of pushing the
-        // rest of the top bar (settings gear) off-screen at narrow widths.
-        readonly property int pad: root.multi ? 62 : 38
+        readonly property int pad: root.canPick ? 62 : 38
         width: Math.min(210, Math.max(120, txt.implicitWidth + pad))
         height: 32; radius: 8
         color: (hov.hovered || menu.opened) ? Theme.cardHover : Theme.card
@@ -54,8 +59,15 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             anchors.left: parent.left; anchors.leftMargin: 12
             spacing: 8
-            // wired/wireless at a glance, in place of the old plain dot
+            // mouse glyph when the mouse is the active device, else the controller's
+            // wired/wireless indicator
+            Text {
+                visible: root.mouseActive
+                anchors.verticalCenter: parent.verticalCenter
+                text: "🖱"; font.pixelSize: 14; color: Theme.accent
+            }
             ConnIcon {
+                visible: !root.mouseActive
                 anchors.verticalCenter: parent.verticalCenter
                 property var cur: root.entryFor(root.current)
                 wired: cur ? cur.wired : null
@@ -64,7 +76,7 @@ Item {
             }
             Text {
                 id: txt
-                text: root.labelFor(root.current)
+                text: root.mouseActive ? root.mouseName : root.labelFor(root.current)
                 color: Theme.text
                 width: Math.min(implicitWidth, btn.width - btn.pad)
                 elide: Text.ElideRight
@@ -72,13 +84,13 @@ Item {
             }
         }
         Text {
-            visible: root.multi
+            visible: root.canPick
             anchors.verticalCenter: parent.verticalCenter
             anchors.right: parent.right; anchors.rightMargin: 10
             text: menu.opened ? "▴" : "▾"; color: Theme.textDim; font.pixelSize: 12
         }
         HoverHandler { id: hov }
-        TapHandler { enabled: root.multi; onTapped: menu.opened ? menu.close() : menu.open() }
+        TapHandler { enabled: root.canPick; onTapped: menu.opened ? menu.close() : menu.open() }
     }
 
     // Dropdown list — a Popup so it overlays the content below the bar and gets taps.
@@ -100,7 +112,7 @@ Item {
                     required property var modelData
                     width: menu.availableWidth
                     height: 32; radius: 6
-                    property bool sel: modelData.id === root.current
+                    property bool sel: !root.mouseActive && modelData.id === root.current
                     color: sel ? Theme.accent
                                 : (ihov.hovered ? Theme.cardHover : "transparent")
                     Row {
@@ -118,13 +130,10 @@ Item {
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
                             text: root.displayFor(modelData)
-                            // an empty dongle isn't a controller — de-emphasise it
                             opacity: modelData.live ? 1 : 0.6
                             color: parent.parent.sel ? "white" : Theme.text
                             font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
                         }
-                        // Only annotate the exceptional case; "Connected" on every
-                        // row would just be noise.
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
                             visible: !modelData.live
@@ -136,9 +145,35 @@ Item {
                     }
                     HoverHandler { id: ihov }
                     TapHandler {
-                        onTapped: { bridge.selectController(modelData.id); menu.close() }
+                        onTapped: { root.pickController(modelData.id); menu.close() }
                     }
                 }
+            }
+            // Mouse row — only when a G502 X is present.
+            Rectangle {
+                visible: root.mousePresent
+                width: menu.availableWidth
+                height: 32; radius: 6
+                property bool sel: root.mouseActive
+                color: sel ? Theme.accent : (mhov.hovered ? Theme.cardHover : "transparent")
+                Row {
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.left: parent.left; anchors.leftMargin: 10
+                    spacing: 8
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "🖱"; font.pixelSize: 14
+                        color: parent.parent.sel ? "white" : Theme.accent
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: root.mouseName
+                        color: parent.parent.sel ? "white" : Theme.text
+                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
+                    }
+                }
+                HoverHandler { id: mhov }
+                TapHandler { onTapped: { root.pickMouse(); menu.close() } }
             }
         }
     }
