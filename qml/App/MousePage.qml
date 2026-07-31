@@ -10,27 +10,34 @@ Item {
     id: page
     property int selIndex: -1
     property string selName: ""
+    property string editLayer: "default"        // "default" | "gshift" (alternate bank)
 
     function committedLabel(i) {
-        var b = mouse.bindings[String(i)]
+        var map = page.editLayer === "gshift" ? mouse.gbindings : mouse.bindings
+        var b = map[String(i)]
         return (b === undefined || b === "" || b === "(empty)") ? "unset" : b
     }
-    function isStaged(i) { return mouse.pending[String(i)] !== undefined }
-    // what to show for a button: the staged target if any, else the committed one
+    function pkey(i) { return page.editLayer + ":" + i }
+    function isStaged(i) { return mouse.pending[page.pkey(i)] !== undefined }
+    // what to show for a button on the current layer: staged target if any, else committed
     function bindLabel(i) {
-        return page.isStaged(i) ? mouse.pending[String(i)] : page.committedLabel(i)
+        return page.isStaged(i) ? mouse.pending[page.pkey(i)] : page.committedLabel(i)
     }
-    // assign = STAGE (no device write until Apply)
-    function stage(spec) { if (page.selIndex >= 0) mouse.stage(page.selIndex, spec) }
+    // assign = STAGE on the current layer (no device write until Apply)
+    function stage(spec) { if (page.selIndex >= 0) mouse.stage(page.editLayer, page.selIndex, spec) }
     function nameFor(i) {
         for (var j = 0; j < mv.buttons.length; j++)
             if (mv.buttons[j].i === i) return mv.buttons[j].name
         return "#" + i
     }
-    // the staged edits as [{i, name, label}] — drives the pending-bar chips
+    // staged edits across BOTH layers, for the pending-bar chips
     readonly property var pendingList: {
         var out = []; var p = mouse.pending
-        for (var k in p) out.push({ i: parseInt(k), name: page.nameFor(parseInt(k)), label: p[k] })
+        for (var k in p) {
+            var parts = k.split(":")
+            out.push({ layer: parts[0], i: parseInt(parts[1]),
+                       name: page.nameFor(parseInt(parts[1])), label: p[k] })
+        }
         return out
     }
 
@@ -71,10 +78,25 @@ Item {
     }
 
     // ---------------------------------------------- connected: master-detail
+    // Default / G-Shift layer toggle (like the reference's DEFAULT/G-SHIFT switch)
+    Row {
+        id: layerToggle
+        visible: mouse.present
+        anchors.top: parent.top; anchors.topMargin: 14
+        anchors.horizontalCenter: parent.horizontalCenter
+        spacing: 8
+        PillButton { label: "Default"; highlight: page.editLayer === "default"
+                     onClicked: page.editLayer = "default" }
+        PillButton { label: "G-Shift"; highlight: page.editLayer === "gshift"
+                     onClicked: page.editLayer = "gshift" }
+    }
+
     RowLayout {
-        anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
+        anchors.top: layerToggle.bottom; anchors.topMargin: 12
+        anchors.left: parent.left; anchors.right: parent.right
         anchors.bottom: pbar.visible ? pbar.top : parent.bottom
-        anchors.margins: 20; spacing: 16
+        anchors.leftMargin: 20; anchors.rightMargin: 20; anchors.bottomMargin: 20
+        spacing: 16
         visible: mouse.present
 
         // -------- LEFT: button list --------
@@ -128,7 +150,8 @@ Item {
 
         // -------- RIGHT: assign a target --------
         Card {
-            title: page.selIndex < 0 ? "Assign" : "Assign — " + page.selName
+            title: (page.selIndex < 0 ? "Assign" : "Assign — " + page.selName)
+                   + (page.editLayer === "gshift" ? "  · G-Shift" : "")
             Layout.preferredWidth: 260; Layout.minimumWidth: 220; Layout.fillHeight: true
             Column {
                 width: parent.width; spacing: 10
@@ -214,13 +237,14 @@ Item {
                         id: chipRow; anchors.centerIn: parent; spacing: 6
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
-                            text: modelData.name + "  →  " + modelData.label
+                            text: (modelData.layer === "gshift" ? "G· " : "")
+                                  + modelData.name + "  →  " + modelData.label
                             color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                         }
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
                             text: "✕"; color: Theme.textDim; font.pixelSize: Theme.fontS
-                            TapHandler { enabled: !mouse.busy; onTapped: mouse.unstage(modelData.i) }
+                            TapHandler { enabled: !mouse.busy; onTapped: mouse.unstage(modelData.layer, modelData.i) }
                         }
                     }
                 }

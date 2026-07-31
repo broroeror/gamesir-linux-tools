@@ -53,14 +53,15 @@ class MouseBridge(QObject):
         super().__init__(parent)
         self._present = False
         self._permission = 'unknown'    # ok | no-access | absent | unknown
-        self._bindings = {}             # {str(button_index): "label"}
         self._active = 0
         self._button_count = 0
         self._battery = -1              # state-of-charge %, -1 = unknown
         self._wireless = False
         self._status = ''
         self._busy = False
-        self._pending = {}              # {int button: str spec} — staged, unsaved
+        self._bindings = {}             # primary-bank labels {str(i): label}
+        self._gbindings = {}            # G-Shift (alternate) bank labels
+        self._pending = {}              # {'<layer>:<button>': spec} — staged, unsaved
         self._io = threading.Lock()     # serialize device access (worker threads)
 
         self._refreshDone.connect(self._on_refresh)
@@ -104,9 +105,19 @@ class MouseBridge(QObject):
             self.presenceChanged.emit()
 
     @staticmethod
-    def _labels(dev, active, size):
+    def _read_both(dev, active, size):
+        """{'buttons': {str(i): label}, 'gbuttons': {str(i): label}} for the UI —
+        both the primary and the G-Shift banks, from one sector read."""
         raw = logi_config.profile_bindings(dev, active, size)
-        return {str(i): (b['label'] or b['kind']) for i, b in raw.items()}
+
+        def mk(d):
+            return {str(i): (b['label'] or b['kind']) for i, b in d.items()}
+        return {'buttons': mk(raw['buttons']), 'gbuttons': mk(raw['gbuttons'])}
+
+    def _set_binds(self, binds):
+        self._bindings = binds.get('buttons', {})
+        self._gbindings = binds.get('gbuttons', {})
+        self.bindingsChanged.emit()
 
     # --------------------------------------------------------------- properties
     @Property(bool, notify=presenceChanged)
@@ -136,6 +147,10 @@ class MouseBridge(QObject):
     @Property('QVariantMap', notify=bindingsChanged)
     def bindings(self):
         return self._bindings
+
+    @Property('QVariantMap', notify=bindingsChanged)
+    def gbindings(self):
+        return self._gbindings
 
     @Property(str, notify=statusChanged)
     def status(self):
@@ -174,7 +189,7 @@ class MouseBridge(QObject):
                 with dev:
                     info = dev.onboard_info()
                     active = dev.current_profile()
-                    binds = self._labels(dev, active, info['sector_size'])
+                    binds = self._read_both(dev, active, info['sector_size'])
                     bat = getattr(dev, 'battery', lambda: None)()
                 pct = bat['percent'] if bat else -1
                 self._refreshDone.emit(True, 'ok', active, info['button_count'], pct, wireless, binds)
@@ -201,7 +216,7 @@ class MouseBridge(QObject):
                     ok, msg = logi_config.apply_binding(
                         dev, info, headers, active, button, binding,
                         backup_headers=active_hdr)          # back up only the edited profile
-                    binds = self._labels(dev, active, info['sector_size']) if ok else {}
+                    binds = self._read_both(dev, active, info['sector_size']) if ok else {}
                 self._remapDone.emit(ok, msg, binds)
             except Exception as e:
                 self._remapDone.emit(False, f'error: {e}', {})
@@ -215,13 +230,11 @@ class MouseBridge(QObject):
         self._battery = battery
         self._wireless = wireless
         if present:
-            self._bindings = binds
+            self._set_binds(binds)      # updates both banks + emits bindingsChanged
         elif self._pending:
             self._pending = {}          # device gone -> staged edits are stale
             self.pendingChanged.emit()
         self.presenceChanged.emit()
-        if present:
-            self.bindingsChanged.emit()
 
     def _on_remap(self, ok, status, binds):
         self._busy = False
@@ -229,8 +242,7 @@ class MouseBridge(QObject):
         self._status = status
         self.statusChanged.emit()
         if ok and binds:
-            self._bindings = binds
-            self.bindingsChanged.emit()
+            self._set_binds(binds)
 
     # -------------------------------------------------------------------- slots
     @Slot()
@@ -252,23 +264,22 @@ class MouseBridge(QObject):
         threading.Thread(target=self._remap_worker, args=(button, spec), daemon=True).start()
 
     # ------------------------------------------------- staged (batched) editing
-    @Slot(int, str)
-    def stage(self, button, spec):
-        """Queue a binding change for `button` (no device I/O). Validates the spec
-        now so a bad target is rejected before Apply. Call apply() to write them all
-        in one profile write."""
+    @Slot(str, int, str)
+    def stage(self, layer, button, spec):
+        """Queue a change for `button` on `layer` ('default' | 'gshift') — no device
+        I/O. Validates the spec so a bad target is caught before Apply."""
         try:
             logi_config.binding_from_spec(spec)      # validate only
         except ValueError as e:
             self._set_status(f'unsupported target: {e}')
             return
-        self._pending[int(button)] = spec
+        self._pending[f'{layer}:{int(button)}'] = spec
         self.pendingChanged.emit()
 
-    @Slot(int)
-    def unstage(self, button):
-        """Drop a single staged change."""
-        if self._pending.pop(int(button), None) is not None:
+    @Slot(str, int)
+    def unstage(self, layer, button):
+        """Drop one staged change (by layer + button)."""
+        if self._pending.pop(f'{layer}:{int(button)}', None) is not None:
             self.pendingChanged.emit()
 
     @Slot()
@@ -280,19 +291,22 @@ class MouseBridge(QObject):
 
     @Slot()
     def apply(self):
-        """Write every staged change to the active profile in ONE gated,
-        read-back-verified write (off-thread)."""
+        """Write every staged change (both banks) to the active profile in ONE
+        gated, read-back-verified write (off-thread)."""
         if self._busy or not self._pending:
             return
         self._busy = True
         self.busyChanged.emit()
-        changes_spec = dict(self._pending)           # snapshot for the worker
-        threading.Thread(target=self._apply_worker, args=(changes_spec,), daemon=True).start()
+        snapshot = dict(self._pending)               # {'<layer>:<button>': spec}
+        threading.Thread(target=self._apply_worker, args=(snapshot,), daemon=True).start()
 
-    def _apply_worker(self, changes_spec):
+    def _apply_worker(self, snapshot):
         try:
-            changes = {int(b): logi_config.binding_from_spec(s)
-                       for b, s in changes_spec.items()}
+            button_changes, gshift_changes = {}, {}
+            for key, spec in snapshot.items():
+                layer, _, idx = key.partition(':')
+                b = logi_config.binding_from_spec(spec)
+                (gshift_changes if layer == 'gshift' else button_changes)[int(idx)] = b
         except ValueError as e:
             self._applyDone.emit(False, f'unsupported target: {e}', {})
             return
@@ -308,8 +322,10 @@ class MouseBridge(QObject):
                     active = dev.current_profile()
                     active_hdr = [h for h in headers if h[0] == active] or [(active, 1)]
                     ok, msg = logi_config.apply_bindings(
-                        dev, info, headers, active, changes, backup_headers=active_hdr)
-                    binds = self._labels(dev, active, info['sector_size']) if ok else {}
+                        dev, info, headers, active,
+                        button_changes=button_changes, gshift_changes=gshift_changes,
+                        backup_headers=active_hdr)
+                    binds = self._read_both(dev, active, info['sector_size']) if ok else {}
                 self._applyDone.emit(ok, msg, binds)
             except Exception as e:
                 self._applyDone.emit(False, f'error: {e}', {})
@@ -323,5 +339,4 @@ class MouseBridge(QObject):
             self._pending = {}                       # committed -> clear the queue
             self.pendingChanged.emit()
             if binds:
-                self._bindings = binds
-                self.bindingsChanged.emit()
+                self._set_binds(binds)

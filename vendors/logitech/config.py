@@ -56,33 +56,42 @@ def friendly_binding(b):
 
 
 def profile_bindings(dev, sector, size):
-    """Read a profile sector -> {button_index: {'kind','detail','label'}} for every
-    button. Read-only; `label` is the friendly display string used by the UI."""
+    """Read a profile sector -> {'buttons': {i: {...,'label'}}, 'gbuttons': {...}} —
+    both the primary and the G-Shift (alternate) banks, in a single sector read.
+    `label` is the friendly display string used by the UI."""
     raw = dev.read_sector(sector, size)
     prof = onboard.OnboardProfile.decode(raw, sector=sector)
-    return {i: {'kind': b.kind, 'detail': b.detail, 'label': friendly_binding(b)}
-            for i, b in enumerate(prof.buttons)}
+
+    def bank(src):
+        return {i: {'kind': b.kind, 'detail': b.detail, 'label': friendly_binding(b)}
+                for i, b in enumerate(src)}
+    return {'buttons': bank(prof.buttons), 'gbuttons': bank(prof.gbuttons)}
 
 
-def apply_bindings(dev, info, headers, sector, changes, backup_headers=None):
-    """Gated, reversible write of MANY button bindings to `sector` in ONE profile
-    write — the batch the GUI's "Apply" uses. `changes` = {button_index:
-    onboard.Button}. Returns (ok, message). Backs up first; aborts unless the change
-    touches ONLY the edited buttons' 4-byte slots + the CRC; read-back-verifies;
-    restores the original on any failure so a partial/failed write never persists.
+def apply_bindings(dev, info, headers, sector, button_changes=None,
+                   gshift_changes=None, backup_headers=None):
+    """Gated, reversible write of MANY bindings to `sector` in ONE profile write —
+    the batch the GUI's "Apply" uses. `button_changes` / `gshift_changes` are
+    {button_index: onboard.Button} for the primary bank and the G-Shift (alternate)
+    bank respectively; BOTH banks can change in the single write (they live in the
+    same 255-byte sector). Returns (ok, message). Backs up first; aborts unless the
+    change touches ONLY the edited buttons' 4-byte slots (primary @32, gshift @96) +
+    the CRC; read-back-verifies; restores on any failure so a partial write never
+    persists.
 
-    Batching matters: the whole 255-byte sector is rewritten regardless of how many
-    buttons change, so N staged edits cost ONE backup + write + read-back (~50 HID++
-    round-trips) instead of N times that — a big deal over the wireless link.
-
-    `backup_headers` limits the pre-write backup (default: all profiles); the GUI
-    passes just the edited profile."""
+    Batching matters: the whole sector is rewritten regardless of how many buttons
+    change, so N staged edits cost ONE backup + write + read-back — a big deal over
+    the wireless link. `backup_headers` limits the pre-write backup (default: all
+    profiles); the GUI passes just the edited profile."""
+    button_changes = button_changes or {}
+    gshift_changes = gshift_changes or {}
     size = info['sector_size']
-    if not changes:
+    if not button_changes and not gshift_changes:
         return False, 'nothing to apply'
-    for button in changes:
-        if not (0 <= button < info['button_count']):
-            return False, f'button {button} out of range (0..{info["button_count"] - 1})'
+    for grp in (button_changes, gshift_changes):
+        for b in grp:
+            if not (0 <= b < info['button_count']):
+                return False, f'button {b} out of range (0..{info["button_count"] - 1})'
     if sector not in {s for s, _ in headers}:
         return False, f'sector 0x{sector:04x} is not a profile'
 
@@ -92,15 +101,18 @@ def apply_bindings(dev, info, headers, sector, changes, backup_headers=None):
     if not prof.crc_ok:
         return False, 'profile CRC not OK on read — aborting'
 
-    for button, binding in changes.items():
-        prof.set_button(button, binding)
+    for i, b in button_changes.items():
+        prof.set_button(i, b)
+    for i, b in gshift_changes.items():
+        prof.set_gshift(i, b)
     new_bytes = prof.to_bytes()
 
     offs = remap.diff_offsets(raw, new_bytes)
     expected = {size - 2, size - 1}
-    for button in changes:
-        b = 32 + button * 4
-        expected |= set(range(b, b + 4))
+    for i in button_changes:
+        expected |= set(range(32 + i * 4, 36 + i * 4))
+    for i in gshift_changes:
+        expected |= set(range(96 + i * 4, 100 + i * 4))
     safe = (onboard.OnboardProfile.decode(new_bytes).crc_ok
             and set(offs).issubset(expected)
             and onboard.OnboardProfile.decode(raw).to_bytes() == raw
@@ -120,14 +132,15 @@ def apply_bindings(dev, info, headers, sector, changes, backup_headers=None):
             return False, (f'write failed ({e}) AND restore failed ({e2}) — '
                            f'restore manually from {os.path.basename(path)}')
         return False, f'write failed ({e}) — reverted to original'
-    n = len(changes)
+    n = len(button_changes) + len(gshift_changes)
     return True, f'applied {n} change{"" if n == 1 else "s"} (backup {os.path.basename(path)})'
 
 
 def apply_binding(dev, info, headers, sector, button, new_binding, backup_headers=None):
-    """Single-button convenience wrapper over apply_bindings (see it for the gate
-    and safety details). Kept for callers that change one button at a time."""
-    return apply_bindings(dev, info, headers, sector, {button: new_binding}, backup_headers)
+    """Single primary-button convenience wrapper over apply_bindings (see it for the
+    gate + safety). Kept for callers that change one button at a time."""
+    return apply_bindings(dev, info, headers, sector, {button: new_binding},
+                          backup_headers=backup_headers)
 
 
 # Binding constructors the UI offers, expressed as onboard.Button factories.
