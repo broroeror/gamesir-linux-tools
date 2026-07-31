@@ -25,18 +25,23 @@ def profile_bindings(dev, sector, size):
     return {i: {'kind': b.kind, 'detail': b.detail} for i, b in enumerate(prof.buttons)}
 
 
-def apply_binding(dev, info, headers, sector, button, new_binding):
+def apply_binding(dev, info, headers, sector, button, new_binding, backup_headers=None):
     """Gated, reversible write of ONE button binding to `sector`. Returns
-    (ok: bool, message: str). Backs up all profiles first; aborts unless the change
-    touches ONLY the button's 4 bytes + the CRC; read-back-verifies; restores the
-    original bytes on any failure so a partial/failed write never persists."""
+    (ok: bool, message: str). Backs up first; aborts unless the change touches ONLY
+    the button's 4 bytes + the CRC; read-back-verifies; restores the original bytes
+    on any failure so a partial/failed write never persists.
+
+    `backup_headers` limits what the pre-write backup captures (default: all
+    profiles). Since a single-button edit only ever mutates ONE profile, the GUI
+    passes just that profile — far fewer HID++ round-trips, which matters over the
+    wireless link."""
     size = info['sector_size']
     if not (0 <= button < info['button_count']):
         return False, f'button {button} out of range (0..{info["button_count"] - 1})'
     if sector not in {s for s, _ in headers}:
         return False, f'sector 0x{sector:04x} is not a profile'
 
-    path = remap.backup_all(dev, info, headers)
+    path = remap.backup_all(dev, info, backup_headers if backup_headers is not None else headers)
     raw = dev.read_sector(sector, size)
     prof = onboard.OnboardProfile.decode(raw, sector=sector)
     if not prof.crc_ok:

@@ -10,6 +10,12 @@ via the (proven, gated) vendors/logitech backend. This bridge:
   * applies a remap to a button through config.apply_binding (backed up + gated
     + read-back-verified — the device is only ever left verified or untouched).
 
+Device I/O runs on a WORKER THREAD (a single onboard write is ~50-100 HID++
+round-trips, seconds over the wireless link) so the GUI never freezes; results
+are marshalled back to the GUI thread via private signals (Qt delivers a
+cross-thread emit as a queued connection), where the exposed state is updated.
+A `busy` flag drives an "Applying…" state and blocks overlapping operations.
+
 Runs as the logged-in user; hidraw write access comes from the udev rule in
 packaging/udev (no sudo). Until that rule is installed the device shows up but
 isn't openable, which we surface as permission == "no-access".
@@ -17,6 +23,7 @@ isn't openable, which we surface as permission == "no-access".
 
 import os
 import sys
+import threading
 
 from PySide6.QtCore import QObject, Signal, Property, Slot, QTimer
 
@@ -31,6 +38,14 @@ class MouseBridge(QObject):
     presenceChanged = Signal()   # present / permission / activeProfile changed
     bindingsChanged = Signal()   # the per-button binding map changed
     statusChanged = Signal()     # last action result text changed
+    busyChanged = Signal()       # a device write is in flight
+
+    # Private carriers from the worker thread back to the GUI thread. Emitting a
+    # signal from another thread to this (GUI-thread) object is delivered as a
+    # queued connection, so the handlers run on the GUI thread and it's safe to
+    # touch the exposed state there.
+    _refreshDone = Signal(bool, str, int, int, 'QVariantMap')   # present, perm, active, count, binds
+    _remapDone = Signal(bool, str, 'QVariantMap')               # ok, status, binds
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -40,6 +55,12 @@ class MouseBridge(QObject):
         self._active = 0
         self._button_count = 0
         self._status = ''
+        self._busy = False
+        self._io = threading.Lock()     # serialize device access (worker threads)
+
+        self._refreshDone.connect(self._on_refresh)
+        self._remapDone.connect(self._on_remap)
+
         # light hotplug poll: enumerate (no open) every few seconds; a full read
         # happens only on a connect transition or an explicit refresh().
         self._timer = QTimer(self)
@@ -48,7 +69,7 @@ class MouseBridge(QObject):
         self._timer.start()
         self.refresh()
 
-    # ------------------------------------------------------------------ probing
+    # ---------------------------------------------- probing (GUI thread, cheap)
     def _node_present(self):
         """True if a G502 X hidraw node is enumerable (does NOT need open access)."""
         try:
@@ -61,18 +82,9 @@ class MouseBridge(QObject):
             pass
         return False
 
-    def _open(self):
-        """Open the G502 X (returns an open Hidpp) or None, updating _permission.
-        find_device returns None on BOTH absent and permission-denied (it swallows
-        the open error), so we disambiguate with an enumerate probe."""
-        dev = hidpp.find_device()
-        if dev is None:
-            self._permission = 'no-access' if self._node_present() else 'absent'
-            return None
-        self._permission = 'ok'
-        return dev
-
     def _poll(self):
+        if self._busy:
+            return
         node = self._node_present()
         if node and not self._present:
             self.refresh()                       # just connected -> read it
@@ -81,8 +93,9 @@ class MouseBridge(QObject):
             self._permission = 'absent'
             self.presenceChanged.emit()
 
-    def _labels(self, dev, size):
-        raw = logi_config.profile_bindings(dev, self._active, size)
+    @staticmethod
+    def _labels(dev, active, size):
+        raw = logi_config.profile_bindings(dev, active, size)
         return {str(i): (b['detail'] or b['kind']) for i, b in raw.items()}
 
     # --------------------------------------------------------------- properties
@@ -110,62 +123,88 @@ class MouseBridge(QObject):
     def status(self):
         return self._status
 
-    def _set_status(self, s):
-        self._status = s
+    @Property(bool, notify=busyChanged)
+    def busy(self):
+        return self._busy
+
+    # ------------------------------------------------------------- worker thread
+    def _refresh_worker(self):
+        with self._io:
+            dev = hidpp.find_device()
+            if dev is None:
+                perm = 'no-access' if self._node_present() else 'absent'
+                self._refreshDone.emit(False, perm, 0, 0, {})
+                return
+            try:
+                with dev:
+                    info = dev.onboard_info()
+                    active = dev.current_profile()
+                    binds = self._labels(dev, active, info['sector_size'])
+                self._refreshDone.emit(True, 'ok', active, info['button_count'], binds)
+            except Exception as e:
+                self._refreshDone.emit(False, f'read error: {e}', 0, 0, {})
+
+    def _remap_worker(self, button, spec):
+        try:
+            binding = logi_config.binding_from_spec(spec)
+        except ValueError as e:
+            self._remapDone.emit(False, f'unsupported target: {e}', {})
+            return
+        with self._io:
+            dev = hidpp.find_device()
+            if dev is None:
+                self._remapDone.emit(False, 'mouse not accessible — connected and permitted?', {})
+                return
+            try:
+                with dev:
+                    info = dev.onboard_info()
+                    headers = dev.profile_headers()
+                    active = dev.current_profile()
+                    active_hdr = [h for h in headers if h[0] == active] or [(active, 1)]
+                    ok, msg = logi_config.apply_binding(
+                        dev, info, headers, active, button, binding,
+                        backup_headers=active_hdr)          # back up only the edited profile
+                    binds = self._labels(dev, active, info['sector_size']) if ok else {}
+                self._remapDone.emit(ok, msg, binds)
+            except Exception as e:
+                self._remapDone.emit(False, f'error: {e}', {})
+
+    # ------------------------------------------------- GUI-thread result handlers
+    def _on_refresh(self, present, perm, active, count, binds):
+        self._permission = perm
+        self._present = present
+        self._active = active
+        self._button_count = count
+        if present:
+            self._bindings = binds
+        self.presenceChanged.emit()
+        if present:
+            self.bindingsChanged.emit()
+
+    def _on_remap(self, ok, status, binds):
+        self._busy = False
+        self.busyChanged.emit()
+        self._status = status
         self.statusChanged.emit()
+        if ok and binds:
+            self._bindings = binds
+            self.bindingsChanged.emit()
 
     # -------------------------------------------------------------------- slots
     @Slot()
     def refresh(self):
-        """Detect the device and read the active profile's bindings."""
-        dev = self._open()
-        if dev is None:
-            if self._present:
-                self._present = False
-                self.presenceChanged.emit()
-            else:
-                self.presenceChanged.emit()      # permission/absent may have changed
+        """Detect the device and read the active profile's bindings (off-thread)."""
+        if self._busy:
             return
-        try:
-            with dev:
-                info = dev.onboard_info()
-                self._active = dev.current_profile()
-                self._button_count = info['button_count']
-                self._bindings = self._labels(dev, info['sector_size'])
-            self._present = True
-            self.presenceChanged.emit()
-            self.bindingsChanged.emit()
-        except Exception as e:
-            self._set_status(f'read error: {e}')
-            if self._present:
-                self._present = False
-                self.presenceChanged.emit()
+        threading.Thread(target=self._refresh_worker, daemon=True).start()
 
     @Slot(int, str)
     def remap(self, button, spec):
-        """Apply a binding to `button` on the active profile. spec vocabulary:
-        key:<char|name> | mouse:<n> | sniper | dpi-up | dpi-down | dpi-cycle |
-        disabled."""
-        try:
-            binding = logi_config.binding_from_spec(spec)
-        except ValueError as e:
-            self._set_status(f'unsupported target: {e}')
+        """Apply a binding to `button` on the active profile (off-thread). spec
+        vocabulary: key:<char|name> | mouse:<n> | sniper | dpi-up | dpi-down |
+        dpi-cycle | disabled."""
+        if self._busy:
             return
-        dev = self._open()
-        if dev is None:
-            self._set_status('mouse not accessible — is it connected and permitted?')
-            return
-        try:
-            with dev:
-                info = dev.onboard_info()
-                headers = dev.profile_headers()
-                active = dev.current_profile()
-                ok, msg = logi_config.apply_binding(
-                    dev, info, headers, active, button, binding)
-                self._set_status(msg)
-                if ok:
-                    self._active = active
-                    self._bindings = self._labels(dev, info['sector_size'])
-                    self.bindingsChanged.emit()
-        except Exception as e:
-            self._set_status(f'error: {e}')
+        self._busy = True
+        self.busyChanged.emit()
+        threading.Thread(target=self._remap_worker, args=(button, spec), daemon=True).start()

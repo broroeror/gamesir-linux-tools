@@ -111,8 +111,8 @@ Item {
             Layout.preferredWidth: 260; Layout.minimumWidth: 220; Layout.fillHeight: true
             Column {
                 width: parent.width; spacing: 10
-                enabled: page.selIndex >= 0
-                opacity: page.selIndex >= 0 ? 1 : 0.45
+                enabled: page.selIndex >= 0 && !mouse.busy
+                opacity: (page.selIndex >= 0 && !mouse.busy) ? 1 : 0.45
 
                 Flow {
                     width: parent.width; spacing: 6
@@ -161,8 +161,9 @@ Item {
                 }
                 Text {
                     width: parent.width; wrapMode: Text.WordWrap; topPadding: 4
-                    visible: mouse.status.length > 0
-                    text: mouse.status; color: Theme.textDim
+                    visible: mouse.busy || mouse.status.length > 0
+                    text: mouse.busy ? "Applying…" : mouse.status
+                    color: mouse.busy ? Theme.accent : Theme.textDim
                     font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                 }
             }
