@@ -22,6 +22,7 @@ from PySide6.QtQml import QQmlApplicationEngine
 
 from reader import read_controller, press_select_loop
 from bridge import GamesirBridge
+from mouse_bridge import MouseBridge
 import kwin
 import mousegrab
 
@@ -78,6 +79,8 @@ def main():
     engine.addImportPath(QML_DIR)                 # makes `import App` resolve
     bridge = GamesirBridge()
     engine.rootContext().setContextProperty('bridge', bridge)
+    mouse = MouseBridge()
+    engine.rootContext().setContextProperty('mouse', mouse)
     engine.rootContext().setContextProperty('appVersion', __version__)
     engine.rootContext().setContextProperty(
         'assetsDir', QUrl.fromLocalFile(ASSETS_DIR + os.sep).toString())

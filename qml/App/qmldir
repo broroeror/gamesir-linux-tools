@@ -8,6 +8,7 @@ ConnIcon 1.0 ConnIcon.qml
 StatusPill 1.0 StatusPill.qml
 ControllerView 1.0 ControllerView.qml
 MouseView 1.0 MouseView.qml
+MousePage 1.0 MousePage.qml
 AccentSlider 1.0 AccentSlider.qml
 ToggleSwitch 1.0 ToggleSwitch.qml
 ColorPicker 1.0 ColorPicker.qml

@@ -1,0 +1,17 @@
+# Deadband — grant the logged-in user access to the Logitech G502 X's hidraw node,
+# so the app can read and write the mouse's onboard profile WITHOUT root. This is
+# the same mechanism ratbagd / Solaar use (TAG+="uaccess" hands the device to the
+# active-seat user via systemd-logind).
+#
+# Install:
+#   sudo cp packaging/udev/70-deadband-g502x.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload && sudo udevadm trigger
+# then replug the mouse (or the Lightspeed receiver).
+#
+# Note: stop ratbagd first if it holds the device (sudo systemctl stop ratbagd),
+# or exclude the G502 X from ratbagd — two writers on one profile can contend.
+
+# G502 X LIGHTSPEED, wired
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c098", TAG+="uaccess"
+# via the Lightspeed receiver
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c547", TAG+="uaccess"
