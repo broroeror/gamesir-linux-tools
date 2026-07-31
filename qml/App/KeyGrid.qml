@@ -24,6 +24,7 @@ Column {
 
     readonly property real ku: 28       // key unit (px)
     readonly property real kgap: 4
+    property bool showExtended: false    // reveal F13–F24 + numpad + system keys
 
     readonly property var rows: [
         [{t:"Esc",k:"esc"},{t:"F1",k:"f1"},{t:"F2",k:"f2"},{t:"F3",k:"f3"},{t:"F4",k:"f4"},{t:"F5",k:"f5"},{t:"F6",k:"f6"},{t:"F7",k:"f7"},{t:"F8",k:"f8"},{t:"F9",k:"f9"},{t:"F10",k:"f10"},{t:"F11",k:"f11"},{t:"F12",k:"f12"}],
@@ -32,6 +33,13 @@ Column {
         [{t:"Caps",k:"capslock",w:1.75},{t:"A",k:"a"},{t:"S",k:"s"},{t:"D",k:"d"},{t:"F",k:"f"},{t:"G",k:"g"},{t:"H",k:"h"},{t:"J",k:"j"},{t:"K",k:"k"},{t:"L",k:"l"},{t:";",k:";"},{t:"'",k:"'"},{t:"↵",k:"enter",w:2.25}],
         [{t:"Z",k:"z"},{t:"X",k:"x"},{t:"C",k:"c"},{t:"V",k:"v"},{t:"B",k:"b"},{t:"N",k:"n"},{t:"M",k:"m"},{t:",",k:","},{t:".",k:"."},{t:"/",k:"/"}],
         [{t:"Space",k:"space",w:6},{t:"Del",k:"delete",w:1.4},{t:"Home",k:"home",w:1.4},{t:"End",k:"end",w:1.4},{t:"←",k:"left"},{t:"↑",k:"up"},{t:"↓",k:"down"},{t:"→",k:"right"}]
+    ]
+    // Extended keys — F13..F24, numpad, and system keys (MMO / macro keybinds).
+    readonly property var extRows: [
+        [{t:"F13",k:"f13"},{t:"F14",k:"f14"},{t:"F15",k:"f15"},{t:"F16",k:"f16"},{t:"F17",k:"f17"},{t:"F18",k:"f18"},{t:"F19",k:"f19"},{t:"F20",k:"f20"},{t:"F21",k:"f21"},{t:"F22",k:"f22"},{t:"F23",k:"f23"},{t:"F24",k:"f24"}],
+        [{t:"PrtSc",k:"printscreen",w:1.4},{t:"ScrLk",k:"scrolllock",w:1.4},{t:"Pause",k:"pause",w:1.4},{t:"Ins",k:"insert",w:1.2},{t:"PgUp",k:"pageup",w:1.3},{t:"PgDn",k:"pagedown",w:1.3},{t:"Menu",k:"menu",w:1.3}],
+        [{t:"Num",k:"numlock"},{t:"/",k:"numdivide"},{t:"*",k:"nummultiply"},{t:"-",k:"numminus"},{t:"7",k:"num7"},{t:"8",k:"num8"},{t:"9",k:"num9"},{t:"+",k:"numplus"}],
+        [{t:"4",k:"num4"},{t:"5",k:"num5"},{t:"6",k:"num6"},{t:"1",k:"num1"},{t:"2",k:"num2"},{t:"3",k:"num3"},{t:"0",k:"num0"},{t:".",k:"numdot"},{t:"↵",k:"numenter",w:1.4}]
     ]
 
     // modifier toggles
@@ -58,11 +66,12 @@ Column {
         }
     }
 
-    // keyboard
-    Column {
+    // key rendering — shared by the main + extended grids
+    component KeyRows: Column {
+        property var rowModel: []
         spacing: kg.kgap
         Repeater {
-            model: kg.rows
+            model: parent.rowModel
             delegate: Row {
                 required property var modelData
                 spacing: kg.kgap
@@ -89,4 +98,18 @@ Column {
             }
         }
     }
+
+    // main keyboard
+    KeyRows { rowModel: kg.rows }
+
+    // extended keys (F13–F24, numpad, system) behind a toggle
+    Row {
+        spacing: 8
+        PillButton {
+            label: (kg.showExtended ? "▾ " : "▸ ") + "More keys (F13–F24, numpad)"
+            highlight: kg.showExtended
+            onClicked: kg.showExtended = !kg.showExtended
+        }
+    }
+    KeyRows { visible: kg.showExtended; rowModel: kg.extRows }
 }

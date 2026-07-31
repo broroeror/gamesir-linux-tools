@@ -67,6 +67,10 @@ def friendly_binding(b):
 #   {'t':'key',   'combo':'ctrl+c', 'hold':0, 'delay':30}  a key or shortcut
 #   {'t':'click', 'button':1,       'hold':0, 'delay':30}  a mouse button
 #   {'t':'text',  'text':'hello',             'delay':30}  type a string (auto-shift)
+# mouse-button step labels (the action a step performs, named like the buttons)
+_CLICK_NAMES = {1: 'Left Click', 2: 'Right Click', 3: 'Middle Click', 4: 'Back', 5: 'Forward'}
+
+
 def _macro_steps(macrodef):
     return macrodef.get('steps', []) if isinstance(macrodef, dict) else (macrodef or [])
 
@@ -103,6 +107,13 @@ def build_macro_body(macrodef):
                 if _ms(s.get('hold')):
                     m.pause(_ms(s.get('hold')))
                 m.mouse_up(int(s.get('button', 1) or 1))
+            elif t == 'scroll':
+                m.scroll(int(s.get('delta', 1) or 1))       # +up / -down (i8)
+            elif t == 'media':
+                code = int(s.get('code', 0) or 0)
+                if code <= 0:
+                    raise ValueError('media step needs a "code"')
+                m.consumer(code)
             elif t == 'text':
                 text = s.get('text')
                 if not text:
@@ -129,14 +140,18 @@ def _combo_label(combo):
 
 
 def macro_step_label(s):
-    """One step -> a short label ('Ctrl+C', 'Click M1', '“hi”') for the editor/chips."""
+    """One step -> a short label ('Ctrl+C', 'Left Click', 'Scroll ↑', '“hi”')."""
     if not isinstance(s, dict):
         return str(s)
     t = s.get('t')
     if t == 'key':
         return _combo_label(s.get('combo', ''))
     if t == 'click':
-        return 'Click M%d' % int(s.get('button', 1) or 1)
+        return _CLICK_NAMES.get(int(s.get('button', 1) or 1), 'Mouse %d' % int(s.get('button', 1) or 1))
+    if t == 'scroll':
+        return 'Scroll ' + ('↑' if int(s.get('delta', 1) or 1) >= 0 else '↓')
+    if t == 'media':
+        return macros.CONSUMER.get(int(s.get('code', 0) or 0), 'Media')
     if t == 'text':
         return '“%s”' % s.get('text', '')
     return str(t)

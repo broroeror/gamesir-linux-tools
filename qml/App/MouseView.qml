@@ -27,17 +27,17 @@ Item {
     // match the onboard-profile button slots (0=primary … 10=prev-dpi). Pages read
     // this for their button list so the map lives in ONE place.
     readonly property var buttons: [
-        { i: 0,  name: "Primary Click",         nx: 0.400, ny: 0.140, r: 0.043 },
-        { i: 1,  name: "Secondary Click",       nx: 0.730, ny: 0.130, r: 0.043 },
-        { i: 2,  name: "Middle Click",          nx: 0.566, ny: 0.250, wheel: true },
-        { i: 6,  name: "Scroll Left",           nx: 0.492, ny: 0.250, r: 0.021 },
-        { i: 7,  name: "Scroll Right",          nx: 0.640, ny: 0.250, r: 0.021 },
-        { i: 9,  name: "DPI Up",                nx: 0.240, ny: 0.130, r: 0.030 },
-        { i: 10, name: "DPI Down",              nx: 0.200, ny: 0.270, r: 0.030 },
-        { i: 8,  name: "Onboard Profile Cycle", nx: 0.566, ny: 0.400, r: 0.032 },
-        { i: 4,  name: "DPI Shift",             nx: 0.160, ny: 0.440, r: 0.037 },
-        { i: 5,  name: "Forward",               nx: 0.120, ny: 0.560, r: 0.031 },
-        { i: 3,  name: "Back",                  nx: 0.090, ny: 0.640, r: 0.031 }
+        { i: 0,  name: "Left Click",     nx: 0.400, ny: 0.140, r: 0.043 },
+        { i: 1,  name: "Right Click",    nx: 0.730, ny: 0.130, r: 0.043 },
+        { i: 2,  name: "Middle Click",   nx: 0.566, ny: 0.250, wheel: true },
+        { i: 6,  name: "Scroll L/T",     nx: 0.492, ny: 0.250, r: 0.021 },
+        { i: 7,  name: "Scroll R/T",     nx: 0.640, ny: 0.250, r: 0.021 },
+        { i: 9,  name: "DPI Up",         nx: 0.240, ny: 0.130, r: 0.030 },
+        { i: 10, name: "DPI Down",       nx: 0.200, ny: 0.270, r: 0.030 },
+        { i: 8,  name: "Profile Cycle",  nx: 0.566, ny: 0.400, r: 0.032 },
+        { i: 4,  name: "DPI Shift",      nx: 0.160, ny: 0.440, r: 0.037 },
+        { i: 5,  name: "Forward",        nx: 0.120, ny: 0.560, r: 0.031 },
+        { i: 3,  name: "Backward",       nx: 0.090, ny: 0.640, r: 0.031 }
     ]
 
     // Traced silhouette, normalized 0..1 (front = top, thumb wing = left).

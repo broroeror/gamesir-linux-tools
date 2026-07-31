@@ -38,12 +38,20 @@ import config as logi_config     # noqa: E402  (vendors/logitech/config.py)
 # with MouseView.qml's `buttons` table (the visual source of truth) so a queued-
 # change chip reads the same on any tab, including the DPI tab which has no diagram.
 BUTTON_NAMES = {
-    0: 'Primary Click', 1: 'Secondary Click', 2: 'Middle Click',
-    3: 'Back', 4: 'DPI Shift', 5: 'Forward', 6: 'Scroll Left', 7: 'Scroll Right',
-    8: 'Onboard Profile Cycle', 9: 'DPI Up', 10: 'DPI Down',
+    0: 'Left Click', 1: 'Right Click', 2: 'Middle Click',
+    3: 'Backward', 4: 'DPI Shift', 5: 'Forward', 6: 'Scroll L/T', 7: 'Scroll R/T',
+    8: 'Profile Cycle', 9: 'DPI Up', 10: 'DPI Down',
 }
-# Display order for button lists (matches MouseView.qml's diagram order).
-BUTTON_ORDER = [0, 1, 2, 6, 7, 9, 10, 8, 4, 5, 3]
+# Grouped, ordered button picker (device index per group). Names/groups follow the
+# industry convention (label by default action — G HUB/Synapse do the same).
+BUTTON_GROUPS = [
+    ('Clicks', [0, 1, 2]),
+    ('Scroll', [6, 7]),
+    ('DPI', [9, 10, 4]),
+    ('Thumb', [8, 5, 3]),
+]
+# Flat display order (matches the grouping above).
+BUTTON_ORDER = [i for _, idxs in BUTTON_GROUPS for i in idxs]
 
 # Report rates the G502 X LIGHTSPEED supports, low→high (1000/500/250/125 Hz map to
 # the 1/2/4/8 ms interval stored in the profile's byte 0).
@@ -315,11 +323,23 @@ class MouseBridge(QObject):
         """Ordered [{index, name}] for the button pickers (macros tab selector)."""
         return [{'index': i, 'name': BUTTON_NAMES.get(i, f'Button {i}')} for i in BUTTON_ORDER]
 
+    @Property('QVariantList', constant=True)
+    def buttonGroups(self):
+        """Grouped [{group, buttons:[{index,name}]}] for the macros-tab button picker."""
+        return [{'group': g, 'buttons': [{'index': i, 'name': BUTTON_NAMES.get(i, f'Button {i}')}
+                                         for i in idxs]}
+                for g, idxs in BUTTON_GROUPS]
+
     @Slot(int, result='QVariantMap')
     def stagedMacro(self, button):
         """The staged macro def for a button ({'steps':[...],'repeat':bool}), or an
         empty map — lets the macros tab resume editing a macro already in the queue."""
         return dict(self._pending_macros.get(int(button), {}))
+
+    @Property('QVariantList', constant=True)
+    def mediaActions(self):
+        """[{code, name}] consumer-control (media) actions for the Media popout."""
+        return [{'code': c, 'name': n} for c, n in logi_config.macros.CONSUMER.items()]
 
     # ------------------------------------------------------------- worker thread
     def _refresh_worker(self):
