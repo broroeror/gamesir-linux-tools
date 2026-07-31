@@ -50,6 +50,8 @@ def friendly_binding(b):
         return _key_label(b.key, b.modifiers)
     if b.kind == 'send-button':
         return 'Mouse %d' % (b.mouse_mask.bit_length() if b.mouse_mask else 0)
+    if b.kind == 'function' and b.function == 0x0B:
+        return 'G-Shift'
     if b.kind == 'unset':
         return 'unset'
     return b.detail
@@ -160,4 +162,6 @@ def binding_from_spec(spec):
         else:
             mods, usage = 0, macros.key_usage(combo)
         return onboard.Button.key(usage, mods)
+    if spec == 'gshift-hold':                     # the G-Shift trigger button
+        return onboard.Button.gshift_trigger()
     return remap.parse_binding(spec)

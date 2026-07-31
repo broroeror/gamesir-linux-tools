@@ -162,6 +162,10 @@ Item {
                     width: parent.width; spacing: 6
                     PillButton { label: "Disabled";  onClicked: page.stage("disabled") }
                     PillButton { label: "Sniper";    onClicked: page.stage("sniper") }
+                    PillButton {
+                        label: "G-Shift"; visible: page.editLayer === "default"
+                        onClicked: page.stage("gshift-hold")     // makes this button the G-Shift trigger
+                    }
                     PillButton { label: "DPI +";     onClicked: page.stage("dpi-up") }
                     PillButton { label: "DPI −";     onClicked: page.stage("dpi-down") }
                     PillButton { label: "DPI cycle"; onClicked: page.stage("dpi-cycle") }
