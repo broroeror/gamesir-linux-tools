@@ -33,10 +33,27 @@ if _LOGI not in sys.path:
 import hidpp                     # noqa: E402
 import config as logi_config     # noqa: E402  (vendors/logitech/config.py)
 
+# Canonical G502 X button names, keyed by onboard-profile slot index. Kept in sync
+# with MouseView.qml's `buttons` table (the visual source of truth) so a queued-
+# change chip reads the same on any tab, including the DPI tab which has no diagram.
+BUTTON_NAMES = {
+    0: 'Primary Click', 1: 'Secondary Click', 2: 'Middle Click',
+    3: 'Back', 4: 'DPI Shift', 5: 'Forward', 6: 'Scroll Left', 7: 'Scroll Right',
+    8: 'Onboard Profile Cycle', 9: 'DPI Up', 10: 'DPI Down',
+}
+
+# Report rates the G502 X LIGHTSPEED supports, low→high (1000/500/250/125 Hz map to
+# the 1/2/4/8 ms interval stored in the profile's byte 0).
+REPORT_RATES = [125, 250, 500, 1000]
+# Sensor range fallback if feature 0x2201 can't be read (the HERO 25K's documented
+# range); a live dpi_range() query overrides these.
+DPI_FALLBACK = {'min': 100, 'max': 25600, 'step': 50}
+
 
 class MouseBridge(QObject):
     presenceChanged = Signal()   # present / permission / activeProfile changed
     bindingsChanged = Signal()   # the per-button binding map changed
+    sensorChanged = Signal()     # DPI stages / indices / report rate / range changed
     statusChanged = Signal()     # last action result text changed
     busyChanged = Signal()       # a device write is in flight
     pendingChanged = Signal()    # the staged (unsaved) change set changed
@@ -61,7 +78,16 @@ class MouseBridge(QObject):
         self._busy = False
         self._bindings = {}             # primary-bank labels {str(i): label}
         self._gbindings = {}            # G-Shift (alternate) bank labels
-        self._pending = {}              # {'<layer>:<button>': spec} — staged, unsaved
+        # sensor header (bytes 0..12 of the active profile)
+        self._dpi_stages = []           # the 5 DPI resolutions
+        self._dpi_default = 0           # index of the active/boot stage
+        self._dpi_shift = 0             # index of the sniper (shift-DPI) stage
+        self._report_rate = 0           # Hz
+        self._dpi_min = DPI_FALLBACK['min']
+        self._dpi_max = DPI_FALLBACK['max']
+        self._dpi_step = DPI_FALLBACK['step']
+        self._pending = {}              # {'<layer>:<button>': spec} — staged buttons
+        self._pending_sensor = {}       # {'dpi:<i>'|'dpi_default'|'dpi_shift'|'report_rate': int}
         self._io = threading.Lock()     # serialize device access (worker threads)
 
         self._refreshDone.connect(self._on_refresh)
@@ -106,18 +132,32 @@ class MouseBridge(QObject):
 
     @staticmethod
     def _read_both(dev, active, size):
-        """{'buttons': {str(i): label}, 'gbuttons': {str(i): label}} for the UI —
-        both the primary and the G-Shift banks, from one sector read."""
+        """{'buttons', 'gbuttons', 'sensor'} for the UI — both button banks AND the
+        sensor header (DPI stages + indices + report rate), from one sector read."""
         raw = logi_config.profile_bindings(dev, active, size)
 
         def mk(d):
             return {str(i): (b['label'] or b['kind']) for i, b in d.items()}
-        return {'buttons': mk(raw['buttons']), 'gbuttons': mk(raw['gbuttons'])}
+        return {'buttons': mk(raw['buttons']), 'gbuttons': mk(raw['gbuttons']),
+                'sensor': raw['sensor']}
 
     def _set_binds(self, binds):
         self._bindings = binds.get('buttons', {})
         self._gbindings = binds.get('gbuttons', {})
         self.bindingsChanged.emit()
+        sensor = binds.get('sensor')
+        rng = binds.get('range')
+        if sensor is not None or rng is not None:
+            if sensor is not None:
+                self._dpi_stages = list(sensor.get('dpi', []))
+                self._dpi_default = sensor.get('dpi_default', 0)
+                self._dpi_shift = sensor.get('dpi_shift', 0)
+                self._report_rate = sensor.get('report_rate_hz', 0)
+            if rng:
+                self._dpi_min = rng.get('min', self._dpi_min)
+                self._dpi_max = rng.get('max', self._dpi_max)
+                self._dpi_step = rng.get('step') or self._dpi_step
+            self.sensorChanged.emit()
 
     # --------------------------------------------------------------- properties
     @Property(bool, notify=presenceChanged)
@@ -152,6 +192,39 @@ class MouseBridge(QObject):
     def gbindings(self):
         return self._gbindings
 
+    # ---- sensor: DPI stages, active/sniper index, report rate, range ----------
+    @Property('QVariantList', notify=sensorChanged)
+    def dpiStages(self):
+        return list(self._dpi_stages)
+
+    @Property(int, notify=sensorChanged)
+    def dpiDefault(self):
+        return self._dpi_default
+
+    @Property(int, notify=sensorChanged)
+    def dpiShift(self):
+        return self._dpi_shift
+
+    @Property(int, notify=sensorChanged)
+    def reportRate(self):
+        return self._report_rate
+
+    @Property(int, notify=sensorChanged)
+    def dpiMin(self):
+        return self._dpi_min
+
+    @Property(int, notify=sensorChanged)
+    def dpiMax(self):
+        return self._dpi_max
+
+    @Property(int, notify=sensorChanged)
+    def dpiStep(self):
+        return self._dpi_step
+
+    @Property('QVariantList', constant=True)
+    def reportRates(self):
+        return list(REPORT_RATES)
+
     @Property(str, notify=statusChanged)
     def status(self):
         return self._status
@@ -162,17 +235,57 @@ class MouseBridge(QObject):
 
     @Property(int, notify=pendingChanged)
     def pendingCount(self):
-        return len(self._pending)
+        return len(self._pending) + len(self._pending_sensor)
 
     @Property('QVariantMap', notify=pendingChanged)
     def pending(self):
-        """Staged (unsaved) targets, as {str(button): label} for the UI to preview."""
+        """Staged (unsaved) BUTTON targets, {'<layer>:<button>': label}, for the
+        Buttons page to preview per-button (list + diagram)."""
         out = {}
         for b, spec in self._pending.items():
             try:
                 out[str(b)] = logi_config.friendly_binding(logi_config.binding_from_spec(spec))
             except Exception:
                 out[str(b)] = spec
+        return out
+
+    @Property('QVariantMap', notify=pendingChanged)
+    def pendingSensor(self):
+        """Staged (unsaved) SENSOR edits, {key: numeric value}, for the DPI page to
+        reflect a staged-but-unapplied stage/index/rate on the control itself."""
+        return dict(self._pending_sensor)
+
+    @staticmethod
+    def _sensor_chip(key, value):
+        """Friendly (name, label) for a staged sensor edit — the DPI-tab chips."""
+        if key.startswith('dpi:'):
+            return f'DPI {int(key[4:]) + 1}', f'{int(value)}'
+        if key == 'dpi_default':
+            return 'Active DPI', f'Stage {int(value) + 1}'
+        if key == 'dpi_shift':
+            return 'Sniper DPI', f'Stage {int(value) + 1}'
+        if key == 'report_rate':
+            return 'Report rate', f'{int(value)} Hz'
+        return key, str(value)
+
+    @Property('QVariantList', notify=pendingChanged)
+    def pendingList(self):
+        """Every staged change (buttons + G-Shift + sensor) as self-describing chip
+        rows [{group, key, name, label}], so any tab's pending bar renders and
+        removes them identically."""
+        out = []
+        for key, spec in self._pending.items():
+            layer, _, idx = key.partition(':')
+            try:
+                label = logi_config.friendly_binding(logi_config.binding_from_spec(spec))
+            except Exception:
+                label = spec
+            out.append({'group': 'gshift' if layer == 'gshift' else 'button',
+                        'key': key, 'name': BUTTON_NAMES.get(int(idx), f'Button {idx}'),
+                        'label': label})
+        for key, value in self._pending_sensor.items():
+            name, label = self._sensor_chip(key, value)
+            out.append({'group': 'sensor', 'key': key, 'name': name, 'label': label})
         return out
 
     # ------------------------------------------------------------- worker thread
@@ -190,6 +303,7 @@ class MouseBridge(QObject):
                     info = dev.onboard_info()
                     active = dev.current_profile()
                     binds = self._read_both(dev, active, info['sector_size'])
+                    binds['range'] = getattr(dev, 'dpi_range', lambda: None)()
                     bat = getattr(dev, 'battery', lambda: None)()
                 pct = bat['percent'] if bat else -1
                 self._refreshDone.emit(True, 'ok', active, info['button_count'], pct, wireless, binds)
@@ -230,9 +344,10 @@ class MouseBridge(QObject):
         self._battery = battery
         self._wireless = wireless
         if present:
-            self._set_binds(binds)      # updates both banks + emits bindingsChanged
-        elif self._pending:
+            self._set_binds(binds)      # updates both banks + sensor state
+        elif self._pending or self._pending_sensor:
             self._pending = {}          # device gone -> staged edits are stale
+            self._pending_sensor = {}
             self.pendingChanged.emit()
         self.presenceChanged.emit()
 
@@ -278,29 +393,74 @@ class MouseBridge(QObject):
 
     @Slot(str, int)
     def unstage(self, layer, button):
-        """Drop one staged change (by layer + button)."""
+        """Drop one staged BUTTON change (by layer + button)."""
         if self._pending.pop(f'{layer}:{int(button)}', None) is not None:
+            self.pendingChanged.emit()
+
+    @Slot(str)
+    def unstageItem(self, key):
+        """Drop one staged change by its pendingList key — button OR sensor (the
+        keyspaces don't collide: 'default:'/'gshift:' vs 'dpi'/'report_rate')."""
+        if self._pending.pop(key, None) is not None or \
+                self._pending_sensor.pop(key, None) is not None:
             self.pendingChanged.emit()
 
     @Slot()
     def discard(self):
-        """Drop all staged changes."""
-        if self._pending:
+        """Drop all staged changes (buttons + sensor)."""
+        if self._pending or self._pending_sensor:
             self._pending = {}
+            self._pending_sensor = {}
+            self.pendingChanged.emit()
+
+    # --------------------------------------------- sensor (DPI / rate) staging
+    @Slot(int, int)
+    def stageDpi(self, index, value):
+        """Queue a DPI-stage value change (snapped/clamped to the sensor range)."""
+        if not (0 <= index < 5):
+            return
+        step = self._dpi_step or 1
+        v = max(self._dpi_min, min(self._dpi_max, int(value)))
+        v = int(round((v - self._dpi_min) / step)) * step + self._dpi_min
+        v = max(self._dpi_min, min(self._dpi_max, v))
+        self._pending_sensor[f'dpi:{index}'] = v
+        self.pendingChanged.emit()
+
+    @Slot(int)
+    def stageDpiDefault(self, index):
+        """Queue which stage is the active (boot) DPI."""
+        if 0 <= index < 5:
+            self._pending_sensor['dpi_default'] = int(index)
+            self.pendingChanged.emit()
+
+    @Slot(int)
+    def stageDpiShift(self, index):
+        """Queue which stage the Sniper (shift-DPI) button uses."""
+        if 0 <= index < 5:
+            self._pending_sensor['dpi_shift'] = int(index)
+            self.pendingChanged.emit()
+
+    @Slot(int)
+    def stageReportRate(self, hz):
+        """Queue the report rate (Hz)."""
+        if hz in REPORT_RATES:
+            self._pending_sensor['report_rate'] = int(hz)
             self.pendingChanged.emit()
 
     @Slot()
     def apply(self):
-        """Write every staged change (both banks) to the active profile in ONE
-        gated, read-back-verified write (off-thread)."""
-        if self._busy or not self._pending:
+        """Write every staged change (both button banks + sensor header) to the
+        active profile in ONE gated, read-back-verified write (off-thread)."""
+        if self._busy or (not self._pending and not self._pending_sensor):
             return
         self._busy = True
         self.busyChanged.emit()
         snapshot = dict(self._pending)               # {'<layer>:<button>': spec}
-        threading.Thread(target=self._apply_worker, args=(snapshot,), daemon=True).start()
+        sensor_snapshot = dict(self._pending_sensor)
+        threading.Thread(target=self._apply_worker,
+                         args=(snapshot, sensor_snapshot), daemon=True).start()
 
-    def _apply_worker(self, snapshot):
+    def _apply_worker(self, snapshot, sensor_snapshot):
         try:
             button_changes, gshift_changes = {}, {}
             for key, spec in snapshot.items():
@@ -310,6 +470,16 @@ class MouseBridge(QObject):
         except ValueError as e:
             self._applyDone.emit(False, f'unsupported target: {e}', {})
             return
+        sensor, dpi = {}, {}
+        for k, v in sensor_snapshot.items():
+            if k.startswith('dpi:'):
+                dpi[int(k[4:])] = int(v)
+            elif k in ('dpi_default', 'dpi_shift'):
+                sensor[k] = int(v)
+            elif k == 'report_rate':
+                sensor['report_rate_hz'] = int(v)
+        if dpi:
+            sensor['dpi'] = dpi
         with self._io:
             dev = hidpp.find_device()
             if dev is None:
@@ -324,7 +494,7 @@ class MouseBridge(QObject):
                     ok, msg = logi_config.apply_bindings(
                         dev, info, headers, active,
                         button_changes=button_changes, gshift_changes=gshift_changes,
-                        backup_headers=active_hdr)
+                        sensor=sensor, backup_headers=active_hdr)
                     binds = self._read_both(dev, active, info['sector_size']) if ok else {}
                 self._applyDone.emit(ok, msg, binds)
             except Exception as e:
@@ -337,6 +507,7 @@ class MouseBridge(QObject):
         self.statusChanged.emit()
         if ok:
             self._pending = {}                       # committed -> clear the queue
+            self._pending_sensor = {}
             self.pendingChanged.emit()
             if binds:
                 self._set_binds(binds)

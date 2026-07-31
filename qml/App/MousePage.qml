@@ -25,57 +25,8 @@ Item {
     }
     // assign = STAGE on the current layer (no device write until Apply)
     function stage(spec) { if (page.selIndex >= 0) mouse.stage(page.editLayer, page.selIndex, spec) }
-    function nameFor(i) {
-        for (var j = 0; j < mv.buttons.length; j++)
-            if (mv.buttons[j].i === i) return mv.buttons[j].name
-        return "#" + i
-    }
-    // staged edits across BOTH layers, for the pending-bar chips
-    readonly property var pendingList: {
-        var out = []; var p = mouse.pending
-        for (var k in p) {
-            var parts = k.split(":")
-            out.push({ layer: parts[0], i: parseInt(parts[1]),
-                       name: page.nameFor(parseInt(parts[1])), label: p[k] })
-        }
-        return out
-    }
-
     // ---------------------------------------------- not connected / no access
-    ColumnLayout {
-        anchors.centerIn: parent
-        width: Math.min(parent.width - 60, 460)
-        visible: !mouse.present
-        spacing: 14
-
-        Text {
-            Layout.fillWidth: true
-            horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap
-            font.family: Theme.fontFamily; font.pixelSize: Theme.fontL; color: Theme.text
-            text: mouse.permission === "no-access"
-                    ? "Your G502 X is connected, but Deadband can't access it yet."
-                    : mouse.permission === "absent"
-                    ? "Connect your Logitech G502 X to configure it."
-                    : "Looking for a G502 X…"
-        }
-        Card {
-            visible: mouse.permission === "no-access"
-            title: "Grant access (one-time)"
-            Layout.fillWidth: true
-            Text {
-                width: parent.width; wrapMode: Text.WrapAnywhere
-                color: Theme.textDim; font.family: "monospace"; font.pixelSize: Theme.fontS
-                text: "sudo cp packaging/udev/70-deadband-g502x.rules /etc/udev/rules.d/\n"
-                    + "sudo udevadm control --reload && sudo udevadm trigger"
-            }
-            Text {
-                width: parent.width; wrapMode: Text.WordWrap; topPadding: 6
-                color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
-                text: "…then replug the mouse. If ratbagd holds the device, stop it first."
-            }
-        }
-        PillButton { Layout.alignment: Qt.AlignHCenter; label: "Retry"; onClicked: mouse.refresh() }
-    }
+    MouseConnectState {}
 
     // ---------------------------------------------- connected: master-detail
     // Default / G-Shift layer toggle (like the reference's DEFAULT/G-SHIFT switch)
@@ -204,56 +155,11 @@ Item {
         }
     }
 
-    // -------- staged-changes bar: shows each queued edit; applies all in one write --------
-    Rectangle {
+    // -------- staged-changes bar: shows every queued edit; applies all in one write --------
+    MousePendingBar {
         id: pbar
-        visible: mouse.present && mouse.pendingCount > 0
         anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
         anchors.leftMargin: 20; anchors.rightMargin: 20; anchors.bottomMargin: 20
-        height: Math.max(52, chips.implicitHeight + 20); radius: Theme.radius
-        color: Theme.card; border.color: Theme.accent; border.width: 1
-
-        Row {
-            id: actions
-            anchors.right: parent.right; anchors.rightMargin: 14
-            anchors.verticalCenter: parent.verticalCenter; spacing: 8
-            PillButton { label: "Discard"; enabled: !mouse.busy; onClicked: mouse.discard() }
-            PillButton {
-                label: mouse.busy ? "Applying…" : "Apply " + mouse.pendingCount
-                highlight: !mouse.busy; enabled: !mouse.busy
-                onClicked: mouse.apply()
-            }
-        }
-        // one chip per queued change (✕ removes just that one)
-        Flow {
-            id: chips
-            anchors.left: parent.left; anchors.leftMargin: 14
-            anchors.right: actions.left; anchors.rightMargin: 12
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 6
-            Repeater {
-                model: page.pendingList
-                delegate: Rectangle {
-                    required property var modelData
-                    height: 26; radius: 6; implicitWidth: chipRow.implicitWidth + 16
-                    color: Theme.button; border.color: Theme.accent; border.width: 1
-                    Row {
-                        id: chipRow; anchors.centerIn: parent; spacing: 6
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: (modelData.layer === "gshift" ? "G· " : "")
-                                  + modelData.name + "  →  " + modelData.label
-                            color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
-                        }
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: "✕"; color: Theme.textDim; font.pixelSize: Theme.fontS
-                            TapHandler { enabled: !mouse.busy; onTapped: mouse.unstage(modelData.layer, modelData.i) }
-                        }
-                    }
-                }
-            }
-        }
     }
 
     // modal keyboard picker, opened by the assign panel's "Choose a key…"

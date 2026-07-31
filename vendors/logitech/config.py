@@ -58,8 +58,9 @@ def friendly_binding(b):
 
 
 def profile_bindings(dev, sector, size):
-    """Read a profile sector -> {'buttons': {i: {...,'label'}}, 'gbuttons': {...}} —
-    both the primary and the G-Shift (alternate) banks, in a single sector read.
+    """Read a profile sector -> {'buttons': {i: {...,'label'}}, 'gbuttons': {...},
+    'sensor': {...}} — the primary + G-Shift button banks AND the sensor header
+    (DPI stages, active/sniper index, report rate), in a single sector read.
     `label` is the friendly display string used by the UI."""
     raw = dev.read_sector(sector, size)
     prof = onboard.OnboardProfile.decode(raw, sector=sector)
@@ -67,33 +68,53 @@ def profile_bindings(dev, sector, size):
     def bank(src):
         return {i: {'kind': b.kind, 'detail': b.detail, 'label': friendly_binding(b)}
                 for i, b in enumerate(src)}
-    return {'buttons': bank(prof.buttons), 'gbuttons': bank(prof.gbuttons)}
+    return {'buttons': bank(prof.buttons), 'gbuttons': bank(prof.gbuttons),
+            'sensor': {
+                'dpi': list(prof.resolutions),
+                'dpi_default': prof.default_dpi_index,
+                'dpi_shift': prof.shift_dpi_index,
+                'report_rate_hz': prof.report_rate_hz,
+            }}
 
 
 def apply_bindings(dev, info, headers, sector, button_changes=None,
-                   gshift_changes=None, backup_headers=None):
-    """Gated, reversible write of MANY bindings to `sector` in ONE profile write —
+                   gshift_changes=None, sensor=None, backup_headers=None):
+    """Gated, reversible write of MANY edits to `sector` in ONE profile write —
     the batch the GUI's "Apply" uses. `button_changes` / `gshift_changes` are
     {button_index: onboard.Button} for the primary bank and the G-Shift (alternate)
-    bank respectively; BOTH banks can change in the single write (they live in the
-    same 255-byte sector). Returns (ok, message). Backs up first; aborts unless the
-    change touches ONLY the edited buttons' 4-byte slots (primary @32, gshift @96) +
-    the CRC; read-back-verifies; restores on any failure so a partial write never
-    persists.
+    bank; `sensor` is an optional dict of header edits — {'dpi': {stage: value},
+    'dpi_default': idx, 'dpi_shift': idx, 'report_rate_hz': hz} — that all live in
+    bytes 0..12 of the SAME 255-byte sector. Every kind of edit rides in the single
+    write. Returns (ok, message). Backs up first; aborts unless the change touches
+    ONLY the edited buttons' 4-byte slots (primary @32, gshift @96), the edited
+    sensor bytes, and the CRC; read-back-verifies; restores on any failure so a
+    partial write never persists.
 
-    Batching matters: the whole sector is rewritten regardless of how many buttons
+    Batching matters: the whole sector is rewritten regardless of how many fields
     change, so N staged edits cost ONE backup + write + read-back — a big deal over
     the wireless link. `backup_headers` limits the pre-write backup (default: all
     profiles); the GUI passes just the edited profile."""
     button_changes = button_changes or {}
     gshift_changes = gshift_changes or {}
+    sensor = sensor or {}
+    dpi_changes = sensor.get('dpi') or {}
     size = info['sector_size']
-    if not button_changes and not gshift_changes:
+    if not button_changes and not gshift_changes and not sensor:
         return False, 'nothing to apply'
     for grp in (button_changes, gshift_changes):
         for b in grp:
             if not (0 <= b < info['button_count']):
                 return False, f'button {b} out of range (0..{info["button_count"] - 1})'
+    for i in dpi_changes:
+        if not (0 <= int(i) < onboard.N_RESOLUTIONS):
+            return False, f'dpi stage {i} out of range (0..{onboard.N_RESOLUTIONS - 1})'
+    for k in ('dpi_default', 'dpi_shift'):
+        if k in sensor and not (0 <= int(sensor[k]) < onboard.N_RESOLUTIONS):
+            return False, f'{k} out of range (0..{onboard.N_RESOLUTIONS - 1})'
+    if 'report_rate_hz' in sensor and int(sensor['report_rate_hz']) <= 0:
+        # guard the 1000/hz in set_report_rate_hz for any future caller (the GUI
+        # already only offers positive rates)
+        return False, 'report_rate_hz must be positive'
     if sector not in {s for s, _ in headers}:
         return False, f'sector 0x{sector:04x} is not a profile'
 
@@ -107,6 +128,14 @@ def apply_bindings(dev, info, headers, sector, button_changes=None,
         prof.set_button(i, b)
     for i, b in gshift_changes.items():
         prof.set_gshift(i, b)
+    for i, v in dpi_changes.items():
+        prof.set_dpi(int(i), int(v))
+    if 'dpi_default' in sensor:
+        prof.default_dpi_index = int(sensor['dpi_default'])
+    if 'dpi_shift' in sensor:
+        prof.shift_dpi_index = int(sensor['dpi_shift'])
+    if 'report_rate_hz' in sensor:
+        prof.set_report_rate_hz(int(sensor['report_rate_hz']))
     new_bytes = prof.to_bytes()
 
     offs = remap.diff_offsets(raw, new_bytes)
@@ -115,6 +144,14 @@ def apply_bindings(dev, info, headers, sector, button_changes=None,
         expected |= set(range(32 + i * 4, 36 + i * 4))
     for i in gshift_changes:
         expected |= set(range(96 + i * 4, 100 + i * 4))
+    if 'report_rate_hz' in sensor:
+        expected.add(0)
+    if 'dpi_default' in sensor:
+        expected.add(1)
+    if 'dpi_shift' in sensor:
+        expected.add(2)
+    for i in dpi_changes:
+        expected |= set(range(3 + int(i) * 2, 5 + int(i) * 2))
     safe = (onboard.OnboardProfile.decode(new_bytes).crc_ok
             and set(offs).issubset(expected)
             and onboard.OnboardProfile.decode(raw).to_bytes() == raw
@@ -134,7 +171,8 @@ def apply_bindings(dev, info, headers, sector, button_changes=None,
             return False, (f'write failed ({e}) AND restore failed ({e2}) — '
                            f'restore manually from {os.path.basename(path)}')
         return False, f'write failed ({e}) — reverted to original'
-    n = len(button_changes) + len(gshift_changes)
+    n = (len(button_changes) + len(gshift_changes) + len(dpi_changes)
+         + sum(k in sensor for k in ('dpi_default', 'dpi_shift', 'report_rate_hz')))
     return True, f'applied {n} change{"" if n == 1 else "s"} (backup {os.path.basename(path)})'
 
 

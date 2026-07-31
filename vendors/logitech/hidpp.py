@@ -42,6 +42,7 @@ FEATURE_ROOT = 0x0000
 FEATURE_FEATURE_SET = 0x0001
 FEATURE_ONBOARD_PROFILES = 0x8100
 FEATURE_UNIFIED_BATTERY = 0x1004
+FEATURE_ADJUSTABLE_DPI = 0x2201
 
 # ONBOARD_PROFILES (0x8100) FUNCTION INDICES — RAW 0..15; request() applies the
 # <<4 to place them in the high nibble. Pass raw indices here, NOT the pre-shifted
@@ -202,6 +203,40 @@ class Hidpp:
             return {'percent': d[0], 'charging': len(d) > 2 and d[2] in (1, 2, 3)}
         except Exception:
             return None
+
+    def dpi_range(self, sensor=0):
+        """feature 0x2201 (adjustable DPI) getSensorDpiList -> {'min','max','step'}
+        for `sensor` (the sensor's usable resolution range), or None if the feature
+        is absent/unreadable. Best-effort; never raises so a probe hiccup can't break
+        a profile read.
+
+        Logitech encodes a RANGE as three consecutive u16s in the list: [min,
+        0xE000|step, max] — the 0xE000 top-bits mark the middle value as the step,
+        not a discrete DPI. (A mouse with only discrete steps returns a plain list
+        with no marker.) We parse the marker form the HERO sensor uses; if there's
+        no marker we fall back to the min/max of the discrete values."""
+        try:
+            idx = self.get_feature_index(FEATURE_ADJUSTABLE_DPI)
+            if not idx:
+                return None
+            d = self.request(idx, 0x01, bytes([sensor]))     # fn1 getSensorDpiList
+            # data[0] echoes the sensor index; the u16 list follows, 0-padded.
+            vals = [(d[1 + i * 2] << 8) | d[2 + i * 2] for i in range((len(d) - 1) // 2)]
+            while vals and vals[-1] == 0:
+                vals.pop()
+            if not vals:
+                return None
+            for i, v in enumerate(vals):
+                if (v & 0xE000) == 0xE000 and 0 < i < len(vals) - 1:
+                    step, lo, hi = v & 0x1FFF, vals[i - 1], vals[i + 1]
+                    if step and hi > lo:
+                        return {'min': lo, 'max': hi, 'step': step}
+            disc = [v for v in vals if (v & 0xE000) != 0xE000]
+            if len(disc) >= 2:
+                return {'min': min(disc), 'max': max(disc), 'step': 0, 'list': disc}
+        except Exception:
+            return None
+        return None
 
     def profile_headers(self):
         """Read the directory sector and return [(sector, enabled), ...].
