@@ -7,6 +7,7 @@ Rectangle {
     id: root
     property string title: ""
     property string headerValue: ""      // optional right-aligned value in the header
+    property Component headerRight: null // optional control placed at the header's right
     property alias content: body.data
     // vertical padding/spacing compress with Theme.vComp (driven by FitScroll) so a
     // tall page packs more rows before scrolling; horizontal padding stays `pad`,
@@ -31,7 +32,8 @@ Rectangle {
 
         Item {
             visible: root.title.length > 0
-            width: parent.width; height: titleRow.height
+            width: parent.width
+            height: Math.max(titleRow.height, headerRightLoader.height)
             Row {
                 id: titleRow
                 spacing: 8
@@ -49,10 +51,19 @@ Rectangle {
                     font.weight: Font.DemiBold
                 }
             }
+            // optional control at the header's right (e.g. a toggle beside the label)
+            Loader {
+                id: headerRightLoader
+                active: root.headerRight !== null
+                sourceComponent: root.headerRight
+                anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+            }
             Text {                     // optional value on the right of the header
                 visible: root.headerValue.length > 0
                 text: root.headerValue
-                anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                anchors.right: headerRightLoader.active ? headerRightLoader.left : parent.right
+                anchors.rightMargin: headerRightLoader.active ? 10 : 0
+                anchors.verticalCenter: parent.verticalCenter
                 color: Theme.textDim
                 font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
             }
