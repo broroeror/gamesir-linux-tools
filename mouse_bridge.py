@@ -45,7 +45,7 @@ class MouseBridge(QObject):
     # signal from another thread to this (GUI-thread) object is delivered as a
     # queued connection, so the handlers run on the GUI thread and it's safe to
     # touch the exposed state there.
-    _refreshDone = Signal(bool, str, int, int, 'QVariantMap')   # present, perm, active, count, binds
+    _refreshDone = Signal(bool, str, int, int, int, bool, 'QVariantMap')  # present, perm, active, count, battery, wireless, binds
     _remapDone = Signal(bool, str, 'QVariantMap')               # ok, status, binds
     _applyDone = Signal(bool, str, 'QVariantMap')               # ok, status, binds
 
@@ -56,6 +56,8 @@ class MouseBridge(QObject):
         self._bindings = {}             # {str(button_index): "label"}
         self._active = 0
         self._button_count = 0
+        self._battery = -1              # state-of-charge %, -1 = unknown
+        self._wireless = False
         self._status = ''
         self._busy = False
         self._pending = {}              # {int button: str spec} — staged, unsaved
@@ -74,17 +76,21 @@ class MouseBridge(QObject):
         self.refresh()
 
     # ---------------------------------------------- probing (GUI thread, cheap)
-    def _node_present(self):
-        """True if a G502 X hidraw node is enumerable (does NOT need open access)."""
+    def _node_pid(self):
+        """USB product id of an enumerable G502 X node (no open needed), or None —
+        lets us tell wired (0xC098) from the wireless/receiver ids."""
         try:
             import hid
             for d in hid.enumerate():
                 if d.get('vendor_id') == hidpp.LOGITECH_VID and \
-                        d.get('product_id') in hidpp.G502X_PIDS:
-                    return True
+                        d.get('product_id') in (hidpp.G502X_PIDS + (0xC547,)):
+                    return d.get('product_id')
         except Exception:
             pass
-        return False
+        return None
+
+    def _node_present(self):
+        return self._node_pid() is not None
 
     def _poll(self):
         if self._busy:
@@ -119,6 +125,14 @@ class MouseBridge(QObject):
     def buttonCount(self):
         return self._button_count
 
+    @Property(int, notify=presenceChanged)
+    def battery(self):
+        return self._battery            # state-of-charge %, or -1 if unknown
+
+    @Property(bool, notify=presenceChanged)
+    def wireless(self):
+        return self._wireless
+
     @Property('QVariantMap', notify=bindingsChanged)
     def bindings(self):
         return self._bindings
@@ -149,19 +163,23 @@ class MouseBridge(QObject):
     # ------------------------------------------------------------- worker thread
     def _refresh_worker(self):
         with self._io:
+            pid = self._node_pid()
+            wireless = pid is not None and pid != 0xC098
             dev = hidpp.find_device()
             if dev is None:
-                perm = 'no-access' if self._node_present() else 'absent'
-                self._refreshDone.emit(False, perm, 0, 0, {})
+                perm = 'no-access' if pid is not None else 'absent'
+                self._refreshDone.emit(False, perm, 0, 0, -1, wireless, {})
                 return
             try:
                 with dev:
                     info = dev.onboard_info()
                     active = dev.current_profile()
                     binds = self._labels(dev, active, info['sector_size'])
-                self._refreshDone.emit(True, 'ok', active, info['button_count'], binds)
+                    bat = getattr(dev, 'battery', lambda: None)()
+                pct = bat['percent'] if bat else -1
+                self._refreshDone.emit(True, 'ok', active, info['button_count'], pct, wireless, binds)
             except Exception as e:
-                self._refreshDone.emit(False, f'read error: {e}', 0, 0, {})
+                self._refreshDone.emit(False, f'read error: {e}', 0, 0, -1, wireless, {})
 
     def _remap_worker(self, button, spec):
         try:
@@ -189,11 +207,13 @@ class MouseBridge(QObject):
                 self._remapDone.emit(False, f'error: {e}', {})
 
     # ------------------------------------------------- GUI-thread result handlers
-    def _on_refresh(self, present, perm, active, count, binds):
+    def _on_refresh(self, present, perm, active, count, battery, wireless, binds):
         self._permission = perm
         self._present = present
         self._active = active
         self._button_count = count
+        self._battery = battery
+        self._wireless = wireless
         if present:
             self._bindings = binds
         elif self._pending:

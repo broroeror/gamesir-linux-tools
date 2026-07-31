@@ -330,6 +330,40 @@ Window {
                 }
 
                 StatusPill { compact: win.width < 1000; visible: win.activeDevice === "controller" }
+
+                // Mouse status (when the G502 X is the active device): its OWN
+                // battery / connection, read over HID++ — not the controller's.
+                Row {
+                    visible: win.activeDevice === "mouse"
+                    Layout.alignment: Qt.AlignVCenter
+                    spacing: 8
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 8; height: 8; radius: 4
+                        color: mouse.present ? Theme.ok : Theme.warn
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: mouse.present ? "Connected" : "Not connected"
+                        color: Theme.textDim
+                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: mouse.present && mouse.battery >= 0
+                        text: mouse.battery + "%"
+                        color: mouse.battery >= 0 && mouse.battery <= 15 ? Theme.warn : Theme.accent
+                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                        font.weight: Font.DemiBold
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: mouse.present
+                        text: mouse.wireless ? "Wireless" : "Wired"
+                        color: Theme.textDim
+                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                    }
+                }
             }
 
             // Settings gear — pinned to the bar's right edge, OUTSIDE the RowLayout,

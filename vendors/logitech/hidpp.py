@@ -41,6 +41,7 @@ ROOT_INDEX = 0x00            # the ROOT feature is always at index 0
 FEATURE_ROOT = 0x0000
 FEATURE_FEATURE_SET = 0x0001
 FEATURE_ONBOARD_PROFILES = 0x8100
+FEATURE_UNIFIED_BATTERY = 0x1004
 
 # ONBOARD_PROFILES (0x8100) FUNCTION INDICES — RAW 0..15; request() applies the
 # <<4 to place them in the high nibble. Pass raw indices here, NOT the pre-shifted
@@ -187,6 +188,20 @@ class Hidpp:
         idx = self.get_feature_index(FEATURE_ONBOARD_PROFILES)
         d = self.request(idx, OB_GET_CURRENT_PROFILE)
         return (d[0] << 8) | d[1]
+
+    def battery(self):
+        """feature 0x1004 (unified battery) getStatus -> {'percent', 'charging'},
+        or None if the feature is absent/unreadable. Best-effort; never raises so a
+        battery hiccup can't break a profile read. `percent` is state-of-charge 0..100;
+        `charging` is true for the charging/near-full/complete states."""
+        try:
+            idx = self.get_feature_index(FEATURE_UNIFIED_BATTERY)
+            if not idx:
+                return None
+            d = self.request(idx, 0x01)              # fn1 get_status
+            return {'percent': d[0], 'charging': len(d) > 2 and d[2] in (1, 2, 3)}
+        except Exception:
+            return None
 
     def profile_headers(self):
         """Read the directory sector and return [(sector, enabled), ...].
