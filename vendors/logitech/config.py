@@ -14,15 +14,54 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import onboard      # noqa: E402
-import remap        # noqa: E402  (backup_all / diff_offsets / parse_binding / key_usage)
+import remap        # noqa: E402  (backup_all / diff_offsets / parse_binding)
+import macros       # noqa: E402  (richer key mapping for key: specs)
+
+
+# --- friendly binding labels for the UI ("Ctrl+C", "F5", "Mouse 5", "Sniper") ---
+def _usage_names():
+    n = {}
+    for nm, u in macros._NAMED.items():
+        n.setdefault(u, nm[:1].upper() + nm[1:])        # space->Space, f5->F5, up->Up
+    for c in 'abcdefghijklmnopqrstuvwxyz':
+        n[macros.char_to_key(c)[0]] = c.upper()
+    for ch in "0123456789`-=[]\\;',./":
+        try:
+            n[macros.char_to_key(ch)[0]] = ch
+        except ValueError:
+            pass
+    return n
+
+
+_USAGE_NAMES = _usage_names()
+_MODS = [(0x01, 'Ctrl'), (0x02, 'Shift'), (0x04, 'Alt'), (0x08, 'Meta'),
+         (0x10, 'RCtrl'), (0x20, 'RShift'), (0x40, 'RAlt'), (0x80, 'RMeta')]
+
+
+def _key_label(usage, mods):
+    name = _USAGE_NAMES.get(usage, 'key 0x%02x' % usage)
+    return ''.join(m + '+' for bit, m in _MODS if mods & bit) + name
+
+
+def friendly_binding(b):
+    """onboard.Button -> a human label ('Ctrl+C', 'F5', 'Mouse 5', 'Sniper', …);
+    falls back to the raw detail for kinds that already read well (function/macro)."""
+    if b.kind == 'send-key':
+        return _key_label(b.key, b.modifiers)
+    if b.kind == 'send-button':
+        return 'Mouse %d' % (b.mouse_mask.bit_length() if b.mouse_mask else 0)
+    if b.kind == 'unset':
+        return 'unset'
+    return b.detail
 
 
 def profile_bindings(dev, sector, size):
-    """Read a profile sector -> {button_index: {'kind','detail'}} for every button.
-    Read-only; used to show the current binding of each button in the UI."""
+    """Read a profile sector -> {button_index: {'kind','detail','label'}} for every
+    button. Read-only; `label` is the friendly display string used by the UI."""
     raw = dev.read_sector(sector, size)
     prof = onboard.OnboardProfile.decode(raw, sector=sector)
-    return {i: {'kind': b.kind, 'detail': b.detail} for i, b in enumerate(prof.buttons)}
+    return {i: {'kind': b.kind, 'detail': b.detail, 'label': friendly_binding(b)}
+            for i, b in enumerate(prof.buttons)}
 
 
 def apply_bindings(dev, info, headers, sector, changes, backup_headers=None):
@@ -95,6 +134,17 @@ def apply_binding(dev, info, headers, sector, button, new_binding, backup_header
 # Mirrors remap.parse_binding's vocabulary; the bridge maps a UI choice to one of
 # these and hands the Button to apply_binding.
 def binding_from_spec(spec):
-    """'key:a' | 'mouse:5' | 'sniper' | 'dpi-up' | 'dpi-down' | 'dpi-cycle' |
-    'disabled' -> onboard.Button. Raises ValueError on an unknown spec."""
+    """'key:<name|char|combo>' | 'mouse:<n>' | 'sniper' | 'dpi-up' | 'dpi-down' |
+    'dpi-cycle' | 'disabled' -> onboard.Button. Raises ValueError on an unknown spec.
+
+    'key:' uses the macro engine's key map (letters, digits, F-keys, symbols,
+    arrows, nav keys) and accepts a modifier combo like 'key:ctrl+c' — the onboard
+    button binding carries [modifier][key], so a mod+key chord is one binding."""
+    if spec.startswith('key:'):
+        combo = spec[len('key:'):]
+        if '+' in combo:
+            mods, usage = macros.parse_combo(combo)
+        else:
+            mods, usage = 0, macros.key_usage(combo)
+        return onboard.Button.key(usage, mods)
     return remap.parse_binding(spec)

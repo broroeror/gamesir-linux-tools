@@ -22,6 +22,17 @@ Item {
     }
     // assign = STAGE (no device write until Apply)
     function stage(spec) { if (page.selIndex >= 0) mouse.stage(page.selIndex, spec) }
+    function nameFor(i) {
+        for (var j = 0; j < mv.buttons.length; j++)
+            if (mv.buttons[j].i === i) return mv.buttons[j].name
+        return "#" + i
+    }
+    // the staged edits as [{i, name, label}] — drives the pending-bar chips
+    readonly property var pendingList: {
+        var out = []; var p = mouse.pending
+        for (var k in p) out.push({ i: parseInt(k), name: page.nameFor(parseInt(k)), label: p[k] })
+        return out
+    }
 
     // ---------------------------------------------- not connected / no access
     ColumnLayout {
@@ -148,26 +159,12 @@ Item {
                     }
                 }
                 Text {
-                    width: parent.width; text: "Keyboard key"; color: Theme.textDim
+                    width: parent.width; text: "Keyboard"; color: Theme.textDim
                     font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                 }
-                Row {
-                    width: parent.width; spacing: 6
-                    QQC.TextField {
-                        id: keyField
-                        width: parent.width - setBtn.width - 6
-                        placeholderText: "a, enter, f5…"
-                        color: Theme.text
-                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
-                        background: Rectangle {
-                            color: Theme.button; border.color: Theme.cardBorder
-                            border.width: 1; radius: 6
-                        }
-                    }
-                    PillButton {
-                        id: setBtn; label: "Set"
-                        onClicked: if (keyField.text.length) page.stage("key:" + keyField.text.trim())
-                    }
+                PillButton {
+                    label: "⌨  Choose a key…"
+                    onClicked: keyPicker.active = true
                 }
                 Text {
                     width: parent.width; wrapMode: Text.WordWrap; topPadding: 4
@@ -180,32 +177,60 @@ Item {
         }
     }
 
-    // -------- staged-changes bar: apply all pending edits in one write --------
+    // -------- staged-changes bar: shows each queued edit; applies all in one write --------
     Rectangle {
         id: pbar
         visible: mouse.present && mouse.pendingCount > 0
         anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
         anchors.leftMargin: 20; anchors.rightMargin: 20; anchors.bottomMargin: 20
-        height: 52; radius: Theme.radius
+        height: Math.max(52, chips.implicitHeight + 20); radius: Theme.radius
         color: Theme.card; border.color: Theme.accent; border.width: 1
-        Text {
-            anchors.left: parent.left; anchors.leftMargin: 16
-            anchors.verticalCenter: parent.verticalCenter
-            text: mouse.busy ? "Applying…"
-                  : mouse.pendingCount + (mouse.pendingCount === 1 ? " unsaved change"
-                                                                   : " unsaved changes")
-            color: mouse.busy ? Theme.accent : Theme.text
-            font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
-        }
+
         Row {
+            id: actions
             anchors.right: parent.right; anchors.rightMargin: 14
             anchors.verticalCenter: parent.verticalCenter; spacing: 8
             PillButton { label: "Discard"; enabled: !mouse.busy; onClicked: mouse.discard() }
             PillButton {
-                label: "Apply " + mouse.pendingCount
+                label: mouse.busy ? "Applying…" : "Apply " + mouse.pendingCount
                 highlight: !mouse.busy; enabled: !mouse.busy
                 onClicked: mouse.apply()
             }
         }
+        // one chip per queued change (✕ removes just that one)
+        Flow {
+            id: chips
+            anchors.left: parent.left; anchors.leftMargin: 14
+            anchors.right: actions.left; anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 6
+            Repeater {
+                model: page.pendingList
+                delegate: Rectangle {
+                    required property var modelData
+                    height: 26; radius: 6; implicitWidth: chipRow.implicitWidth + 16
+                    color: Theme.button; border.color: Theme.accent; border.width: 1
+                    Row {
+                        id: chipRow; anchors.centerIn: parent; spacing: 6
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: modelData.name + "  →  " + modelData.label
+                            color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                        }
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "✕"; color: Theme.textDim; font.pixelSize: Theme.fontS
+                            TapHandler { enabled: !mouse.busy; onTapped: mouse.unstage(modelData.i) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // modal keyboard picker, opened by the assign panel's "Choose a key…"
+    MouseKeyPicker {
+        id: keyPicker
+        onPicked: function (spec) { page.stage(spec) }
     }
 }

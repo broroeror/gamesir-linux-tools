@@ -106,7 +106,7 @@ class MouseBridge(QObject):
     @staticmethod
     def _labels(dev, active, size):
         raw = logi_config.profile_bindings(dev, active, size)
-        return {str(i): (b['detail'] or b['kind']) for i, b in raw.items()}
+        return {str(i): (b['label'] or b['kind']) for i, b in raw.items()}
 
     # --------------------------------------------------------------- properties
     @Property(bool, notify=presenceChanged)
@@ -155,7 +155,7 @@ class MouseBridge(QObject):
         out = {}
         for b, spec in self._pending.items():
             try:
-                out[str(b)] = logi_config.binding_from_spec(spec).detail
+                out[str(b)] = logi_config.friendly_binding(logi_config.binding_from_spec(spec))
             except Exception:
                 out[str(b)] = spec
         return out
