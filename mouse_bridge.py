@@ -42,6 +42,8 @@ BUTTON_NAMES = {
     3: 'Back', 4: 'DPI Shift', 5: 'Forward', 6: 'Scroll Left', 7: 'Scroll Right',
     8: 'Onboard Profile Cycle', 9: 'DPI Up', 10: 'DPI Down',
 }
+# Display order for button lists (matches MouseView.qml's diagram order).
+BUTTON_ORDER = [0, 1, 2, 6, 7, 9, 10, 8, 4, 5, 3]
 
 # Report rates the G502 X LIGHTSPEED supports, low→high (1000/500/250/125 Hz map to
 # the 1/2/4/8 ms interval stored in the profile's byte 0).
@@ -307,6 +309,17 @@ class MouseBridge(QObject):
     @Property(int, notify=sensorChanged)
     def macroSlotsFree(self):
         return self._macro_slots_free       # erased macro sectors available, -1=unknown
+
+    @Property('QVariantList', constant=True)
+    def buttonList(self):
+        """Ordered [{index, name}] for the button pickers (macros tab selector)."""
+        return [{'index': i, 'name': BUTTON_NAMES.get(i, f'Button {i}')} for i in BUTTON_ORDER]
+
+    @Slot(int, result='QVariantMap')
+    def stagedMacro(self, button):
+        """The staged macro def for a button ({'steps':[...],'repeat':bool}), or an
+        empty map — lets the macros tab resume editing a macro already in the queue."""
+        return dict(self._pending_macros.get(int(button), {}))
 
     # ------------------------------------------------------------- worker thread
     def _refresh_worker(self):

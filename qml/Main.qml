@@ -22,7 +22,7 @@ Window {
     // device picker flips this, which swaps the nav tabs + content below.
     property string activeDevice: "controller"       // "controller" | "mouse"
     readonly property var controllerTabs: ["Rebinds", "Sticks", "Motion", "Triggers", "Vibration", "Lights", "Macros"]
-    readonly property var mouseTabs: ["Buttons", "DPI"]
+    readonly property var mouseTabs: ["Buttons", "DPI", "Macros"]
     readonly property var tabs: activeDevice === "mouse" ? mouseTabs : controllerTabs
     // Card vertical-compression is global (only one page shows at a time); reset it
     // to full on every tab switch so the newly-shown page's FitScroll re-fits from
@@ -530,6 +530,7 @@ Window {
               visible: win.activeDevice === "mouse"
               MousePage { anchors.fill: parent; visible: win.currentTab === 0 }
               MouseDpiPage { anchors.fill: parent; visible: win.currentTab === 1 }
+              MouseMacrosPage { anchors.fill: parent; visible: win.currentTab === 2 }
           }
         }
     }

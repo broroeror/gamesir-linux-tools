@@ -60,33 +60,49 @@ def friendly_binding(b):
 
 
 # --- macro definitions (structured steps <-> bytecode + labels) ---------------
-# A macro definition is {'steps': [step, ...], 'repeat': bool}. Steps:
-#   {'t':'combo','combo':'ctrl+c'}  a key or shortcut ('a' / 'enter' / 'f5' too)
-#   {'t':'text','text':'hello'}     type a string (auto-shift)
-#   {'t':'delay','ms':100}          pause
-#   {'t':'click','button':1}        click a mouse button (1=left…)
+# A macro definition is {'steps': [step, ...], 'repeat': bool}. Each step is a
+# key/click/text action with an optional HOLD (ms the key/button is held) and
+# DELAY-after (ms before the next step) — the same per-step timing model as the
+# controller macro editor:
+#   {'t':'key',   'combo':'ctrl+c', 'hold':0, 'delay':30}  a key or shortcut
+#   {'t':'click', 'button':1,       'hold':0, 'delay':30}  a mouse button
+#   {'t':'text',  'text':'hello',             'delay':30}  type a string (auto-shift)
 def _macro_steps(macrodef):
     return macrodef.get('steps', []) if isinstance(macrodef, dict) else (macrodef or [])
 
 
+def _ms(v):
+    """A timing field (hold/delay) -> a clamped non-negative int (None/'' -> 0)."""
+    return max(0, min(0xFFFF, int(v or 0)))
+
+
 def build_macro_body(macrodef):
-    """Structured macro def -> macro bytecode (terminated with END). Raises
-    ValueError on an unknown step or an empty macro."""
+    """Structured macro def -> macro bytecode (terminated with END). A key/click step
+    emits press, an optional HOLD delay, release, then an optional DELAY-after; text
+    types the string then an optional delay. Raises ValueError on an unknown/malformed
+    step or an empty macro (the def comes from untrusted JSON, so every field error is
+    normalized to ValueError for the callers' `except`)."""
     m = macros.Macro()
     n = 0
     for s in _macro_steps(macrodef):
         if not isinstance(s, dict):
             raise ValueError(f'bad macro step (not an object): {s!r}')
         t = s.get('t')
-        # Convert any malformed-field error (missing/wrong-typed operand) into a
-        # ValueError so callers' `except ValueError` catches every bad macro — the
-        # def comes from untrusted JSON, not just the well-formed editor output.
         try:
-            if t == 'combo':
+            if t == 'key':
                 combo = s.get('combo')
                 if not isinstance(combo, str) or not combo:
-                    raise ValueError('combo step needs a non-empty "combo" string')
-                m.combo(combo)
+                    raise ValueError('key step needs a non-empty "combo" string')
+                mods, key = macros.parse_combo(combo)
+                m.press_key(key, mods)
+                if _ms(s.get('hold')):
+                    m.pause(_ms(s.get('hold')))
+                m.release_key(key, mods)
+            elif t == 'click':
+                m.mouse_down(int(s.get('button', 1) or 1))
+                if _ms(s.get('hold')):
+                    m.pause(_ms(s.get('hold')))
+                m.mouse_up(int(s.get('button', 1) or 1))
             elif t == 'text':
                 text = s.get('text')
                 if not text:
@@ -94,12 +110,10 @@ def build_macro_body(macrodef):
                 if not isinstance(text, str):
                     raise ValueError('text step "text" must be a string')
                 m.type(text)
-            elif t == 'delay':
-                m.pause(int(s.get('ms', 0) or 0))
-            elif t == 'click':
-                m.click(int(s.get('button', 1) or 1))
             else:
                 raise ValueError(f'unknown macro step: {t!r}')
+            if _ms(s.get('delay')):
+                m.pause(_ms(s.get('delay')))
         except (KeyError, TypeError, AttributeError) as e:
             raise ValueError(f'bad macro step {t!r}: {e}')
         n += 1
@@ -114,19 +128,23 @@ def _combo_label(combo):
     return '+'.join(p[:1].upper() + p[1:] for p in str(combo).split('+') if p)
 
 
+def macro_step_label(s):
+    """One step -> a short label ('Ctrl+C', 'Click M1', '“hi”') for the editor/chips."""
+    if not isinstance(s, dict):
+        return str(s)
+    t = s.get('t')
+    if t == 'key':
+        return _combo_label(s.get('combo', ''))
+    if t == 'click':
+        return 'Click M%d' % int(s.get('button', 1) or 1)
+    if t == 'text':
+        return '“%s”' % s.get('text', '')
+    return str(t)
+
+
 def macro_summary(macrodef):
-    """Short human label for a macro def (chips / button preview)."""
-    parts = []
-    for s in _macro_steps(macrodef):
-        t = s.get('t')
-        if t == 'combo':
-            parts.append(_combo_label(s.get('combo', '')))
-        elif t == 'text':
-            parts.append('"%s"' % s.get('text', ''))
-        elif t == 'delay':
-            parts.append('%dms' % int(s.get('ms', 0)))
-        elif t == 'click':
-            parts.append('click%d' % int(s.get('button', 1)))
+    """Short human label for a whole macro def (chips / button preview)."""
+    parts = [macro_step_label(s) for s in _macro_steps(macrodef)]
     label = ' · '.join(parts) or 'empty'
     if isinstance(macrodef, dict) and macrodef.get('repeat'):
         label += ' ⟳'
