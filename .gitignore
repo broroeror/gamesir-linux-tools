@@ -48,3 +48,8 @@ attic/
 
 # local mouse onboard-profile backups (user data)
 mouse-backups/
+
+# Local 3D source model for the G502 X diagram trace — NOT shipped. We redistribute
+# only the derived vector outline (qml/App/MouseView.qml); see CREDITS.md. The model
+# is CC-BY 4.0 by Okopchi (https://skfb.ly/p8PWQ).
+assets/source/502.fbx
