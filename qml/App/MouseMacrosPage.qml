@@ -3,12 +3,13 @@ import QtQuick.Controls as QQC
 import QtQuick.Layouts
 import App 1.0
 
-// Mouse macros tab (controller-style). LEFT: the sequence + the selected-step editor
-// (during/hold + between/delay sliders, copy/paste/duplicate/move/delete). RIGHT: a
-// grouped button picker (which button's macro you're editing) and "Add action"
+// Mouse macros tab (controller-style). LEFT: the sequence (with its own "+ Add" like
+// the controller) + the selected-step editor (during/hold + between/delay sliders,
+// copy/paste/duplicate/move/delete). RIGHT: a grouped button picker and "Add action"
 // popouts — keyboard (with F13–F24 / numpad), mouse, media, and live keystroke
-// record. Edits stage the macro on that button (debounced) into the shared queue, so
-// nothing writes to flash until Apply and an identical re-apply is a no-op.
+// record. Everything sits in a FitScroll so the panels compress then scroll to fit
+// the window rather than spilling past its edges. Edits stage the macro on that
+// button (debounced) into the shared queue — nothing writes until Apply.
 Item {
     id: page
 
@@ -124,7 +125,7 @@ Item {
         if (!base) return ""
         var p = ""
         if (event.modifiers & Qt.ControlModifier) p += "ctrl+"
-        if (event.modifiers & Qt.ShiftModifier && base.length !== 1) p += "shift+"   // a printable already carries case
+        if (event.modifiers & Qt.ShiftModifier && base.length !== 1) p += "shift+"   // printable already carries case
         if (event.modifiers & Qt.AltModifier) p += "alt+"
         if (event.modifiers & Qt.MetaModifier) p += "meta+"
         return p + base
@@ -173,224 +174,253 @@ Item {
     MouseConnectState {}
 
     // ---------------------------------------------- connected: the editor
-    RowLayout {
+    // FitScroll compresses card padding, then scrolls, so nothing spills past the
+    // window edges (the columns keep their natural heights).
+    FitScroll {
+        id: scroller
         visible: mouse.present
         anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
         anchors.bottom: pbar.visible ? pbar.top : parent.bottom
         anchors.margins: 20; anchors.bottomMargin: 16
-        spacing: 16
+        content: fitBox
 
-        // ============ LEFT: sequence + selected-step editor ============
-        ColumnLayout {
-            Layout.fillWidth: true; Layout.horizontalStretchFactor: 3; Layout.fillHeight: true
-            spacing: 12
+        Column {
+            id: fitBox
+            width: scroller.availableWidth
 
-            Card {
-                title: "Sequence"
-                headerValue: page.steps.length + " step" + (page.steps.length === 1 ? "" : "s")
-                Layout.fillWidth: true; Layout.fillHeight: true
-                Text {
-                    visible: page.steps.length === 0
-                    width: parent.width; wrapMode: Text.WordWrap
-                    text: "Empty — add actions from the right, or ⏺ Record your keystrokes."
-                    color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
-                }
-                ListView {
-                    id: stepList
-                    width: parent.width
-                    height: page.steps.length ? Math.min(8, page.steps.length) * 40 : 0
-                    clip: true; spacing: 6; boundsBehavior: Flickable.StopAtBounds
-                    model: page.steps.length
-                    WheelHandler {
-                        onWheel: function (ev) {
-                            var max = Math.max(0, stepList.contentHeight - stepList.height)
-                            stepList.contentY = Math.max(0, Math.min(max, stepList.contentY - ev.angleDelta.y))
+            RowLayout {
+                width: parent.width
+                spacing: 16
+
+                // ============ LEFT: sequence + selected-step editor ============
+                ColumnLayout {
+                    Layout.fillWidth: true; Layout.horizontalStretchFactor: 3; Layout.alignment: Qt.AlignTop
+                    spacing: 12
+
+                    Card {
+                        title: "Sequence"
+                        headerValue: page.steps.length + " step" + (page.steps.length === 1 ? "" : "s")
+                        Layout.fillWidth: true
+                        Text {
+                            visible: page.steps.length === 0
+                            width: parent.width; wrapMode: Text.WordWrap
+                            text: "Empty — + Add a step, add actions from the right, or ⏺ Record your keystrokes."
+                            color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                        }
+                        ListView {
+                            id: stepList
+                            width: parent.width
+                            height: page.steps.length ? Math.min(8, page.steps.length) * 40 : 0
+                            clip: true; spacing: 6; boundsBehavior: Flickable.StopAtBounds
+                            model: page.steps.length
+                            WheelHandler {
+                                onWheel: function (ev) {
+                                    var max = Math.max(0, stepList.contentHeight - stepList.height)
+                                    stepList.contentY = Math.max(0, Math.min(max, stepList.contentY - ev.angleDelta.y))
+                                }
+                            }
+                            delegate: Rectangle {
+                                required property int index
+                                width: ListView.view.width; height: 34; radius: Theme.radius
+                                color: page.sel === index ? Theme.cardHover : "transparent"
+                                border.color: page.sel === index ? Theme.accent : Theme.cardBorder; border.width: 1
+                                Row {
+                                    anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 96; spacing: 8
+                                    Text {
+                                        anchors.verticalCenter: parent.verticalCenter; width: 16
+                                        text: (index + 1); color: Theme.textDim
+                                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                                    }
+                                    Text {
+                                        anchors.verticalCenter: parent.verticalCenter; width: 130; elide: Text.ElideRight
+                                        text: page.stepLabel(page.steps[index]); color: Theme.text; font.bold: true
+                                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                                    }
+                                    Text {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: page.stepTiming(page.steps[index]); color: Theme.textDim
+                                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                                    }
+                                }
+                                Row {
+                                    anchors.right: parent.right; anchors.rightMargin: 8
+                                    anchors.verticalCenter: parent.verticalCenter; spacing: 4
+                                    component Mini: Rectangle {
+                                        property string glyph: ""; signal act()
+                                        width: 22; height: 22; radius: 5
+                                        color: mh.hovered ? Theme.cardHover : "transparent"
+                                        border.color: Theme.cardBorder; border.width: 1
+                                        Text { anchors.centerIn: parent; text: parent.glyph; color: Theme.textDim; font.pixelSize: Theme.fontS }
+                                        HoverHandler { id: mh }
+                                        TapHandler { onTapped: parent.act() }
+                                    }
+                                    Mini { glyph: "⧉"; onAct: { page.sel = index; page.duplicate() } }
+                                    Mini { glyph: "✕"; onAct: page.removeStep(index) }
+                                }
+                                TapHandler { onTapped: page.sel = index }
+                            }
+                        }
+                        // "+ Add" in the sequence panel (like the controller macro page)
+                        PillButton {
+                            label: "+ Add ▾"
+                            onClicked: addMenu.popup()
                         }
                     }
-                    delegate: Rectangle {
-                        required property int index
-                        width: ListView.view.width; height: 34; radius: Theme.radius
-                        color: page.sel === index ? Theme.cardHover : "transparent"
-                        border.color: page.sel === index ? Theme.accent : Theme.cardBorder; border.width: 1
+
+                    // selected-step editor
+                    Card {
+                        title: page.sel >= 0 ? "Step " + (page.sel + 1) + " — " + page.stepLabel(page.steps[page.sel]) : "Step"
+                        Layout.fillWidth: true
+                        visible: page.sel >= 0 && page.sel < page.steps.length
+
                         Row {
-                            anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 96; spacing: 8
-                            Text {
-                                anchors.verticalCenter: parent.verticalCenter; width: 16
-                                text: (index + 1); color: Theme.textDim
-                                font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                            width: parent.width; spacing: 10
+                            visible: page.sel >= 0 && page.steps[page.sel].t === "text"
+                            Text { text: "Text"; color: Theme.textDim; width: 92
+                                   anchors.verticalCenter: parent.verticalCenter
+                                   font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
+                            QQC.TextField {
+                                width: parent.width - 102
+                                text: page.sel >= 0 && page.steps[page.sel].t === "text" ? page.steps[page.sel].text : ""
+                                color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                                background: Rectangle { color: Theme.bg; radius: 6; border.color: Theme.cardBorder; border.width: 1 }
+                                onEditingFinished: page.setField(page.sel, "text", text)
                             }
-                            Text {
-                                anchors.verticalCenter: parent.verticalCenter; width: 130; elide: Text.ElideRight
-                                text: page.stepLabel(page.steps[index]); color: Theme.text; font.bold: true
-                                font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
-                            }
-                            Text {
+                        }
+                        Row {
+                            width: parent.width; spacing: 10
+                            visible: page.selTimed
+                            Text { text: "During (hold)"; color: Theme.textDim; width: 92
+                                   anchors.verticalCenter: parent.verticalCenter
+                                   font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
+                            AccentSlider {
+                                width: parent.width - 92 - 74; from: 0; to: 2000
                                 anchors.verticalCenter: parent.verticalCenter
-                                text: page.stepTiming(page.steps[index]); color: Theme.textDim
-                                font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                                value: page.selTimed ? (page.steps[page.sel].hold || 0) : 0
+                                onMoved: function (v) { page.setField(page.sel, "hold", Math.round(v)) }
+                            }
+                            NumField {
+                                anchors.verticalCenter: parent.verticalCenter
+                                value: page.selTimed ? (page.steps[page.sel].hold || 0) : 0
+                                onCommitted: function (v) { page.setField(page.sel, "hold", v) }
                             }
                         }
-                        // quick per-row tools
                         Row {
-                            anchors.right: parent.right; anchors.rightMargin: 8
-                            anchors.verticalCenter: parent.verticalCenter; spacing: 4
-                            component Mini: Rectangle {
-                                property string glyph: ""; signal act()
-                                width: 22; height: 22; radius: 5
-                                color: mh.hovered ? Theme.cardHover : "transparent"
-                                border.color: Theme.cardBorder; border.width: 1
-                                Text { anchors.centerIn: parent; text: parent.glyph; color: Theme.textDim; font.pixelSize: Theme.fontS }
-                                HoverHandler { id: mh }
-                                TapHandler { onTapped: parent.act() }
+                            width: parent.width; spacing: 10
+                            Text { text: "Between (delay)"; color: Theme.textDim; width: 92
+                                   anchors.verticalCenter: parent.verticalCenter
+                                   font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
+                            AccentSlider {
+                                width: parent.width - 92 - 74; from: 0; to: 2000
+                                anchors.verticalCenter: parent.verticalCenter
+                                value: page.sel >= 0 ? (page.steps[page.sel].delay || 0) : 0
+                                onMoved: function (v) { page.setField(page.sel, "delay", Math.round(v)) }
                             }
-                            Mini { glyph: "⧉"; onAct: { page.sel = index; page.duplicate() } }
-                            Mini { glyph: "✕"; onAct: page.removeStep(index) }
+                            NumField {
+                                anchors.verticalCenter: parent.verticalCenter
+                                value: page.sel >= 0 ? (page.steps[page.sel].delay || 0) : 0
+                                onCommitted: function (v) { page.setField(page.sel, "delay", v) }
+                            }
                         }
-                        TapHandler { onTapped: page.sel = index }
-                    }
-                }
-            }
-
-            // selected-step editor
-            Card {
-                title: page.selTimed || (page.sel >= 0) ? "Step " + (page.sel + 1) + " — " + page.stepLabel(page.steps[page.sel]) : "Step"
-                Layout.fillWidth: true
-                visible: page.sel >= 0 && page.sel < page.steps.length
-
-                Row {
-                    width: parent.width; spacing: 10
-                    visible: page.sel >= 0 && page.steps[page.sel].t === "text"
-                    Text { text: "Text"; color: Theme.textDim; width: 92
-                           anchors.verticalCenter: parent.verticalCenter
-                           font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
-                    QQC.TextField {
-                        width: parent.width - 102
-                        text: page.sel >= 0 && page.steps[page.sel].t === "text" ? page.steps[page.sel].text : ""
-                        color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
-                        background: Rectangle { color: Theme.bg; radius: 6; border.color: Theme.cardBorder; border.width: 1 }
-                        onEditingFinished: page.setField(page.sel, "text", text)
-                    }
-                }
-                Row {
-                    width: parent.width; spacing: 10
-                    visible: page.selTimed
-                    Text { text: "During (hold)"; color: Theme.textDim; width: 92
-                           anchors.verticalCenter: parent.verticalCenter
-                           font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
-                    AccentSlider {
-                        width: parent.width - 92 - 74; from: 0; to: 2000
-                        anchors.verticalCenter: parent.verticalCenter
-                        value: page.selTimed ? (page.steps[page.sel].hold || 0) : 0
-                        onMoved: function (v) { page.setField(page.sel, "hold", Math.round(v)) }
-                    }
-                    NumField {
-                        anchors.verticalCenter: parent.verticalCenter
-                        value: page.selTimed ? (page.steps[page.sel].hold || 0) : 0
-                        onCommitted: function (v) { page.setField(page.sel, "hold", v) }
-                    }
-                }
-                Row {
-                    width: parent.width; spacing: 10
-                    Text { text: "Between (delay)"; color: Theme.textDim; width: 92
-                           anchors.verticalCenter: parent.verticalCenter
-                           font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
-                    AccentSlider {
-                        width: parent.width - 92 - 74; from: 0; to: 2000
-                        anchors.verticalCenter: parent.verticalCenter
-                        value: page.sel >= 0 ? (page.steps[page.sel].delay || 0) : 0
-                        onMoved: function (v) { page.setField(page.sel, "delay", Math.round(v)) }
-                    }
-                    NumField {
-                        anchors.verticalCenter: parent.verticalCenter
-                        value: page.sel >= 0 ? (page.steps[page.sel].delay || 0) : 0
-                        onCommitted: function (v) { page.setField(page.sel, "delay", v) }
-                    }
-                }
-                Flow {
-                    width: parent.width; spacing: 6; topPadding: 4
-                    PillButton { label: "Duplicate"; onClicked: page.duplicate() }
-                    PillButton { label: "Copy"; onClicked: page.copyStep() }
-                    PillButton { label: "Paste"; enabled: page.clip !== null; onClicked: page.pasteStep() }
-                    PillButton { label: "Move ▲"; enabled: page.sel > 0; onClicked: page.move(-1) }
-                    PillButton { label: "Move ▼"; enabled: page.sel >= 0 && page.sel < page.steps.length - 1; onClicked: page.move(1) }
-                    PillButton { label: "Remove"; onClicked: page.removeStep(page.sel) }
-                }
-            }
-            Item { Layout.fillHeight: true }
-        }
-
-        // ============ RIGHT: button picker + add actions ============
-        ColumnLayout {
-            Layout.preferredWidth: 300; Layout.minimumWidth: 260; Layout.fillHeight: true
-            spacing: 12
-
-            Card {
-                title: "Button"
-                Layout.fillWidth: true
-                Repeater {
-                    model: mouse.buttonGroups
-                    delegate: Column {
-                        required property var modelData
-                        width: parent.width; spacing: 5; topPadding: 2
-                        Text { text: modelData.group; color: Theme.textFaint
-                               font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                         Flow {
-                            width: parent.width; spacing: 6
-                            Repeater {
-                                model: modelData.buttons
-                                delegate: PillButton {
-                                    required property var modelData
-                                    label: modelData.name
-                                    highlight: page.btn === modelData.index
-                                    onClicked: page.btn = modelData.index
+                            width: parent.width; spacing: 6; topPadding: 4
+                            PillButton { label: "Duplicate"; onClicked: page.duplicate() }
+                            PillButton { label: "Copy"; onClicked: page.copyStep() }
+                            PillButton { label: "Paste"; enabled: page.clip !== null; onClicked: page.pasteStep() }
+                            PillButton { label: "Move ▲"; enabled: page.sel > 0; onClicked: page.move(-1) }
+                            PillButton { label: "Move ▼"; enabled: page.sel >= 0 && page.sel < page.steps.length - 1; onClicked: page.move(1) }
+                            PillButton { label: "Remove"; onClicked: page.removeStep(page.sel) }
+                        }
+                    }
+                }
+
+                // ============ RIGHT: button picker + add actions ============
+                ColumnLayout {
+                    Layout.preferredWidth: 300; Layout.minimumWidth: 260; Layout.alignment: Qt.AlignTop
+                    spacing: 12
+
+                    Card {
+                        title: "Button"
+                        Layout.fillWidth: true
+                        Repeater {
+                            model: mouse.buttonGroups
+                            delegate: Column {
+                                required property var modelData
+                                width: parent.width; spacing: 5; topPadding: 2
+                                Text { text: modelData.group; color: Theme.textFaint
+                                       font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
+                                Flow {
+                                    width: parent.width; spacing: 6
+                                    Repeater {
+                                        model: modelData.buttons
+                                        delegate: PillButton {
+                                            required property var modelData
+                                            label: modelData.name
+                                            highlight: page.btn === modelData.index
+                                            onClicked: page.btn = modelData.index
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
-                }
-            }
 
-            Card {
-                title: "Add action"
-                Layout.fillWidth: true
-                Flow {
-                    width: parent.width; spacing: 6
-                    PillButton { label: "⌨ Keyboard ▾"; onClicked: kbPop.open() }
-                    PillButton { label: "🖱 Mouse ▾"; onClicked: mouseMenu.popup() }
-                    PillButton { label: "⏯ Media ▾"; onClicked: mediaMenu.popup() }
-                    PillButton { label: "⏺ Record"; highlight: page.recording; onClicked: page.startRecord() }
-                }
-                Row {
-                    width: parent.width; spacing: 6; topPadding: 4
-                    QQC.TextField {
-                        id: textField
-                        width: parent.width - addText.width - 6
-                        placeholderText: "type text…"
-                        color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
-                        background: Rectangle { color: Theme.bg; radius: 6; border.color: Theme.cardBorder; border.width: 1 }
-                        onAccepted: { page.addText(text); text = "" }
+                    Card {
+                        title: "Add action"
+                        Layout.fillWidth: true
+                        Flow {
+                            width: parent.width; spacing: 6
+                            PillButton { label: "⌨ Keyboard ▾"; onClicked: kbPop.open() }
+                            PillButton { label: "🖱 Mouse ▾"; onClicked: mouseMenu.popup() }
+                            PillButton { label: "⏯ Media ▾"; onClicked: mediaMenu.popup() }
+                            PillButton { label: "⏺ Record"; highlight: page.recording; onClicked: page.startRecord() }
+                        }
+                        Row {
+                            width: parent.width; spacing: 6; topPadding: 4
+                            QQC.TextField {
+                                id: textField
+                                width: parent.width - addText.width - 6
+                                placeholderText: "type text…"
+                                color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                                background: Rectangle { color: Theme.bg; radius: 6; border.color: Theme.cardBorder; border.width: 1 }
+                                onAccepted: { page.addText(text); text = "" }
+                            }
+                            PillButton { id: addText; label: "+ Text"; onClicked: { page.addText(textField.text); textField.text = "" } }
+                        }
+                        Row {
+                            width: parent.width; spacing: 10; topPadding: 4
+                            ToggleSwitch { id: repSw; anchors.verticalCenter: parent.verticalCenter
+                                           onToggled: { page.repeat = repSw.checked; page.touch() } }
+                            Text { text: "Repeat while held"; color: Theme.textDim
+                                   anchors.verticalCenter: parent.verticalCenter
+                                   font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
+                        }
+                        Text {
+                            width: parent.width; wrapMode: Text.WordWrap; topPadding: 2
+                            visible: mouse.macroSlotsFree >= 0
+                            text: mouse.macroSlotsFree + " macro slot" + (mouse.macroSlotsFree === 1 ? "" : "s") + " free"
+                                  + (page.committedMacro ? "  ·  already runs a macro" : "")
+                            color: mouse.macroSlotsFree === 0 ? Theme.warn : Theme.textFaint
+                            font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                        }
                     }
-                    PillButton { id: addText; label: "+ Text"; onClicked: { page.addText(textField.text); textField.text = "" } }
-                }
-                Row {
-                    width: parent.width; spacing: 10; topPadding: 4
-                    ToggleSwitch { id: repSw; anchors.verticalCenter: parent.verticalCenter
-                                   onToggled: { page.repeat = repSw.checked; page.touch() } }
-                    Text { text: "Repeat while held"; color: Theme.textDim
-                           anchors.verticalCenter: parent.verticalCenter
-                           font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
-                }
-                Text {
-                    width: parent.width; wrapMode: Text.WordWrap; topPadding: 2
-                    visible: mouse.macroSlotsFree >= 0
-                    text: mouse.macroSlotsFree + " macro slot" + (mouse.macroSlotsFree === 1 ? "" : "s") + " free"
-                          + (page.committedMacro ? "  ·  already runs a macro" : "")
-                    color: mouse.macroSlotsFree === 0 ? Theme.warn : Theme.textFaint
-                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                 }
             }
-            Item { Layout.fillHeight: true }
         }
+    }
+
+    // ---- "+ Add" menu (opened from the Sequence panel) ----
+    QQC.Menu {
+        id: addMenu
+        QQC.MenuItem { text: "Key…"; onTriggered: kbPop.open() }
+        QQC.MenuItem { text: "Left Click"; onTriggered: page.addClick(1) }
+        QQC.MenuItem { text: "Right Click"; onTriggered: page.addClick(2) }
+        QQC.MenuItem { text: "Middle Click"; onTriggered: page.addClick(3) }
+        QQC.MenuItem { text: "Scroll Up"; onTriggered: page.addScroll(1) }
+        QQC.MenuItem { text: "Scroll Down"; onTriggered: page.addScroll(-1) }
+        QQC.MenuItem { text: "Media…"; onTriggered: Qt.callLater(mediaMenu.popup) }
+        QQC.MenuSeparator {}
+        QQC.MenuItem { text: "Record keystrokes…"; onTriggered: page.startRecord() }
     }
 
     // ---- keyboard popout (inline grid, F13–F24 / numpad behind "More keys") ----
