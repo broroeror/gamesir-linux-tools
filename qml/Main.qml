@@ -409,6 +409,62 @@ Window {
                         height: 1; color: Theme.cardBorder }
         }
 
+        // ---------------------------------------------- device-access banner
+        // A controller was FOUND but can't be OPENED (permission / hidapi
+        // backend). Without this, that state is an eternal "Searching…" with
+        // every click a silent no-op (issue #1) — say what's wrong + the fix.
+        Rectangle {
+            visible: win.activeDevice === "controller" && bridge.accessProblem.length > 0
+                     && !bridge.demoMode
+            Layout.fillWidth: true
+            Layout.leftMargin: 20; Layout.rightMargin: 20; Layout.topMargin: 10
+            implicitHeight: accessCol.implicitHeight + 20
+            radius: Theme.radius
+            color: Theme.card; border.color: Theme.warn; border.width: 1
+            Column {
+                id: accessCol
+                anchors.left: parent.left; anchors.right: parent.right
+                anchors.top: parent.top; anchors.margins: 10
+                anchors.leftMargin: 14; anchors.rightMargin: 14
+                spacing: 6
+                Text {
+                    width: parent.width; wrapMode: Text.WordWrap
+                    color: Theme.warn; font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontM; font.weight: Font.DemiBold
+                    text: bridge.accessProblem === "backend"
+                          ? "⚠ Found your controller, but the Python hidapi library can't open it"
+                          : "⚠ Found your controller, but Deadband isn't allowed to open it"
+                }
+                Text {
+                    width: parent.width; wrapMode: Text.WordWrap
+                    color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                    text: bridge.accessProblem === "backend"
+                          ? "Your hidapi build uses the libusb backend, which can't open hidraw "
+                            + "devices. Reinstall it with:  pip install --user --force-reinstall "
+                            + "--no-binary :all: hidapi   — details in Settings → Diagnostics."
+                          : "Run this once, then unplug and replug the controller:"
+                }
+                Text {
+                    visible: bridge.accessProblem !== "backend"
+                    width: parent.width; wrapMode: Text.WrapAnywhere
+                    color: Theme.text; font.family: "monospace"; font.pixelSize: Theme.fontS
+                    text: bridge.accessFixCommand
+                }
+                Row {
+                    spacing: 8
+                    PillButton {
+                        visible: bridge.accessProblem !== "backend"
+                        label: "Copy commands"
+                        onClicked: bridge.copyText(bridge.accessFixCommand)
+                    }
+                    PillButton {
+                        label: "Diagnostics…"
+                        onClicked: { diagWin.show(); diagWin.raise(); bridge.runDiagnostics() }
+                    }
+                }
+            }
+        }
+
         // --------------------------------------------------------- content
         Item {
             Layout.fillWidth: true
@@ -832,11 +888,32 @@ Window {
                         SectionHeader { text: "Firmware Backup & Restore"; visible: bridge.fwSupported }
                         FirmwarePanel { width: parent.width; visible: bridge.fwSupported }
 
+                        Divider {}
+
+                        // ------------------------------------------ Diagnostics
+                        SectionHeader { text: "Help & Diagnostics" }
+                        Text {
+                            width: parent.width; wrapMode: Text.WordWrap
+                            text: "Something not working? Diagnostics checks whether Deadband "
+                                + "can actually open your devices and tells you how to fix it — "
+                                + "with a report you can paste into a GitHub issue."
+                            color: Theme.textDim
+                            font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                        }
+                        PillButton {
+                            label: "🩺 Open diagnostics…"
+                            onClicked: { diagWin.show(); diagWin.raise() }
+                        }
+
                     }
                 }
             }
         }
     }
+
+    // Diagnostics window (Settings → Help & Diagnostics, or the access banner).
+    // A separate top-level window; hidden until shown, auto-runs on first open.
+    DiagnosticsWindow { id: diagWin }
 
     // Transient toast: read-back result of the last "Save to Profile" (Apply).
     // Confirms an edit actually landed on the hardware (vs. a silently-dropped

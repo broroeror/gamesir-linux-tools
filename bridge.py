@@ -12,6 +12,7 @@ Two cadences:
   * status (~4  Hz) - connection, battery, profile, firmware, mode warning.
 """
 
+import os
 import threading
 import time
 from datetime import datetime
@@ -150,6 +151,8 @@ class GamesirBridge(QObject):
     fwProgress = Signal(str)            # phase text (Entering loader / Writing / …)
     fwStatus = Signal(bool, str)        # ok, message
     fwVersionsChanged = Signal()        # library changed (e.g. after a backup)
+    diagChanged = Signal()              # diagnostics report text / busy changed
+    _diagDone = Signal(str)             # worker thread -> GUI (queued delivery)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -181,6 +184,9 @@ class GamesirBridge(QObject):
         self._config = {}               # friendly key -> loaded value
         self._pending = {}              # addr -> {'data','label','display'}
         self._apply_status = ''         # transient Apply read-back result (UI hint)
+        self._diag_report = ''          # last diagnostics report text
+        self._diag_busy = False
+        self._diagDone.connect(self._on_diag_done)
         self._backup_busy = False
         self._fw_busy = False
 
@@ -282,7 +288,8 @@ class GamesirBridge(QObject):
 
         sig = (state['connected'], state['mode_ok'], state['battery'],
                state['charging'], state['profile'], state['led_slot'],
-               state['firmware'], state['controller'], state['wired'])
+               state['firmware'], state['controller'], state['wired'],
+               state.get('access'))
         if sig != self._status_sig:
             self._status_sig = sig
             self.statusChanged.emit()
@@ -713,6 +720,66 @@ class GamesirBridge(QObject):
     def controllerName(self):
         """Detected controller model ('Cyclone 2' / 'G7'), or '' if unknown."""
         return state['controller'] or ''
+
+    # ------------------------------------------------ access problem + doctor
+    @Property(str, notify=statusChanged)
+    def accessProblem(self):
+        """'' when device opens work (or nothing is connected). 'no-access' when a
+        controller was FOUND but every open is permission-denied (udev rule missing
+        or not yet applied); 'backend' when the node is openable but the Python
+        hidapi build can't open hidraw paths (libusb backend). Drives the banner —
+        the fix for the silent eternal "Searching…" from issue #1."""
+        a = state.get('access')
+        return a if a in ('no-access', 'backend') else ''
+
+    @Property(str, constant=True)
+    def accessFixCommand(self):
+        """The exact one-time commands that grant device access, with the rule's
+        real path on THIS machine (shown in the banner for copy/paste)."""
+        rule = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            '70-gamesir.rules')
+        return (f'sudo cp "{rule}" /etc/udev/rules.d/\n'
+                'sudo udevadm control --reload-rules && sudo udevadm trigger')
+
+    @Property(str, notify=diagChanged)
+    def diagReport(self):
+        return self._diag_report
+
+    @Property(bool, notify=diagChanged)
+    def diagBusy(self):
+        return self._diag_busy
+
+    @Slot()
+    def runDiagnostics(self):
+        """Collect the full doctor report off-thread (it opens device nodes and
+        can take a couple of seconds); diagReport updates when done."""
+        if self._diag_busy:
+            return
+        self._diag_busy = True
+        self.diagChanged.emit()
+
+        def work():
+            try:
+                import doctor
+                text = doctor.format_report(doctor.collect())
+            except Exception as e:
+                text = f'diagnostics failed: {e}'
+            self._diagDone.emit(text)
+        threading.Thread(target=work, daemon=True).start()
+
+    def _on_diag_done(self, text):
+        self._diag_report = text
+        self._diag_busy = False
+        self.diagChanged.emit()
+
+    @Slot(str)
+    def copyText(self, text):
+        """Copy arbitrary text to the clipboard (the Diagnostics window's
+        'Copy report' — QML has no clipboard API of its own)."""
+        from PySide6.QtGui import QGuiApplication
+        cb = QGuiApplication.clipboard()
+        if cb is not None:
+            cb.setText(text)
 
     @Property(str, notify=controllerChanged)
     def lightingStyle(self):

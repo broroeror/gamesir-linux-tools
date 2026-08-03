@@ -10,11 +10,18 @@ the `gamesir_*` modules are the GameSir vendor namespace — each speaks that
 vendor's protocol, and other manufacturers get their own modules alongside.
 
 Run:  python3 deadband.py
+Diagnose device-access problems (headless, no GUI):  deadband --doctor
 """
 
 import os
 import sys
 import threading
+
+# --doctor: print the device-access diagnostic report and exit — BEFORE any Qt
+# import side effects, so it works over SSH / in a broken graphical session.
+if '--doctor' in sys.argv:
+    from doctor import run_cli
+    raise SystemExit(run_cli())
 
 from PySide6.QtCore import QUrl, QSettings
 from PySide6.QtGui import QGuiApplication, QIcon

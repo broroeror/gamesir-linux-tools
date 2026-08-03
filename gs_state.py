@@ -33,6 +33,11 @@ state = {
     'demo': False,       # Demo mode: the bridge synthesizes one of each supported
                          # controller (no hardware). The reader idles and register
                          # reads are answered with defaults, so every page renders.
+    'access': None,      # why device opens fail: None = fine/undetermined,
+                         # 'no-access' = filesystem permission (udev rule missing/
+                         # not applied), 'backend' = hidapi built with the libusb
+                         # backend (can't open hidraw paths at all). Drives the
+                         # "found your controller but can't open it" banner.
 }
 
 EXTRA_BTNS = ('l4', 'r4', 'm', 'home', 'share')

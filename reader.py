@@ -240,6 +240,7 @@ def read_controller():
             state['wired'] = None
             state['selected'] = None
             state['driving'] = None
+            state['access'] = None      # nothing found ≠ found-but-blocked
             profiles.set_active(None)   # nothing connected: mark unrecognised
             time.sleep(1.0)
             continue
@@ -282,9 +283,19 @@ def read_controller():
             device.set_nonblocking(True)
         except Exception:
             state['connected'] = False
+            # Say WHY it failed: a found-but-unopenable controller looked like
+            # an eternal "Searching…" (issue #1) when it was really a udev-
+            # permission (or hidapi-backend) problem. The bridge shows a banner
+            # with the one-time fix.
+            try:
+                from doctor import classify_open_failure
+                state['access'] = classify_open_failure(devnode)
+            except Exception:
+                state['access'] = None
             time.sleep(1.0)
             continue
 
+        state['access'] = 'ok'
         state['connected'] = True
         read_session(device, sel['id'])   # blocks until drop / switch
         try:
