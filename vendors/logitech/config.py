@@ -166,14 +166,37 @@ def macro_summary(macrodef):
     return label
 
 
+# One macro may chain across this many sectors (via JUMP). 4 of the ~10 slots is
+# a generous single-macro cap (~1000 bytes ≈ 80 steps) that can't starve the rest.
+MAX_MACRO_SECTORS = 4
+
+
+def max_macro_bytes(sector_size, sectors=MAX_MACRO_SECTORS):
+    """Largest macro bytecode that fits `sectors` chained sectors. Matches
+    split_body exactly: its per-chunk budget is sector_size-5 for EVERY chunk
+    (the last included), so advertising the last chunk at full sector size let
+    1001..1005-byte bodies pass the limit check and then fail the split
+    (review #5 false-abort)."""
+    return sectors * (sector_size - 5)
+
+
 def free_macro_sectors(dev, info, headers):
-    """Every ERASED (all-0xFF) sector in the free/macro region that is not a listed
-    profile (nor the directory). These are the slots a new macro can be written to."""
+    """Every macro-region sector a new macro may be written to: ERASED (all-0xFF),
+    not the directory / a listed profile, AND NOT REFERENCED by any button. The
+    referenced check matters even for blank sectors — a pointer or chain JUMP
+    targeting an erased sector is a legal instant-END macro, and allocating that
+    sector would make that button run someone else's bytecode (review #4). If
+    the reference scan can't complete, claim nothing (allocating on an unproven
+    map is how live macros get clobbered)."""
     listed = {s for s, _ in headers} | {0x0000}
+    try:
+        refs = referenced_macro_sectors(dev, info, headers)
+    except Exception:
+        return []
     size = info['sector_size']
     out = []
     for s in range(info['profile_count'] + 1, info['sector_count']):
-        if s in listed:
+        if s in listed or s in refs:
             continue
         if all(b == 0xFF for b in dev.read_sector(s, size)):
             out.append(s)
@@ -181,24 +204,135 @@ def free_macro_sectors(dev, info, headers):
 
 
 def _macro_body_at(dev, size, sector, offset):
-    """Read the macro bytecode at (sector, offset): bytes from offset up to and
-    including the first END, via the opcode-length walk. b'' on any issue."""
+    """Read the LOGICAL macro bytecode at (sector, offset): the opcode stream up
+    to and including END, FOLLOWING chain JUMPs (which are dropped from the
+    result, so a chained macro compares equal to its pre-split body). b'' on any
+    issue — malformed stream, missing END, or a jump loop."""
     try:
         raw = dev.read_sector(sector, size)
-        i = offset
-        for _ in range(512):
+        out = bytearray()
+        i, hops = offset, 0
+        for _ in range(2048):
             if i >= len(raw):
                 return b''
             op = raw[i]
             n = macros.opcode_len(op)
             if n is None or i + n > len(raw):
                 return b''
+            if op == macros.OP_JUMP:
+                hops += 1
+                if hops > MAX_MACRO_SECTORS + 2:      # loop guard
+                    return b''
+                tgt = (raw[i + 1] << 8) | raw[i + 2]
+                off = (raw[i + 3] << 8) | raw[i + 4]
+                raw = dev.read_sector(tgt, size)
+                i = off
+                continue
+            out += raw[i:i + n]
             i += n
             if op == macros.OP_END:
-                return bytes(raw[offset:i])
+                return bytes(out)
         return b''
     except Exception:
         return b''
+
+
+def referenced_macro_sectors(dev, info, headers):
+    """Every sector some button's macro pointer (any listed profile, either bank)
+    reaches — the pointed-at sectors plus everything their chains JUMP into.
+    These are the macro sectors that must NEVER be blanked.
+
+    RAISES on anything it cannot FULLY decode — an unreadable sector, an unknown
+    opcode, a stream running off the sector end. An incomplete walk must abort
+    the caller (reclaim), never under-collect: a silently truncated walk would
+    classify a live chain tail as an orphan and blank it (adversarial-review
+    findings #1/#2 — foreign-written chains, e.g. G HUB's, can be longer or use
+    opcodes we don't model). Loops are detected via visited jump states (safe to
+    stop there: everything reachable has been walked); there is NO hop cap."""
+    size = info['sector_size']
+    starts = set()
+    for sector, _ in headers:
+        prof = onboard.OnboardProfile.decode(dev.read_sector(sector, size),
+                                             sector=sector)
+        for b in list(prof.buttons) + list(prof.gbuttons):
+            if b.kind == 'macro':
+                starts.add((b.macro_sector, b.macro_address))
+    seen = set()
+    for start_sec, start_off in starts:
+        visited = set()                  # (sector, jump-op offset) states
+        sec, i = start_sec, start_off
+        seen.add(sec)
+        raw = dev.read_sector(sec, size)
+        for _ in range(8192):
+            if i >= len(raw):
+                raise ValueError(
+                    f'macro stream in sector 0x{sec:04x} runs past the sector end')
+            op = raw[i]
+            n = macros.opcode_len(op)
+            if n is None:
+                raise ValueError(
+                    f'undecodable opcode 0x{op:02x} in macro sector 0x{sec:04x}')
+            if i + n > len(raw):
+                raise ValueError(f'truncated opcode in macro sector 0x{sec:04x}')
+            if op == macros.OP_END:
+                break
+            if op == macros.OP_JUMP:
+                if (sec, i) in visited:
+                    break                # loop — all reachable sectors collected
+                visited.add((sec, i))
+                tgt = (raw[i + 1] << 8) | raw[i + 2]
+                off = (raw[i + 3] << 8) | raw[i + 4]
+                seen.add(tgt)
+                raw = dev.read_sector(tgt, size)
+                sec, i = tgt, off
+                continue
+            i += n
+        else:
+            raise ValueError('macro walk exceeded the op budget')
+    return seen
+
+
+def reclaim_orphan_macros(dev, info, headers):
+    """Blank (erase to all-0xFF) every macro-region sector that NO button in any
+    listed profile references — the orphans left behind by macro edits/clears
+    (and old G HUB macros nothing points at). Structurally safe: the candidate
+    set excludes the directory, every listed profile sector, and every sector
+    reachable from any macro pointer; blanking an unreferenced sector cannot
+    change any behaviour. Each blank is read-back-verified. Returns
+    (ok, freed_count, message)."""
+    size = info['sector_size']
+    listed = {s for s, _ in headers} | {0x0000}
+    try:
+        refs = referenced_macro_sectors(dev, info, headers)
+    except Exception as e:
+        # can't PROVE what's referenced -> touch NOTHING (raises cover unreadable
+        # sectors AND undecodable/foreign macro streams — review #1/#2)
+        return False, 0, f'could not verify macro references ({e}) — nothing was changed'
+    blank = b'\xff' * size
+    freed = failed = 0
+    for s in range(info['profile_count'] + 1, info['sector_count']):
+        if s in listed or s in refs:
+            continue
+        try:
+            if dev.read_sector(s, size) == blank:
+                continue                       # already free
+            dev.write_full_sector_no_crc(s, blank)
+            if dev.read_sector(s, size) == blank:
+                freed += 1
+            else:
+                failed += 1
+        except Exception:
+            failed += 1
+    if failed and not freed:
+        return False, 0, ('could not blank any orphaned sector — this firmware '
+                          'may not support erasing (nothing was referencing '
+                          'them, so nothing changed)')
+    msg = f'freed {freed} macro slot{"" if freed == 1 else "s"}'
+    if failed:
+        msg += f' ({failed} could not be blanked)'
+    if freed == 0:
+        msg = 'no orphaned macro slots to free — every stored macro is in use'
+    return True, freed, msg
 
 
 def profile_bindings(dev, sector, size):
@@ -353,8 +487,8 @@ def apply_edits(dev, info, headers, sector, button_changes=None, gshift_changes=
             cur = onboard.OnboardProfile.decode(dev.read_sector(sector, size), sector=sector)
         except Exception as e:
             return False, f'profile read failed: {e}'
-        # --- plan (no writes): validate + build bodies + resolve skips/clears ---
-        to_write = []                                  # [(button, body)] needing a sector
+        # --- plan (no writes): validate + build bodies + split into chunks ---
+        to_write = []                                  # [(button, [chunk, ...])]
         for btn, macrodef in macro_changes.items():
             if not (0 <= btn < info['button_count']):
                 return False, f'macro button {btn} out of range (0..{info["button_count"] - 1})'
@@ -365,29 +499,48 @@ def apply_edits(dev, info, headers, sector, button_changes=None, gshift_changes=
                 body = build_macro_body(macrodef)
             except ValueError as e:
                 return False, f'button {btn}: {e}'
-            if len(body) > size:
-                return False, (f'macro on button {btn} is {len(body)} bytes — too large '
-                               f'for one {size}-byte sector')
+            if len(body) > max_macro_bytes(size):
+                return False, (f'macro on button {btn} is {len(body)} bytes — over the '
+                               f'{max_macro_bytes(size)}-byte limit '
+                               f'({MAX_MACRO_SECTORS} chained sectors); shorten it')
             curb = cur.buttons[btn]
-            if curb.kind == 'macro' and \
-                    _macro_body_at(dev, size, curb.macro_sector, curb.macro_address) == body:
+            # identical-skip only for a macro-EXECUTE binding: 'macro' kind also
+            # covers macro-STOP (behavior 0x1), whose bytes may match the staged
+            # body while the button does the opposite thing (review #3)
+            if curb.kind == 'macro' and curb.behavior == onboard.BEHAVIOR_MACRO_EXECUTE \
+                    and _macro_body_at(dev, size, curb.macro_sector, curb.macro_address) == body:
                 continue                               # already runs this exact macro
-            to_write.append((btn, body))
-        # --- capacity check up front, then write ---
+            # one sector if it fits; else split at opcode boundaries + JUMP-chain
+            try:
+                chunks = ([body] if len(body) <= size
+                          else macros.split_body(body, size, MAX_MACRO_SECTORS))
+            except ValueError as e:
+                return False, f'button {btn}: {e}'
+            to_write.append((btn, chunks))
+        # --- capacity check up front (whole batch, chains included), then write ---
         if to_write:
+            need = sum(len(c) for _, c in to_write)
             free = free_macro_sectors(dev, info, headers)
-            if len(free) < len(to_write):
+            if len(free) < need:
                 return False, (f'not enough free macro slots — {len(free)} free, '
-                               f'need {len(to_write)} (clear a macro to free a slot)')
-            for (btn, body), macro_sector in zip(to_write, free):
-                image = macros.to_sector(body, size, crc=False, offset=0)
-                try:
-                    dev.write_full_sector_no_crc(macro_sector, image)
-                    if dev.read_sector(macro_sector, size) != image:
-                        return False, f'macro sector 0x{macro_sector:04x} read-back mismatch — not committed'
-                except Exception as e:
-                    return False, f'macro write failed: {e}'
-                button_changes[btn] = onboard.Button.macro_ptr(macro_sector, 0)
+                               f'need {need} (use "Free unused slots", or clear a macro)')
+            fi = 0
+            for btn, chunks in to_write:
+                alloc = free[fi:fi + len(chunks)]
+                fi += len(chunks)
+                for j, chunk in enumerate(chunks):
+                    # every chunk but the last ends with a JUMP to the next sector
+                    stream = chunk if j == len(chunks) - 1 \
+                        else chunk + macros.jump(alloc[j + 1], 0)
+                    image = macros.to_sector(stream, size, crc=False, offset=0)
+                    try:
+                        dev.write_full_sector_no_crc(alloc[j], image)
+                        if dev.read_sector(alloc[j], size) != image:
+                            return False, (f'macro sector 0x{alloc[j]:04x} read-back '
+                                           'mismatch — not committed')
+                    except Exception as e:
+                        return False, f'macro write failed: {e}'
+                button_changes[btn] = onboard.Button.macro_ptr(alloc[0], 0)
 
     if not button_changes and not gshift_changes and not sensor:
         return True, 'no changes needed'          # all staged edits were no-ops

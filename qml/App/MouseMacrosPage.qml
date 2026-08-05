@@ -322,6 +322,26 @@ Item {
                                 }
                             }
                         }
+                        // running low on flash slots: offer to blank the orphans
+                        // (sectors left behind by macro edits/clears that nothing
+                        // references any more — incl. old G HUB leftovers)
+                        Row {
+                            width: parent.width; spacing: 8; topPadding: 4
+                            visible: mouse.macroSlotsFree >= 0 && mouse.macroSlotsFree <= 2
+                            PillButton {
+                                label: "♻ Free unused slots"
+                                enabled: !mouse.busy
+                                onClicked: mouse.reclaimSlots()
+                            }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width - 160
+                                wrapMode: Text.WordWrap
+                                text: "Blanks stored macros nothing points at (edits leave orphans behind)."
+                                color: Theme.textFaint
+                                font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                            }
+                        }
                     }
 
                     // selected-step editor — ALWAYS visible, greyed until a step is selected

@@ -78,6 +78,7 @@ class MouseBridge(QObject):
     _remapDone = Signal(bool, str, 'QVariantMap')               # ok, status, binds
     _applyDone = Signal(bool, str, 'QVariantMap')               # ok, status, binds
     _macroSlotsDone = Signal(int)                              # free macro sector count
+    _reclaimDone = Signal(bool, str, int)                      # ok, message, free-after
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -110,6 +111,7 @@ class MouseBridge(QObject):
         self._remapDone.connect(self._on_remap)
         self._applyDone.connect(self._on_apply)
         self._macroSlotsDone.connect(self._on_macro_slots)
+        self._reclaimDone.connect(self._on_reclaim)
 
         # light hotplug poll: enumerate (no open) every few seconds; a full read
         # happens only on a connect transition or an explicit refresh().
@@ -472,9 +474,17 @@ class MouseBridge(QObject):
             return                                       # ignore an out-of-range button
         try:
             mdef = json.loads(macro_json)
-            logi_config.build_macro_body(mdef)           # validate only (raises ValueError)
+            body = logi_config.build_macro_body(mdef)    # validate (raises ValueError)
         except (ValueError, TypeError, json.JSONDecodeError) as e:
             self._set_status(f'bad macro: {e}')
+            return
+        # size guard at STAGE time so the editor flags an over-limit macro while
+        # it's being built, not at Apply. 255 = the G502 X's sector size (the
+        # only supported mouse); apply_edits re-checks with the real value.
+        limit = logi_config.max_macro_bytes(255)
+        if len(body) > limit:
+            self._set_status(f'macro too long ({len(body)} bytes; the mouse can '
+                             f'store about {limit}) — trim some steps')
             return
         self._pending_macros[int(button)] = mdef
         self._pending.pop(f'default:{int(button)}', None)
@@ -501,6 +511,43 @@ class MouseBridge(QObject):
                 self._macroSlotsDone.emit(free)
             except Exception:
                 pass
+
+    @Slot()
+    def reclaimSlots(self):
+        """Blank every orphaned macro sector (nothing points at it, in any
+        profile) to free slots — off-thread; result shows in the Apply toast."""
+        if self._busy:
+            return
+        self._busy = True
+        self.busyChanged.emit()
+        self._apply_status = 'Applying…'
+        self.applyStatusChanged.emit()
+        threading.Thread(target=self._reclaim_worker, daemon=True).start()
+
+    def _reclaim_worker(self):
+        with self._io:
+            dev = hidpp.find_device()
+            if dev is None:
+                self._reclaimDone.emit(False, 'mouse not accessible', -1)
+                return
+            try:
+                with dev:
+                    info = dev.onboard_info()
+                    headers = dev.profile_headers()
+                    ok, _, msg = logi_config.reclaim_orphan_macros(dev, info, headers)
+                    free = len(logi_config.free_macro_sectors(dev, info, headers))
+                self._reclaimDone.emit(ok, msg, free)
+            except Exception as e:
+                self._reclaimDone.emit(False, f'error: {e}', -1)
+
+    def _on_reclaim(self, ok, msg, free):
+        self._busy = False
+        self.busyChanged.emit()
+        self._apply_status = ('✓ ' if ok else '⚠ ') + msg
+        self.applyStatusChanged.emit()
+        if free >= 0:
+            self._macro_slots_free = free
+            self.sensorChanged.emit()
 
     @Slot(str, int)
     def unstage(self, layer, button):

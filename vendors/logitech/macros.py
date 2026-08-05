@@ -208,6 +208,38 @@ def hwheel(delta):
     return bytes([OP_MOUSE_HWHEEL, delta & 0xFF])
 
 
+def jump(sector, offset=0):
+    """JUMP (0x60): continue execution at (sector, offset) — how a macro chains
+    across sectors when its bytecode outgrows one. The 4 operand bytes use the
+    SAME addressing as the button macro pointer ([sector BE, offset BE]; the high
+    byte doubles as the mem_type field, 0x00 = writeable onboard flash)."""
+    return bytes([OP_JUMP, (sector >> 8) & 0xFF, sector & 0xFF,
+                  (offset >> 8) & 0xFF, offset & 0xFF])
+
+
+def split_body(body, sector_size, max_sectors):
+    """Split macro bytecode at OPCODE boundaries into chunks that each fit one
+    sector with 5 bytes reserved for the chaining JUMP appended to every chunk
+    but the last (which keeps the stream's own END). Returns [chunk, ...];
+    raises ValueError on malformed bytecode or > max_sectors chunks."""
+    budget = sector_size - 5
+    chunks, cur, i = [], bytearray(), 0
+    while i < len(body):
+        n = opcode_len(body[i])
+        if n is None or i + n > len(body):
+            raise ValueError('malformed macro bytecode (bad opcode boundary)')
+        if len(cur) + n > budget:
+            chunks.append(bytes(cur))
+            cur = bytearray()
+        cur += body[i:i + n]
+        i += n
+    if cur:
+        chunks.append(bytes(cur))
+    if len(chunks) > max_sectors:
+        raise ValueError(f'macro needs {len(chunks)} sectors (max {max_sectors})')
+    return chunks
+
+
 # --- Macro builder -----------------------------------------------------------
 class Macro:
     """Fluent builder for a macro body. Every method returns self so calls chain.
