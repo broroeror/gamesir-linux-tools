@@ -223,9 +223,17 @@ def collect():
     elif any(n['verdict'] == 'backend' for n in gsnodes):
         rep['verdict'].append(
             'The device node is openable, but the Python hidapi library cannot '
-            'open it — your hidapi appears to be built with the libusb backend '
-            f'({rep["hidapi_backend"]}). Reinstall it with the hidraw backend:\n'
-            '    pip install --user --force-reinstall --no-binary :all: hidapi')
+            'open it — your hidapi is built with the libusb backend '
+            f'({rep["hidapi_backend"]}), which cannot open /dev/hidraw devices. '
+            'The pip package DEFAULTS to libusb when built from source; rebuild '
+            'it with the hidraw backend (the HIDAPI_WITH_HIDRAW variable is the '
+            'selector, and --no-cache-dir is required or pip silently reuses '
+            'the previously built libusb wheel from its cache):\n'
+            '    HIDAPI_WITH_HIDRAW=1 pip install --user --force-reinstall '
+            '--no-cache-dir --no-binary :all: hidapi\n'
+            'Build prerequisites: gcc, python3-devel, and libudev headers — on '
+            'Fedora/Bazzite: rpm-ostree install systemd-devel (then reboot); on '
+            'Debian/Ubuntu: sudo apt install build-essential python3-dev libudev-dev.')
     elif any(n['verdict'] == 'ok' for n in gsnodes):
         rep['verdict'].append('GameSir device access: OK.')
 

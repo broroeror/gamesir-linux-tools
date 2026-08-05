@@ -52,10 +52,48 @@ if [ ${#missing[@]} -ne 0 ]; then
       echo "    Skipped. Install them yourself, then re-run this script."; exit 1
     fi
   else
-    echo "   Install PySide6 and hidapi for Python 3 (e.g. pip install --user PySide6 hidapi),"
-    echo "   then re-run this script."; exit 1
+    echo "   Install PySide6 and hidapi for Python 3, then re-run this script:"
+    echo "       pip install --user PySide6"
+    echo "       HIDAPI_WITH_HIDRAW=1 pip install --user --no-binary :all: hidapi"
+    echo "   (The HIDAPI_WITH_HIDRAW=1 matters: pip's source build DEFAULTS to the"
+    echo "    libusb backend, which cannot open the controller. Building needs gcc,"
+    echo "    python3-devel and libudev headers — Fedora/Bazzite: systemd-devel.)"
+    exit 1
   fi
 fi
+
+# 1b. hidapi backend check --------------------------------------------------
+# `import hid` succeeding is not enough: a source-built pip hidapi DEFAULTS to
+# the libusb backend, which cannot open /dev/hidraw — the app then finds the
+# controller but every open fails. Catch that here, not at first run.
+backend="$(python3 -c "import sys; sys.path.insert(0, '$REPO')
+from doctor import _hidapi_backend; print(_hidapi_backend())" 2>/dev/null || echo unknown)"
+case "$backend" in
+  libusb*)
+    echo
+    echo "==> WARNING: your Python hidapi uses the libusb backend ($backend)."
+    echo "    It cannot open hidraw devices, so Deadband will find your controller"
+    echo "    but fail to talk to it. Rebuild hidapi with the hidraw backend:"
+    echo "        HIDAPI_WITH_HIDRAW=1 pip install --user --force-reinstall \\"
+    echo "            --no-cache-dir --no-binary :all: hidapi"
+    echo "    (--no-cache-dir matters: pip otherwise reuses the old libusb build."
+    echo "     Needs gcc, python3-devel, libudev headers — Fedora/Bazzite:"
+    echo "     rpm-ostree install systemd-devel, then reboot.)"
+    if confirm "    Try that rebuild now?"; then
+      HIDAPI_WITH_HIDRAW=1 pip install --user --force-reinstall \
+        --no-cache-dir --no-binary :all: hidapi
+      backend="$(python3 -c "import sys; sys.path.insert(0, '$REPO')
+from doctor import _hidapi_backend; print(_hidapi_backend())" 2>/dev/null || echo unknown)"
+      case "$backend" in
+        hidraw*) echo "    Rebuilt OK — hidraw backend active." ;;
+        *) echo "    Still not hidraw ($backend) — run ./deadband --doctor after"
+           echo "    installing the build prerequisites, and re-run this script." ;;
+      esac
+    else
+      echo "    Continuing anyway — the app's Diagnostics window shows this too."
+    fi
+    ;;
+esac
 
 # 2. udev rule (one-time sudo, optional) -----------------------------------
 RULE_OK=1

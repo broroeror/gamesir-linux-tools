@@ -423,6 +423,10 @@ Window {
             color: Theme.card; border.color: Theme.warn; border.width: 1
             Column {
                 id: accessCol
+                // the fix command for the diagnosed problem (udev vs hidapi backend)
+                readonly property string fixCmd: bridge.accessProblem === "backend"
+                    ? "HIDAPI_WITH_HIDRAW=1 pip install --user --force-reinstall --no-cache-dir --no-binary :all: hidapi"
+                    : bridge.accessFixCommand
                 anchors.left: parent.left; anchors.right: parent.right
                 anchors.top: parent.top; anchors.margins: 10
                 anchors.leftMargin: 14; anchors.rightMargin: 14
@@ -439,23 +443,22 @@ Window {
                     width: parent.width; wrapMode: Text.WordWrap
                     color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                     text: bridge.accessProblem === "backend"
-                          ? "Your hidapi build uses the libusb backend, which can't open hidraw "
-                            + "devices. Reinstall it with:  pip install --user --force-reinstall "
-                            + "--no-binary :all: hidapi   — details in Settings → Diagnostics."
+                          ? "Your hidapi is built with the libusb backend, which can't open hidraw "
+                            + "devices (the pip default when built from source). Rebuild it — the "
+                            + "--no-cache-dir matters, or pip reuses the old libusb build. "
+                            + "Prerequisites & details in Diagnostics:"
                           : "Run this once, then unplug and replug the controller:"
                 }
                 Text {
-                    visible: bridge.accessProblem !== "backend"
                     width: parent.width; wrapMode: Text.WrapAnywhere
                     color: Theme.text; font.family: "monospace"; font.pixelSize: Theme.fontS
-                    text: bridge.accessFixCommand
+                    text: accessCol.fixCmd
                 }
                 Row {
                     spacing: 8
                     PillButton {
-                        visible: bridge.accessProblem !== "backend"
-                        label: "Copy commands"
-                        onClicked: bridge.copyText(bridge.accessFixCommand)
+                        label: "Copy command" + (bridge.accessProblem === "backend" ? "" : "s")
+                        onClicked: bridge.copyText(accessCol.fixCmd)
                     }
                     PillButton {
                         label: "Diagnostics…"
