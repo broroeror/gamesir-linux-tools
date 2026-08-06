@@ -732,12 +732,25 @@ class GamesirBridge(QObject):
         a = state.get('access')
         return a if a in ('no-access', 'backend') else ''
 
+    @Property(bool, constant=True)
+    def isNixos(self):
+        """NixOS gets declarative-config advice in the access banner (a sudo cp
+        into the generated /etc, or a pip install, is the wrong fix there)."""
+        import doctor
+        return doctor.is_nixos()
+
     @Property(str, constant=True)
     def accessFixCommand(self):
-        """The exact one-time commands that grant device access, with the rule's
-        real path on THIS machine (shown in the banner for copy/paste)."""
+        """The exact one-time fix that grants device access, with the rule's
+        real path on THIS machine (shown in the banner for copy/paste). On
+        NixOS: the declarative snippet + rebuild instead of a sudo cp."""
+        import doctor
         rule = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                             '70-gamesir.rules')
+        if doctor.is_nixos():
+            return (f'services.udev.extraRules = builtins.readFile "{rule}";\n'
+                    f'# or use the community flake: {doctor.NIX_FLAKE_URL}\n'
+                    '# then: sudo nixos-rebuild switch, and replug the controller')
         return (f'sudo cp "{rule}" /etc/udev/rules.d/\n'
                 'sudo udevadm control --reload-rules && sudo udevadm trigger')
 

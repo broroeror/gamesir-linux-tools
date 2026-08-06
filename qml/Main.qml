@@ -423,9 +423,12 @@ Window {
             color: Theme.card; border.color: Theme.warn; border.width: 1
             Column {
                 id: accessCol
-                // the fix command for the diagnosed problem (udev vs hidapi backend)
+                // the fix command for the diagnosed problem (udev vs hidapi
+                // backend); NixOS gets declarative-config fixes for both
                 readonly property string fixCmd: bridge.accessProblem === "backend"
-                    ? "HIDAPI_WITH_HIDRAW=1 pip install --user --force-reinstall --no-cache-dir --no-binary :all: hidapi"
+                    ? (bridge.isNixos
+                       ? "# use the community flake (builds hidapi with the hidraw backend):\nnix run codeberg:Epaphroditus/gamesir-linux-tools-nix"
+                       : "HIDAPI_WITH_HIDRAW=1 pip install --user --force-reinstall --no-cache-dir --no-binary :all: hidapi")
                     : bridge.accessFixCommand
                 anchors.left: parent.left; anchors.right: parent.right
                 anchors.top: parent.top; anchors.margins: 10
@@ -443,11 +446,18 @@ Window {
                     width: parent.width; wrapMode: Text.WordWrap
                     color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                     text: bridge.accessProblem === "backend"
-                          ? "Your hidapi is built with the libusb backend, which can't open hidraw "
-                            + "devices (the pip default when built from source). Rebuild it — the "
-                            + "--no-cache-dir matters, or pip reuses the old libusb build. "
-                            + "Prerequisites & details in Diagnostics:"
-                          : "Run this once, then unplug and replug the controller:"
+                          ? (bridge.isNixos
+                             ? "Your hidapi is built with the libusb backend, which can't open "
+                               + "hidraw devices. On NixOS, use an overridden hidapi build — "
+                               + "details in Diagnostics:"
+                             : "Your hidapi is built with the libusb backend, which can't open hidraw "
+                               + "devices (the pip default when built from source). Rebuild it — the "
+                               + "--no-cache-dir matters, or pip reuses the old libusb build. "
+                               + "Prerequisites & details in Diagnostics:")
+                          : (bridge.isNixos
+                             ? "On NixOS the rule comes from your configuration — add this (or use "
+                               + "the community flake), rebuild, then replug:"
+                             : "Run this once, then unplug and replug the controller:")
                 }
                 Text {
                     width: parent.width; wrapMode: Text.WrapAnywhere

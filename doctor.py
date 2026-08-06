@@ -40,15 +40,28 @@ UDEV_RULES = {
 
 
 # --------------------------------------------------------------------- helpers
-def _os_release():
+def _os_release(field='PRETTY_NAME'):
     try:
         with open('/etc/os-release') as f:
             for line in f:
-                if line.startswith('PRETTY_NAME='):
+                if line.startswith(field + '='):
                     return line.split('=', 1)[1].strip().strip('"')
     except OSError:
         pass
     return 'unknown'
+
+
+def is_nixos():
+    """NixOS needs different advice everywhere: /etc is generated (a `sudo cp`
+    into /etc/udev/rules.d is wrong/ephemeral) and Python packages are immutable
+    (a `pip install` fix doesn't apply). Point at the declarative config — the
+    community flake wires up both."""
+    return _os_release('ID').lower() == 'nixos'
+
+
+# Community NixOS flake (Epaphroditus): NixOS module w/ udev wiring + a
+# hidraw-backend hidapi override — the NixOS-native fix for both problem classes.
+NIX_FLAKE_URL = 'https://codeberg.org/Epaphroditus/gamesir-linux-tools-nix'
 
 
 def _hidapi_backend():
@@ -173,6 +186,7 @@ def collect():
     rep = {
         'app': 'Deadband',
         'os': _os_release(),
+        'nixos': is_nixos(),
         'kernel': platform.release(),
         'python': sys.version.split()[0],
         'session': os.environ.get('XDG_SESSION_TYPE', '?'),
@@ -207,7 +221,18 @@ def collect():
             'kernel/USB-level problem (check `dmesg`), not an app problem.')
     elif all(n['verdict'] == 'no-access' for n in gsnodes):
         rule = rep['rules'].get('GameSir', {})
-        if not rule.get('installed'):
+        if rep.get('nixos'):
+            rep['verdict'].append(
+                'GameSir device found but NOT openable (permission denied). On '
+                'NixOS the udev rule must come from your configuration (files '
+                'copied into /etc/udev/rules.d are generated over). Easiest: use '
+                f'the community flake — {NIX_FLAKE_URL} — whose NixOS module '
+                'wires the rule up. Or add it declaratively:\n'
+                '    services.udev.extraRules = builtins.readFile '
+                f'"{UDEV_RULES["GameSir"][1]}";\n'
+                'then `sudo nixos-rebuild switch` and UNPLUG AND REPLUG the '
+                'controller.')
+        elif not rule.get('installed'):
             rep['verdict'].append(
                 'GameSir device found but NOT openable (permission denied), and '
                 'the udev rule is NOT installed. Fix:\n'
@@ -221,19 +246,29 @@ def collect():
                 '(udevadm trigger does not always re-apply the access tag), and '
                 'make sure you are on a local (not SSH/remote) login.')
     elif any(n['verdict'] == 'backend' for n in gsnodes):
-        rep['verdict'].append(
-            'The device node is openable, but the Python hidapi library cannot '
-            'open it — your hidapi is built with the libusb backend '
-            f'({rep["hidapi_backend"]}), which cannot open /dev/hidraw devices. '
-            'The pip package DEFAULTS to libusb when built from source; rebuild '
-            'it with the hidraw backend (the HIDAPI_WITH_HIDRAW variable is the '
-            'selector, and --no-cache-dir is required or pip silently reuses '
-            'the previously built libusb wheel from its cache):\n'
-            '    HIDAPI_WITH_HIDRAW=1 pip install --user --force-reinstall '
-            '--no-cache-dir --no-binary :all: hidapi\n'
-            'Build prerequisites: gcc, python3-devel, and libudev headers — on '
-            'Fedora/Bazzite: rpm-ostree install systemd-devel (then reboot); on '
-            'Debian/Ubuntu: sudo apt install build-essential python3-dev libudev-dev.')
+        msg = ('The device node is openable, but the Python hidapi library cannot '
+               'open it — your hidapi is built with the libusb backend '
+               f'({rep["hidapi_backend"]}), which cannot open /dev/hidraw devices. ')
+        if rep.get('nixos'):
+            msg += ('On NixOS, override the package to build with the hidraw '
+                    'backend — the community flake already does this:\n'
+                    f'    {NIX_FLAKE_URL}\n'
+                    'or in your own config:\n'
+                    '    python3Packages.hidapi.overrideAttrs (o: { env = '
+                    '(o.env or {}) // { HIDAPI_WITH_HIDRAW = "1"; }; })')
+        else:
+            msg += ('The pip package DEFAULTS to libusb when built from source; '
+                    'rebuild it with the hidraw backend (HIDAPI_WITH_HIDRAW is '
+                    'the selector, and --no-cache-dir is required or pip '
+                    'silently reuses the previously built libusb wheel from its '
+                    'cache):\n'
+                    '    HIDAPI_WITH_HIDRAW=1 pip install --user --force-reinstall '
+                    '--no-cache-dir --no-binary :all: hidapi\n'
+                    'Build prerequisites: gcc, python3-devel, and libudev headers '
+                    '— on Fedora/Bazzite: rpm-ostree install systemd-devel (then '
+                    'reboot); on Debian/Ubuntu: sudo apt install build-essential '
+                    'python3-dev libudev-dev.')
+        rep['verdict'].append(msg)
     elif any(n['verdict'] == 'ok' for n in gsnodes):
         rep['verdict'].append('GameSir device access: OK.')
 
