@@ -84,6 +84,16 @@ needed:
 cd packaging && makepkg -si
 ```
 
+On **NixOS**, there's a community-maintained flake by
+[Epaphroditus](https://codeberg.org/Epaphroditus) —
+[`gamesir-linux-tools-nix`](https://codeberg.org/Epaphroditus/gamesir-linux-tools-nix)
+— with a NixOS module that wires up the udev permissions declaratively and builds
+Python `hidapi` with the hidraw backend the app needs. Try it without installing:
+
+```sh
+nix run codeberg:Epaphroditus/gamesir-linux-tools-nix
+```
+
 ## Requirements
 
 - Python 3
@@ -94,8 +104,10 @@ cd packaging && makepkg -si
 ```sh
 # Arch
 sudo pacman -S --needed python pyside6 python-hidapi
-# or via pip
-pip install hidapi PySide6
+# or via pip — the HIDAPI_WITH_HIDRAW=1 matters: pip's source build otherwise
+# defaults to the libusb backend, which cannot open the controller
+pip install PySide6
+HIDAPI_WITH_HIDRAW=1 pip install --no-binary :all: hidapi
 ```
 
 ## Running
