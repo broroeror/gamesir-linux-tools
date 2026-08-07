@@ -1,42 +1,19 @@
 # Deadband — screenshot tour
 
-Every shot below is the real app rendered page by page, each wearing a
-different one of the six built-in theme presets (Settings → Theme; every color
-is also individually customizable). Data shown via demo mode — no two
-controllers were harmed in the making.
+Five pages of the real app, each wearing a different one of the six built-in
+theme presets (Settings → Theme; every color is also individually
+customizable). Step through them one at a time with the ◀ ▶ links on each
+page — or start here:
 
-## Rebinds — *GameSir Red* (default theme)
+**[▶ Start the tour — Rebinds](tour-1-rebinds.md)**
 
-The live controller view: pick any button on the render or the list, assign a
-gamepad button, keyboard key, or mouse action.
+| # | Page | Theme |
+|---|------|-------|
+| 1 | [Rebinds — live controller view](tour-1-rebinds.md) | GameSir Red (default) |
+| 2 | [Lighting & keyframe animations](tour-2-lights.md) | Violet |
+| 3 | [Stick curves & deadzones](tour-3-sticks.md) | Cobalt |
+| 4 | [G502 X — buttons & G-Shift](tour-4-mouse-buttons.md) | Emerald |
+| 5 | [G502 X — onboard macro editor](tour-5-mouse-macros.md) | Slate (light) |
 
-![Rebinds page, GameSir Red theme](controller-rebinds.png)
-
-## Lighting & keyframes — *Violet*
-
-Per-zone RGB with a full color picker, captured effect presets, brightness /
-speed / power settings, and the custom keyframe animation editor.
-
-![Lights page, Violet theme](controller-lights.png)
-
-## Stick curves — *Cobalt*
-
-Deadzones, anti-deadzones, trajectory, and sensitivity curves — presets or a
-draggable custom curve, per stick.
-
-![Sticks page, Cobalt theme](controller-sticks.png)
-
-## G502 X buttons — *Emerald*
-
-The mouse side: click a button on the diagram, assign clicks, keys (with the
-G-Shift second layer), sniper, or DPI steps — edits stage into a queue and
-apply in one verified write.
-
-![Mouse buttons page, Emerald theme](mouse-buttons.png)
-
-## Mouse macros — *Slate (light)*
-
-The onboard-macro editor: build a sequence step by step or record it from your
-keyboard with live timing, tune each step's hold/delay, then Apply.
-
-![Mouse macros page, Slate light theme](mouse-macros.png)
+Shots are rendered from the app itself in demo mode, so they can be
+regenerated identically after UI changes.

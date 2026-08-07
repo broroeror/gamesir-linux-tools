@@ -40,15 +40,15 @@ alongside. It covers:
   [Something not working?](#something-not-working)).
 
 Every page wears your palette — six built-in theme presets (and full custom
-colors). Click a shot for full size, or browse the
-[screenshot tour](docs/screenshots/README.md):
+colors). The gallery below rotates through five pages, each in a different
+theme; click it (or the caption link) to step through them one at a time:
 
 <p align="center">
-  <a href="docs/screenshots/controller-rebinds.png"><img src="docs/screenshots/thumb-controller-rebinds.png" width="180" alt="Rebinds — GameSir Red"></a>
-  <a href="docs/screenshots/controller-lights.png"><img src="docs/screenshots/thumb-controller-lights.png" width="180" alt="Lighting + keyframes — Violet"></a>
-  <a href="docs/screenshots/controller-sticks.png"><img src="docs/screenshots/thumb-controller-sticks.png" width="180" alt="Stick curves — Cobalt"></a>
-  <a href="docs/screenshots/mouse-buttons.png"><img src="docs/screenshots/thumb-mouse-buttons.png" width="180" alt="G502 X buttons — Emerald"></a>
-  <a href="docs/screenshots/mouse-macros.png"><img src="docs/screenshots/thumb-mouse-macros.png" width="180" alt="Mouse macros — Slate light"></a>
+  <a href="docs/screenshots/tour-1-rebinds.md">
+    <img src="docs/screenshots/gallery.gif" width="880" alt="Rotating gallery: Rebinds, Lighting, Stick curves, G502 X buttons, and mouse macros — each in a different theme">
+  </a>
+  <br>
+  <em><a href="docs/screenshots/README.md">Browse the screenshot tour ▶</a></em>
 </p>
 
 **Version:** `0.2.0-dev` — Deadband: multi-device (Cyclone 2 + G7 Pro 8K
