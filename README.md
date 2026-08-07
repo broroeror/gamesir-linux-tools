@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/screenshots/banner.png" width="900" alt="Deadband — controllers and mice, configured on Linux">
+</p>
+
 # Deadband — a Linux configuration app for controllers and mice
 
 A Linux GUI for gaming input devices, driven over each device's vendor (hidraw)
@@ -34,6 +38,18 @@ alongside. It covers:
 - **Diagnostics** — a built-in doctor that pinpoints permission, udev, and
   hidapi-backend problems, with a copy-paste report for bug reports (see
   [Something not working?](#something-not-working)).
+
+Every page wears your palette — six built-in theme presets (and full custom
+colors). Click a shot for full size, or browse the
+[screenshot tour](docs/screenshots/README.md):
+
+<p align="center">
+  <a href="docs/screenshots/controller-rebinds.png"><img src="docs/screenshots/thumb-controller-rebinds.png" width="180" alt="Rebinds — GameSir Red"></a>
+  <a href="docs/screenshots/controller-lights.png"><img src="docs/screenshots/thumb-controller-lights.png" width="180" alt="Lighting + keyframes — Violet"></a>
+  <a href="docs/screenshots/controller-sticks.png"><img src="docs/screenshots/thumb-controller-sticks.png" width="180" alt="Stick curves — Cobalt"></a>
+  <a href="docs/screenshots/mouse-buttons.png"><img src="docs/screenshots/thumb-mouse-buttons.png" width="180" alt="G502 X buttons — Emerald"></a>
+  <a href="docs/screenshots/mouse-macros.png"><img src="docs/screenshots/thumb-mouse-macros.png" width="180" alt="Mouse macros — Slate light"></a>
+</p>
 
 **Version:** `0.2.0-dev` — Deadband: multi-device (Cyclone 2 + G7 Pro 8K
 controllers, G502 X mouse), the full Qt/QML app (lighting + keyframe editor,
