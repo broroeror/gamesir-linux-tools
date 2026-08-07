@@ -87,127 +87,133 @@ backup/restore, and a mouse-mode toggle. A device picker in the header switches
 between your controllers and the G502 X, which gets its own Buttons / DPI /
 Macros tabs.
 
-## Install (Qt app)
+## Install
 
-On **Arch / KDE**, one command after cloning:
+Deadband needs Python 3 with [`PySide6`](https://pypi.org/project/PySide6/) and
+[`hidapi`](https://pypi.org/project/hidapi/) — hidapi built with its **hidraw**
+backend. Each route below takes care of that unless noted.
 
-```sh
-git clone https://github.com/broroeror/gamesir-linux-tools.git
-cd gamesir-linux-tools
-./install.sh
-```
+### Arch Linux
 
-`install.sh` installs into your home (`~/.local`), so the only step that needs
-`sudo` is the one-time udev rule that lets you open the controller without root —
-and it **prompts before running anything privileged**, showing the exact commands
-first. You can decline the udev step; the app still installs and launches, it just
-can't reach the controller until the rule is in place. Afterwards **Deadband**
-appears in your app launcher (or run `deadband`). Remove it with `./uninstall.sh`.
-Upgrading from the old `gamesir-cyclone2` install? `install.sh` removes it for
-you, and your settings carry over on first run.
-
-Prefer the Arch-native route? Deadband is on the **AUR** as
-[`deadband-git`](https://aur.archlinux.org/packages/deadband-git):
+Install [`deadband-git`](https://aur.archlinux.org/packages/deadband-git) from
+the AUR:
 
 ```sh
 yay -S deadband-git      # or: paru -S deadband-git
 ```
 
-It's a VCS (`-git`) package, so it always builds from the latest commit. Or build
-the included [`packaging/PKGBUILD`](packaging/PKGBUILD) directly, no AUR helper
-needed:
+It's a `-git` package, so it always builds the latest commit. To build without
+an AUR helper, use the included [`packaging/PKGBUILD`](packaging/PKGBUILD):
 
 ```sh
 cd packaging && makepkg -si
 ```
 
-On **NixOS**, there's a community-maintained flake by
+### NixOS
+
+Use the community flake by
 [Epaphroditus](https://codeberg.org/Epaphroditus) —
-[`gamesir-linux-tools-nix`](https://codeberg.org/Epaphroditus/gamesir-linux-tools-nix)
-— with a NixOS module that wires up the udev permissions declaratively and builds
-Python `hidapi` with the hidraw backend the app needs. Try it without installing:
+[`gamesir-linux-tools-nix`](https://codeberg.org/Epaphroditus/gamesir-linux-tools-nix).
+Its NixOS module sets up the udev permissions declaratively and builds `hidapi`
+with the hidraw backend. To try it without installing:
 
 ```sh
 nix run codeberg:Epaphroditus/gamesir-linux-tools-nix
 ```
 
-## Requirements
+### Any distro (installer script)
 
-- Python 3
-- [`hidapi`](https://pypi.org/project/hidapi/) (`import hid`)
-- [`PySide6`](https://pypi.org/project/PySide6/) — for the Qt app
-  (Arch: `pyside6`)
+1. Install the dependencies. On Arch:
+   `sudo pacman -S --needed python pyside6 python-hidapi`. Elsewhere:
 
-```sh
-# Arch
-sudo pacman -S --needed python pyside6 python-hidapi
-# or via pip — the HIDAPI_WITH_HIDRAW=1 matters: pip's source build otherwise
-# defaults to the libusb backend, which cannot open the controller
-pip install PySide6
-HIDAPI_WITH_HIDRAW=1 pip install --no-binary :all: hidapi
-```
+   ```sh
+   pip install --user PySide6
+   HIDAPI_WITH_HIDRAW=1 pip install --user --no-binary :all: hidapi
+   ```
+
+   `HIDAPI_WITH_HIDRAW=1` matters: pip's source build otherwise selects the
+   libusb backend, which can't open the devices. Building needs `gcc`, the
+   Python headers, and libudev (Fedora/Bazzite: `systemd-devel`;
+   Debian/Ubuntu: `build-essential python3-dev libudev-dev`).
+
+2. Clone and install:
+
+   ```sh
+   git clone https://github.com/broroeror/gamesir-linux-tools.git
+   cd gamesir-linux-tools
+   ./install.sh
+   ```
+
+`install.sh` installs to your home directory (`~/.local`) and verifies your
+hidapi backend. The only privileged step is the optional one-time udev rule —
+the script shows the exact commands and asks first; declining still installs
+the app, it just can't reach the controller until the rule is in place.
+Afterwards **Deadband** is in your app launcher (or run `deadband`). To remove
+it, run `./uninstall.sh`. Upgrading from the old `gamesir-cyclone2` install?
+`install.sh` cleans it up, and your settings carry over on first run.
 
 ## Running
 
-The controller must be in **Xbox / XInput mode (use the Start / pause buttons)** —
-the vendor protocol is inert in PS4/DS4 and Switch modes. The app warns you in
-the header when the controller isn't in Xbox mode.
+Put the controller in **Xbox / XInput mode** (use the Start / pause buttons).
+The vendor protocol is inert in PS4/DS4 and Switch modes — the app's header
+warns you when you're in the wrong one.
 
-**Recommended — without `sudo`.** Install the included udev rule once so your
-user can open the controller's `hidraw` nodes directly (and its `input` event
-nodes, for the mouse-mode fix below) - scoped to GameSir's USB vendor id, nothing
-else. Run this **from the repo directory** (where `70-gamesir.rules` lives):
+**Grant device access (recommended, once):**
 
-```sh
-sudo cp 70-gamesir.rules /etc/udev/rules.d/
-sudo udevadm control --reload-rules && sudo udevadm trigger
-```
+1. From the repo directory, install the udev rule — it's scoped to GameSir's
+   USB vendor id, nothing else:
 
-Then run (no replug needed — the trigger re-applies the access ACL):
+   ```sh
+   sudo cp 70-gamesir.rules /etc/udev/rules.d/
+   sudo udevadm control --reload-rules && sudo udevadm trigger
+   ```
 
-```sh
-python3 deadband.py
-```
+2. Start the app — no replug needed:
 
-The rule uses `TAG+="uaccess"`, which grants access to the user logged in at the
-local desktop. **The `70-` prefix matters**: udev runs rules in filename order,
-and `73-seat-late.rules` is what actually applies the `uaccess` ACL — a rule
-numbered `73`+ sets the tag too late and the ACL is silently never granted. On a
-headless/remote box with no local seat, `uaccess` doesn't apply; use a group
-instead (`MODE="0660", GROUP="input"`) and add yourself to it.
+   ```sh
+   python3 deadband.py
+   ```
 
-To confirm it worked, the controller's node should show your ACL:
-`getfacl /dev/hidraw0` → a `user:<you>:rw-` line.
-
-Configuring the **G502 X mouse** takes a second rule the same way (the app's
-mouse page shows these commands too):
+To configure the **G502 X mouse**, install its rule the same way (the app's
+mouse page also shows these commands):
 
 ```sh
 sudo cp packaging/udev/70-deadband-g502x.rules /etc/udev/rules.d/
 sudo udevadm control --reload-rules && sudo udevadm trigger
 ```
 
-**Fallback — with `sudo`.** If you'd rather not install the rule, the `hidraw`
-nodes are root-owned by default, so:
+To verify access: `getfacl /dev/hidraw0` should show a `user:<you>:rw-` line.
+
+How the rule works:
+
+- It uses `TAG+="uaccess"`, which grants access to the user logged in at the
+  local desktop.
+- The `70-` filename prefix matters: udev applies the `uaccess` ACL in
+  `73-seat-late.rules`, so a rule numbered `73` or higher sets the tag too
+  late and access is silently never granted.
+- On a headless box with no local seat, `uaccess` doesn't apply — use
+  `MODE="0660", GROUP="input"` instead and add yourself to that group.
+
+**Fallback — run as root.** Without the rule, the `hidraw` nodes are
+root-owned:
 
 ```sh
 sudo python3 deadband.py
 ```
 
-Note that under `sudo`, `~` resolves to `/root`, so the default Backup path lands
-in `/root/` — another reason to prefer the udev-rule route.
+Under `sudo`, `~` resolves to `/root`, so backups land there — another reason
+to prefer the udev rule.
 
 ## Something not working?
 
-Open **Settings → Help & Diagnostics** in the app (or run `deadband --doctor`
-in a terminal — it works over SSH too). It checks whether the app can actually
+Open **Settings → Help & Diagnostics** in the app, or run `deadband --doctor`
+in a terminal (works over SSH). The doctor checks whether the app can actually
 *open* your devices — the classic failure is a controller that's detected but
-never connects — and tells you exactly what's wrong: a missing or un-applied
-udev rule, a Python `hidapi` built with the wrong backend (the usual pip
-pitfall), and so on, with the fix commands for your distro (NixOS included).
-The **Copy report** button produces a ready-to-paste report for a GitHub issue.
-If a device is found but can't be opened, the app also shows the same guidance
-in a banner with the commands ready to copy.
+never connects — and names the exact problem: a missing or un-applied udev
+rule, a Python `hidapi` built with the libusb backend, and so on, with fix
+commands for your distro (NixOS included). Use **Copy report** to paste the
+result into a GitHub issue. The app shows the same guidance in a banner
+whenever it finds a device it can't open.
 
 ## Safety
 
