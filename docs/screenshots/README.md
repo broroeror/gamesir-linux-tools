@@ -15,5 +15,9 @@ page — or start here:
 | 4 | [G502 X — buttons & G-Shift](tour-4-mouse-buttons.md) | Emerald |
 | 5 | [G502 X — onboard macro editor](tour-5-mouse-macros.md) | Slate (light) |
 
-Shots are rendered from the app itself in demo mode, so they can be
-regenerated identically after UI changes.
+Shots are rendered from the app itself in demo mode. To regenerate the whole
+set (screenshots, banner, and gallery.gif) after a UI change:
+
+```sh
+python3 docs/screenshots/generate_shots.py
+```
