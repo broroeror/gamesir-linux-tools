@@ -1,9 +1,11 @@
-# Deadband — a Linux controller configuration app
+# Deadband — a Linux configuration app for controllers and mice
 
-A Linux GUI for game controllers, driven over the controller's vendor (hidraw)
+A Linux GUI for gaming input devices, driven over each device's vendor (hidraw)
 interface, reverse-engineered from scratch. Currently supports the **GameSir
-Cyclone 2** and **G7 Pro 8K** (see Tested hardware); the protocol modules are
-per-vendor, so other manufacturers can be added alongside. It covers:
+Cyclone 2** and **G7 Pro 8K** controllers and the **Logitech G502 X LIGHTSPEED**
+mouse (see Tested hardware); the protocol modules are per-vendor
+(`vendors/gamesir`, `vendors/logitech`), so other manufacturers can be added
+alongside. It covers:
 
 - **Live input view** — sticks, triggers, all buttons (incl. the L4/R4/M/Home/
   Share extras), D-pad, battery + charging, firmware version, and a mode warning.
@@ -14,15 +16,30 @@ per-vendor, so other manufacturers can be added alongside. It covers:
 - **Config editor** — deadzones, anti-deadzones, stick trajectory, sensitivity
   curves (presets **and** a draggable custom-curve editor), trigger tuning
   (hair-trigger + response curve), vibration, poll rate, and button remap.
+- **Gamepad macros** — a per-paddle (L4/R4, plus L5/R5 on the 8K) sequence
+  editor with per-step hold/delay timing.
+- **Motion / gyro** (G7 Pro 8K) — aim/tilt activation, axis setup, and curves.
 - **Backup / Restore** — snapshot all 4 profiles + lighting to a JSON file and
   write it back later.
 - **Mouse-mode toggle** — turn KDE/KWin's gamepad-drives-the-cursor behaviour
   off (normal gamepad) or on (sticks-as-cursor "couch mode") from the app, plus a
   non-KDE EVIOCGRAB fallback (Wayland; see Status).
+- **Logitech G502 X mouse** — button remaps and keyboard bindings (with the
+  G-Shift second layer and an assignable G-Shift trigger), 5-stage DPI +
+  polling-rate editor, and an onboard-macro editor (build sequences or record
+  them from your keyboard with live timing) — edits stage into a queue and apply
+  in one verified write.
+- **Demo mode** — preview one of each supported controller in software, no
+  hardware connected.
+- **Diagnostics** — a built-in doctor that pinpoints permission, udev, and
+  hidapi-backend problems, with a copy-paste report for bug reports (see
+  [Something not working?](#something-not-working)).
 
-**Version:** `0.2.0-dev` — Deadband: multi-controller (Cyclone 2 + G7 Pro 8K), the full
-Qt/QML app (lighting + keyframe editor, config editor, button remap, backup/restore),
-one-command install, and an [AUR package](https://aur.archlinux.org/packages/deadband-git).
+**Version:** `0.2.0-dev` — Deadband: multi-device (Cyclone 2 + G7 Pro 8K
+controllers, G502 X mouse), the full Qt/QML app (lighting + keyframe editor,
+config editor, remaps, macros, backup/restore), built-in diagnostics,
+one-command install, an [AUR package](https://aur.archlinux.org/packages/deadband-git),
+and a [community NixOS flake](https://codeberg.org/Epaphroditus/gamesir-linux-tools-nix).
 Tracks `main` (the AUR `-git` package builds from the latest commit); last tagged
 snapshot is `v0.1.0-alpha.2`.
 **Going deeper?** The **[Manual](MANUAL.md)** is the user guide — how to use each
@@ -34,21 +51,25 @@ reports to Linux) and **[TODO.md](TODO.md)** (roadmap + open questions).
 This is a hobby reverse-engineering project; fork it and customize it however you like.
 
 > ### ⚠️ Tested hardware
-> Everything here has only been developed and verified on a **GameSir Cyclone 2**
-> and a **GameSir G7 Pro 8K** — **nothing else.** (A regular, non-8K **G7 Pro** was
-> also tested but does **not** work: it's an Xbox-only pad whose config channel Linux
-> doesn't expose — input works, config is blocked. See [RESEARCH.md](RESEARCH.md).)
-> Other GameSir controllers, other dongles, and firmware revisions we haven't seen are
-> **unsupported and untested** and may misbehave. The app won't send config writes to a
-> device it can't positively recognize, but please don't treat it as proven-safe on
-> hardware it has never seen. Use it at your own risk.
+> Everything here has only been developed and verified on a **GameSir Cyclone 2**,
+> a **GameSir G7 Pro 8K**, and a **Logitech G502 X LIGHTSPEED** mouse — **nothing
+> else.** (A regular, non-8K **G7 Pro** was also tested but does **not** work: it's
+> an Xbox-only pad whose config channel Linux doesn't expose — input works, config
+> is blocked. See [RESEARCH.md](RESEARCH.md).)
+> Other GameSir controllers, other Logitech mice, other dongles, and firmware
+> revisions we haven't seen are **unsupported and untested** and may misbehave. The
+> app won't send config writes to a device it can't positively recognize, but
+> please don't treat it as proven-safe on hardware it has never seen. Use it at
+> your own risk.
 
 ## The app
 
 **`deadband.py`** — the **Qt/QML app** (PySide6): a polished, KDE-native UI over
 the reverse-engineered core, with a live controller render, per-zone RGB +
-keyframes, stick/trigger curves, button remap, vibration, backup/restore, and a
-mouse-mode toggle.
+keyframes, stick/trigger curves, button remap, macros, vibration,
+backup/restore, and a mouse-mode toggle. A device picker in the header switches
+between your controllers and the G502 X, which gets its own Buttons / DPI /
+Macros tabs.
 
 ## Install (Qt app)
 
@@ -142,6 +163,14 @@ instead (`MODE="0660", GROUP="input"`) and add yourself to it.
 To confirm it worked, the controller's node should show your ACL:
 `getfacl /dev/hidraw0` → a `user:<you>:rw-` line.
 
+Configuring the **G502 X mouse** takes a second rule the same way (the app's
+mouse page shows these commands too):
+
+```sh
+sudo cp packaging/udev/70-deadband-g502x.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
 **Fallback — with `sudo`.** If you'd rather not install the rule, the `hidraw`
 nodes are root-owned by default, so:
 
@@ -151,6 +180,18 @@ sudo python3 deadband.py
 
 Note that under `sudo`, `~` resolves to `/root`, so the default Backup path lands
 in `/root/` — another reason to prefer the udev-rule route.
+
+## Something not working?
+
+Open **Settings → Help & Diagnostics** in the app (or run `deadband --doctor`
+in a terminal — it works over SSH too). It checks whether the app can actually
+*open* your devices — the classic failure is a controller that's detected but
+never connects — and tells you exactly what's wrong: a missing or un-applied
+udev rule, a Python `hidapi` built with the wrong backend (the usual pip
+pitfall), and so on, with the fix commands for your distro (NixOS included).
+The **Copy report** button produces a ready-to-paste report for a GitHub issue.
+If a device is found but can't be opened, the app also shows the same guidance
+in a banner with the commands ready to copy.
 
 ## Safety
 
@@ -212,10 +253,17 @@ live in **`archive/`**.
 read/switch, rumble, full per-light RGB + effect presets + lighting power settings, a
 **custom keyframe animation editor** (1–8 frames, play/pause), a **config editor**
 (deadzones, anti-deadzones, stick trajectory + sensitivity curves incl. a draggable
-custom-curve editor, trigger tuning, vibration, poll rate), **button remap**, and
+custom-curve editor, trigger tuning, vibration, poll rate), **button remap**,
+**per-paddle gamepad macros** (read-back-verified writes), **8K motion/gyro**, and
 **backup / restore** — all verified end-to-end on hardware. Restore is
 write-verify-retry; only the active profile + lighting are guaranteed (banks
 `0x02`–`0x04`, the stored profiles, appear read-only on this controller).
+
+**Mouse (G502 X):** remaps, keyboard bindings, the G-Shift layer + trigger, DPI
+stages, and report rate are verified on hardware. The onboard-macro editor's
+newest pieces — keystroke recording, multi-sector chaining for long macros, and
+reclaiming unused macro slots — are implemented with offline verification and
+are still gathering on-hardware mileage.
 
 **Mouse-mode gotcha (KDE Plasma 6.7):** after a dongle replug, the sticks may start
 driving the desktop cursor — that's **KWin's Game Controller plugin** reading the
