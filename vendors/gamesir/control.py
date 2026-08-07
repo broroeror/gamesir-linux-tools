@@ -18,7 +18,10 @@ import time
 from gs_common import pad
 import controller_profile as profiles
 
-_write_lock = threading.Lock()
+_write_lock = threading.Lock()   # one COMMAND at a time (send_cmd)
+_wseq_lock = threading.Lock()    # one write SEQUENCE at a time (write_reg) — the
+                                 # controller drops back-to-back commands, so two
+                                 # threads' chunk streams must never interleave
 _device = None
 _generation = 0        # bumped on each (re)bind so a multi-step operation can
                        # tell the device handle was swapped under it
@@ -118,10 +121,25 @@ def write_reg(bank, addr, data, write_style=None, gen=None):
     `gen` pins the write to a device session (see generation()): a multi-register
     operation captures it once and passes it here, so a controller switch mid-way
     makes each remaining chunk refuse (return False) instead of landing on the
-    newly-bound unit. Returns False on the first refused/failed chunk."""
-    global _g7_seq
+    newly-bound unit. Returns False on the first refused/failed chunk.
+
+    The WHOLE chunk sequence runs under _wseq_lock: send_cmd's lock only makes
+    individual commands atomic, so two concurrent write_reg calls (every bridge
+    write spawns its own thread — e.g. editing L4's and R4's macros in quick
+    succession) interleaved their chunks with no spacing, and the controller
+    SILENTLY DROPS commands that arrive back-to-back. Measured on-device
+    (l4r4_concurrent probe): concurrent unserialized writes corrupted both
+    macro blocks in 3/3 rounds — stale bytes where dropped chunks never landed —
+    while serialized writes were clean in 3/3. The trailing 20ms sleep inside
+    the loop also spaces the LAST chunk from the next caller's first."""
     g7 = (write_style or profiles.active().write_style) == 'g7'
     chunk_len = 55 if g7 else 48    # inner block caps at 60B (5B header + 55 data)
+    with _wseq_lock:
+        return _write_reg_chunks(bank, addr, data, g7, gen, chunk_len)
+
+
+def _write_reg_chunks(bank, addr, data, g7, gen, chunk_len):
+    global _g7_seq
     i = 0
     while i < len(data):
         chunk = data[i:i + chunk_len]

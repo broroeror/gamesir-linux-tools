@@ -515,7 +515,15 @@ class GamesirBridge(QObject):
         self.macroLoaded.emit()
 
     def _write_macro(self, base, data):
-        """Immediate profile-bank macro write (auto-chunked by write_reg)."""
+        """Profile-bank macro write with READ-BACK VERIFY + one retry.
+
+        The controller silently drops commands that arrive back-to-back, and a
+        dropped chunk used to persist as a half-written macro with no error
+        (measured on-device: concurrent unserialized L4+R4 writes corrupted
+        3/3 rounds — the "can't set both paddles' macros" field report).
+        write_reg is now serialized at the source; this verify catches anything
+        that still slips (heartbeat/read adjacency) instead of trusting fire-
+        and-forget."""
         if not self._has_macros():
             return
         bank = self._prof.profile_bank(state['profile'])
@@ -523,10 +531,41 @@ class GamesirBridge(QObject):
             return
         style = self._prof.write_style
         gen = control.generation()
-        threading.Thread(
-            target=lambda: control.write_reg(bank, base, list(data),
-                                             write_style=style, gen=gen),
-            daemon=True).start()
+        payload = list(data)
+
+        def verify():
+            """Read the written range back (reader thread pumps the queued
+            reads); True if it matches, None on timeout/rebind."""
+            reads, off = [], 0
+            while off < len(payload):
+                ln = min(48, len(payload) - off)
+                reads.append((bank, base + off, ln))
+                off += ln
+            control.request_regs(reads)
+            deadline = time.time() + 2.5
+            while time.time() < deadline:
+                if gen != control.generation():
+                    return None                       # device rebound — moot
+                got = [control.reg_result(b, a) for b, a, _ln in reads]
+                if all(g is not None for g in got):
+                    flat = [x for g in got for x in g]
+                    return flat[:len(payload)] == payload
+                time.sleep(0.05)
+            return None
+
+        def run():
+            for attempt in (1, 2):
+                if not control.write_reg(bank, base, payload,
+                                         write_style=style, gen=gen):
+                    return                            # rebound/failed — don't retry blind
+                ok = verify()
+                if ok or ok is None:                  # verified, or unverifiable
+                    return
+                # mismatch: a chunk was dropped — retry once, then surface it
+                if attempt == 2:
+                    self._set_apply_status('⚠ macro write didn\'t stick — '
+                                           'try that edit again')
+        threading.Thread(target=run, daemon=True).start()
 
     def _poll_config(self):
         """Read the selected profile's config once whenever the profile changes.

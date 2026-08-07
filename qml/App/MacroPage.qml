@@ -117,7 +117,14 @@ Item {
                             required property int index
                             label: modelData
                             highlight: page.pad === index
-                            onClicked: page.pad = index
+                            // flush a pending debounced commit BEFORE the switch:
+                            // commit() reads `paddle` live, so once pad changes a
+                            // queued slider edit would be lost (seed() replaces
+                            // `events` and the timer then writes a no-op)
+                            onClicked: {
+                                if (commitTimer.running) { commitTimer.stop(); page.commit() }
+                                page.pad = index
+                            }
                         }
                     }
                 }
