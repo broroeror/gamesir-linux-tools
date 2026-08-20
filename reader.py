@@ -31,11 +31,12 @@ def _is_wired(prof, pid, bcd):
     readable in the loader; here we tell them apart from the USB identity we already
     opened. Used only for a DISPLAY hint + a firmware-panel warning — never to gate a
     flash (the in-loader identity guard does that).
-      * 8K: the wired face is PID 0x10c7; the dongle is 0x10c8, or 0x0575 when idle.
+      * 8K: each edition ships its own (wired, dongle) PID pair, so the profile
+        declares which ids are the wired face (an idle dongle reads 0x0575).
       * Cyclone: the controller's own firmware is the 3.x namespace, the dongle's is
         1.x — so a bcdDevice >= 2.0 is the wired controller, below it is the dongle."""
-    if prof is profiles.G7_8K:
-        return pid == 0x10c7
+    if prof is not None and prof.wired_products:
+        return pid in prof.wired_products
     if prof is profiles.CYCLONE and bcd:
         return bcd >= 0x0200
     return None
@@ -99,7 +100,7 @@ def _probe_live(ctrl, prof=None):
 def _label(ctrl):
     """Public shape of a controller for the UI picker. Uses the product-aware
     detect_one (not PID-only) so the 8K's wireless dongle — which shares the
-    Cyclone's 0x0575 PID but reports product 'Gamepad' — is labelled 'G7 Pro 8K',
+    Cyclone's 0x0575 PID but reports product 'Gamepad' — is labelled 'G7 Pro 8K PC',
     not a third 'Cyclone 2'.
 
     `live` distinguishes a real controller from a plugged-in but EMPTY dongle (which

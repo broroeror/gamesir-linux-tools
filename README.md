@@ -6,7 +6,7 @@
 
 A Linux GUI for gaming input devices, driven over each device's vendor (hidraw)
 interface, reverse-engineered from scratch. Currently supports the **GameSir
-Cyclone 2** and **G7 Pro 8K** controllers and the **Logitech G502 X LIGHTSPEED**
+Cyclone 2** and **G7 Pro 8K PC** controllers and the **Logitech G502 X LIGHTSPEED**
 mouse (see Tested hardware); the protocol modules are per-vendor
 (`vendors/gamesir`, `vendors/logitech`), so other manufacturers can be added
 alongside. It covers:
@@ -22,7 +22,7 @@ alongside. It covers:
   (hair-trigger + response curve), vibration, poll rate, and button remap.
 - **Gamepad macros** — a per-paddle (L4/R4, plus L5/R5 on the 8K) sequence
   editor with per-step hold/delay timing.
-- **Motion / gyro** (G7 Pro 8K) — aim/tilt activation, axis setup, and curves.
+- **Motion / gyro** (G7 Pro 8K PC) — aim/tilt activation, axis setup, and curves.
 - **Backup / Restore** — snapshot all 4 profiles + lighting to a JSON file and
   write it back later.
 - **Mouse-mode toggle** — turn KDE/KWin's gamepad-drives-the-cursor behaviour
@@ -51,7 +51,7 @@ theme; click it (or the caption link) to step through them one at a time:
   <em><a href="docs/screenshots/README.md">Browse the screenshot tour ▶</a></em>
 </p>
 
-**Version:** `0.2.0-dev` — Deadband: multi-device (Cyclone 2 + G7 Pro 8K
+**Version:** `0.2.0-dev` — Deadband: multi-device (Cyclone 2 + G7 Pro 8K PC
 controllers, G502 X mouse), the full Qt/QML app (lighting + keyframe editor,
 config editor, remaps, macros, backup/restore), built-in diagnostics,
 one-command install, an [AUR package](https://aur.archlinux.org/packages/deadband-git),
@@ -68,7 +68,7 @@ This is a hobby reverse-engineering project; fork it and customize it however yo
 
 > ### ⚠️ Tested hardware
 > Everything here has only been developed and verified on a **GameSir Cyclone 2**,
-> a **GameSir G7 Pro 8K**, and a **Logitech G502 X LIGHTSPEED** mouse — **nothing
+> a **GameSir G7 Pro 8K PC**, and a **Logitech G502 X LIGHTSPEED** mouse — **nothing
 > else.** (A regular, non-8K **G7 Pro** was also tested but does **not** work: it's
 > an Xbox-only pad whose config channel Linux doesn't expose — input works, config
 > is blocked. See [RESEARCH.md](RESEARCH.md).)
@@ -244,7 +244,7 @@ everything it does is **reversible** and stays **on your machine**. The specific
   online.
 - **Permissions.** Prefer the udev rule (per-user `uaccess`) over running as root —
   see [Running](#running). Under `sudo`, `~` is `/root`, so backups land there.
-- **Tested hardware.** Only the Cyclone 2 and G7 Pro 8K (see the note up top). Treat
+- **Tested hardware.** Only the Cyclone 2 and G7 Pro 8K PC (see the note up top). Treat
   anything else as unproven and use it at your own risk.
 
 ## How it works

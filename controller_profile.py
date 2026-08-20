@@ -63,6 +63,10 @@ class ControllerProfile:
     name: str                              # display name
     short: str                             # short label (status line)
     usb_products: tuple                    # USB product ids that identify it
+    wired_products: tuple = ()             # of those, the ids that are the WIRED
+                                           # controller (its dongle is the rest).
+                                           # Empty = this model needs another
+                                           # discriminator (the Cyclone uses bcdDevice).
     write_style: str = 'cyclone'           # 'cyclone' bare 0f03 / 'g7' enveloped
     input_style: str = 'cyclone_0x12'      # 'cyclone_0x12' (vendor hidraw) / 'evdev'
     dz_wide: bool = False                   # analog stick/trigger deadzones are
@@ -367,9 +371,14 @@ G7_PRO = ControllerProfile(
 #     bank 0x20 (see extras) and is GLOBAL, not per-profile.
 # Flash is OFF: geometry/loader identity unknown -> can_flash=False, no identity.
 G7_8K = ControllerProfile(
-    name='GameSir G7 Pro 8K',
-    short='G7 Pro 8K',
-    usb_products=(0x10c7, 0x10c8),          # 10c7 wired / 10c8 wireless dongle
+    # Officially "G7 Pro 8K PC" — the PC (non-Xbox-licensed) line; reviewers and
+    # GameSir's own shorthand often drop the "PC", and there is no Xbox 8K.
+    name='GameSir G7 Pro 8K PC',
+    short='G7 Pro 8K PC',
+    # EDITIONS get their own consecutive (wired, dongle) PID pair but are the same
+    # controller, same register map — add new pairs here as they turn up.
+    usb_products=(0x10c7, 0x10c8),          # Nioh edition: 10c7 wired / 10c8 dongle
+    wired_products=(0x10c7,),
     write_style='cyclone',                  # bare 0f03 writes (NOT the g7 envelope)
     input_style='cyclone_0x12',             # live 0x12 on the vendor hidraw
     profile_banks=(1, 2, 3, 4),             # 4 profiles, confirmed via the app
@@ -497,7 +506,8 @@ def detect(product_ids):
 # ("GameSir-Cyclone 2") and an IDLE 8K wireless dongle ("Gamepad") both enumerate
 # as 3537:0575. Every other Cyclone id (0x100b pure-XInput, 0x1053 flashed) is
 # Cyclone-EXCLUSIVE, and the 8K's active ids (0x10c7 wired, 0x10c8 dongle) are
-# 8K-exclusive, so only 0x0575 ever needs the product-string tie-breaker.
+# 8K-exclusive (as are every other edition's), so only 0x0575 ever needs the
+# product-string tie-breaker.
 _SHARED_PID = 0x0575
 
 
