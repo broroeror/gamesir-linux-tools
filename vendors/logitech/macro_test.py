@@ -45,7 +45,8 @@ def save_backup(dev, size, sectors):
 
 
 def do_undo(dev, size):
-    files = sorted(glob.glob(os.path.join(remap.BACKUP_DIR, 'g502x_macrotest_*.txt')))
+    files = sorted(f for d in remap.backup_dirs()
+                   for f in glob.glob(os.path.join(d, 'g502x_macrotest_*.txt')))
     if not files:
         print('no macro-test backup found to undo.'); return 1
     path = files[-1]

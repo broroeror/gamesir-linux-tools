@@ -356,7 +356,8 @@ def profile_bindings(dev, sector, size):
 
 
 def apply_bindings(dev, info, headers, sector, button_changes=None,
-                   gshift_changes=None, sensor=None, backup_headers=None):
+                   gshift_changes=None, sensor=None, backup_headers=None,
+                   existing_backup=None):
     """Gated, reversible write of MANY edits to `sector` in ONE profile write —
     the batch the GUI's "Apply" uses. `button_changes` / `gshift_changes` are
     {button_index: onboard.Button} for the primary bank and the G-Shift (alternate)
@@ -396,7 +397,16 @@ def apply_bindings(dev, info, headers, sector, button_changes=None,
     if sector not in {s for s, _ in headers}:
         return False, f'sector 0x{sector:04x} is not a profile'
 
-    path = remap.backup_all(dev, info, backup_headers if backup_headers is not None else headers)
+    if existing_backup is not None:
+        path = existing_backup            # caller already snapshotted (see apply_edits)
+    else:
+        try:
+            path = remap.backup_all(
+                dev, info, backup_headers if backup_headers is not None else headers)
+        except OSError as e:
+            # e.g. an installed app whose backup dir isn't writable: refuse rather
+            # than write to the device with no way back
+            return False, f'could not save the safety backup ({e}) — nothing was changed'
     raw = dev.read_sector(sector, size)
     prof = onboard.OnboardProfile.decode(raw, sector=sector)
     if not prof.crc_ok:
@@ -482,6 +492,7 @@ def apply_edits(dev, info, headers, sector, button_changes=None, gshift_changes=
     button_changes = dict(button_changes or {})
     macro_changes = macro_changes or {}
     size = info['sector_size']
+    backup_path = None                     # set once a macro write needs one first
     if macro_changes:
         try:
             cur = onboard.OnboardProfile.decode(dev.read_sector(sector, size), sector=sector)
@@ -519,6 +530,16 @@ def apply_edits(dev, info, headers, sector, button_changes=None, gshift_changes=
             to_write.append((btn, chunks))
         # --- capacity check up front (whole batch, chains included), then write ---
         if to_write:
+            # The safety backup must exist BEFORE the first flash write. It used to
+            # be taken inside apply_bindings, i.e. AFTER the macro sectors were
+            # written, so a backup failure (installed app, read-only backup dir)
+            # left those sectors written but unreferenced -- orphaned slots for a
+            # write that never completed.
+            try:
+                backup_path = remap.backup_all(
+                    dev, info, backup_headers if backup_headers is not None else headers)
+            except OSError as e:
+                return False, f'could not save the safety backup ({e}) — nothing was changed'
             need = sum(len(c) for _, c in to_write)
             free = free_macro_sectors(dev, info, headers)
             if len(free) < need:
@@ -546,7 +567,8 @@ def apply_edits(dev, info, headers, sector, button_changes=None, gshift_changes=
         return True, 'no changes needed'          # all staged edits were no-ops
     return apply_bindings(dev, info, headers, sector,
                           button_changes=button_changes, gshift_changes=gshift_changes,
-                          sensor=sensor, backup_headers=backup_headers)
+                          sensor=sensor, backup_headers=backup_headers,
+                          existing_backup=backup_path)
 
 
 # Binding constructors the UI offers, expressed as onboard.Button factories.

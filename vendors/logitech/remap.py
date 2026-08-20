@@ -30,7 +30,27 @@ import hidpp        # noqa: E402
 import onboard      # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-BACKUP_DIR = os.path.join(REPO, 'mouse-backups')
+
+
+def _xdg_backup_dir():
+    base = os.environ.get('XDG_DATA_HOME') or os.path.expanduser('~/.local/share')
+    return os.path.join(base, 'deadband', 'mouse-backups')
+
+
+def backup_dirs():
+    """Every directory that may hold profile snapshots, newest-convention first.
+    Readers (restore, undo) search all of them; writes go to backup_dirs()[0]."""
+    repo_dir = os.path.join(REPO, 'mouse-backups')
+    xdg_dir = _xdg_backup_dir()
+    # A git checkout keeps snapshots beside the tree (dev workflow, and where any
+    # existing ones already live). An INSTALLED app lives under /usr/share, which
+    # is root-owned, so writing there fails with EACCES -- use the XDG data dir.
+    if os.access(REPO, os.W_OK):
+        return [repo_dir, xdg_dir]
+    return [xdg_dir, repo_dir]
+
+
+BACKUP_DIR = backup_dirs()[0]
 
 # minimal HID keyboard-usage map (extend as needed)
 _NAMED_KEYS = {'space': 0x2C, 'enter': 0x28, 'return': 0x28, 'esc': 0x29,

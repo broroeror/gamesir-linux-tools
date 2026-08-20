@@ -25,7 +25,8 @@ import remap        # noqa: E402  (reuse BACKUP_DIR / diff_offsets)
 
 
 def latest_backup():
-    files = sorted(glob.glob(os.path.join(remap.BACKUP_DIR, 'g502x_profiles_*.txt')))
+    files = sorted(f for d in remap.backup_dirs()
+                   for f in glob.glob(os.path.join(d, 'g502x_profiles_*.txt')))
     return files[-1] if files else None
 
 
@@ -52,7 +53,8 @@ def main():
 
     path = args.file or latest_backup()
     if not path or not os.path.exists(path):
-        print('No backup file found (mouse-backups/ empty?). Pass --file <path>.')
+        print('No backup found in ' + ' or '.join(remap.backup_dirs())
+              + '. Pass --file <path>.')
         return 1
     try:
         entries = parse_backup(path)
