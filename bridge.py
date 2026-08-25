@@ -1859,7 +1859,7 @@ class GamesirBridge(QObject):
             out.append([block[1], block[2]] if len(block) >= 3 else None)
         return out
 
-    @Slot(str, int)
+    @Slot(int)
     def setPoll(self, index):
         if self._prof.POLL_RATE is None:
             return

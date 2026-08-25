@@ -34,6 +34,33 @@ def _excepthook(args):
 threading.excepthook = _excepthook
 
 
+def _slot_signature_mismatches():
+    """@Slot(...) type args that don't match the Python signature.
+
+    Qt matches a QML call against the DECLARED types, so a wrong decorator makes
+    the call fail at runtime ("Error: Insufficient arguments") while Python and
+    every static checker see nothing wrong. Found in the wild: setPoll declared
+    @Slot(str, int) but took one argument, so changing the poll rate silently did
+    nothing (issue #6). Static, no device or GUI needed."""
+    import ast
+    out = []
+    for path in ('bridge.py', 'mouse_bridge.py'):
+        full = os.path.join(HERE, path)
+        if not os.path.exists(full):
+            continue
+        for node in ast.walk(ast.parse(open(full).read())):
+            if not isinstance(node, ast.FunctionDef):
+                continue
+            for dec in node.decorator_list:
+                if isinstance(dec, ast.Call) and getattr(dec.func, 'id', None) == 'Slot':
+                    declared = len(dec.args)            # positional args are the types
+                    takes = len(node.args.args) - 1 + len(node.args.kwonlyargs)
+                    if declared != takes:
+                        out.append(f'{path}:{node.lineno} {node.name}() declares '
+                                   f'{declared} arg(s), takes {takes}')
+    return out
+
+
 def main():
     from PySide6.QtCore import QUrl
     from PySide6.QtGui import QGuiApplication
@@ -71,9 +98,14 @@ def main():
         time.sleep(0.05)
 
     # --- report ---------------------------------------------------------------
-    ok = qml_ok
+    slot_bad = _slot_signature_mismatches()
+    ok = qml_ok and not slot_bad
     print("=== startup smoke test ===")
     print(f"  QML (Main.qml) loaded : {'OK' if qml_ok else 'FAIL — did not load'}")
+    print(f"  @Slot signatures      : "
+          + ('OK' if not slot_bad else f'FAIL — {len(slot_bad)} mismatch(es)'))
+    for m in slot_bad:
+        print(f"      {m}")
     for name, t in threads.items():
         alive = t.is_alive()
         ok = ok and alive
