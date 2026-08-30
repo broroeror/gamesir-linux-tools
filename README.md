@@ -7,7 +7,8 @@
 A Linux GUI for gaming input devices, driven over each device's vendor (hidraw)
 interface, reverse-engineered from scratch. Currently supports the **GameSir
 Cyclone 2** and **G7 Pro 8K PC** controllers and the **Logitech G502 X LIGHTSPEED**
-mouse (see Tested hardware); the protocol modules are per-vendor
+mouse (see Tested hardware), and recognizes the **GameSir G7 SE** for input; the
+protocol modules are per-vendor
 (`vendors/gamesir`, `vendors/logitech`), so other manufacturers can be added
 alongside. It covers:
 
@@ -71,7 +72,10 @@ This is a hobby reverse-engineering project; fork it and customize it however yo
 > a **GameSir G7 Pro 8K PC**, and a **Logitech G502 X LIGHTSPEED** mouse — **nothing
 > else.** (A regular, non-8K **G7 Pro** was also tested but does **not** work: it's
 > an Xbox-only pad whose config channel Linux doesn't expose — input works, config
-> is blocked. See [RESEARCH.md](RESEARCH.md).)
+> is blocked. See [RESEARCH.md](RESEARCH.md).) A **GameSir G7 SE** is recognized and
+> its input works over evdev (a normal gamepad), but its config channel isn't
+> reverse-engineered — it is input-only: the config/lighting/macro editors are
+> disabled for it.)
 > Other GameSir controllers, other Logitech mice, other dongles, and firmware
 > revisions we haven't seen are **unsupported and untested** and may misbehave. The
 > app won't send config writes to a device it can't positively recognize, but
@@ -244,7 +248,8 @@ everything it does is **reversible** and stays **on your machine**. The specific
   online.
 - **Permissions.** Prefer the udev rule (per-user `uaccess`) over running as root —
   see [Running](#running). Under `sudo`, `~` is `/root`, so backups land there.
-- **Tested hardware.** Only the Cyclone 2 and G7 Pro 8K PC (see the note up top). Treat
+- **Tested hardware.** Only the Cyclone 2 and G7 Pro 8K PC (see the note up top). The
+  G7 SE is recognized for input only (config channel not reverse-engineered). Treat
   anything else as unproven and use it at your own risk.
 
 ## How it works

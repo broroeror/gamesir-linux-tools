@@ -15,7 +15,7 @@ re-tread them. This is a hobby RE effort; corrections and additions welcome.
 |---|---|---|---|---|---|
 | **Cyclone 2** | `0575` / `100b` / `1053` | ✅ vendor `0x12` | ✅ full | ✅ (JieLi BR23) | **Fully supported** |
 | **G7 Pro** | `1022` (PC/HID) · `100a`/`10ba`/`10bb` (Xbox/GIP) | ✅ evdev | ❌ blocked (see below) | — (different chip) | **Input only** |
-| G7 SE *(not owned)* | `1010` | ✅ mainline `xpad` | n/a | — | Reference only |
+| G7 SE *(not owned)* | `1010` (also `1082` in the wild) | ✅ evdev (recognized) | ⛔ not RE'd (input-only) | — | Input supported |
 | G7 Pro 8K *(incoming)* | TBD | TBD | *likely ✅* — uses **Connect** | TBD | To be tested |
 | 8BitDo *(future)* | — | — | — | — | Not started |
 
@@ -164,6 +164,16 @@ Being an Xbox-One entry, it presents a GIP identity that `xpad`/`xone` bind dire
 **Whether it also has a PC/HID mode like the tri-mode Pro is unknown to us** — we don't
 own one; this section is reference, not a tested finding. Source:
 [`drivers/input/joystick/xpad.c`](https://github.com/torvalds/linux/blob/master/drivers/input/joystick/xpad.c).
+
+**Deadband support (input-only).** The app now *recognizes* the G7 SE (`0x1010`, and
+`0x1082` — reported by a unit in the wild as "GameSir-G7 SE Controller for Xbox") as an
+`evdev` input profile, so it shows up as **G7 SE**, live input works over the standard
+gamepad node, and the false "not in Xbox mode" warning no longer appears (the reader's
+Cyclone `0x12` heuristic previously mis-branded it, since a GIP pad never emits that
+report). The vendor config channel is **not reverse-engineered** (it may be inert on
+Linux like the G7 Pro's PC/HID face), so the profile deliberately exposes no register
+addresses: config, lighting, macros and flash are all disabled until captures of the
+official app are decoded.
 
 ---
 

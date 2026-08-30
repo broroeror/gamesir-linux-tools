@@ -173,9 +173,11 @@ No. It's all local USB — no network, no telemetry, no account. Even the firmwa
 *version* is read straight from the USB descriptor, not fetched online.
 
 **Will it work with my other GameSir controller?**
-Only the **Cyclone 2** and **G7 Pro** have been tested; anything else is
-unsupported and untested. The app **refuses state-changing writes to a device it
-can't positively recognize**, so an unknown model reads but won't be written.
+The **Cyclone 2** and **G7 Pro 8K PC** are fully supported, and the **G7 SE** is
+recognized for input (its config channel isn't reverse-engineered, so its config
+editor is disabled). Anything else is unsupported and untested. The app **refuses
+state-changing writes to a device it can't positively recognize**, so an unknown
+model reads but won't be written.
 
 **Do I need `sudo`?**
 No — install the udev rule once and your user gets access. `sudo` is only a

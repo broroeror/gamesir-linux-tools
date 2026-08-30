@@ -351,6 +351,34 @@ G7_PRO = ControllerProfile(
 )
 
 
+# --- G7 SE : GameSir G7 SE (3537:1010 wired) ---------------------------------
+# A wired Xbox-style pad (GIP; listed in mainline `xpad` as 3537:1010,
+# XTYPE_XBOXONE, added in kernel 6.14 — see RESEARCH.md). INPUT-ONLY support:
+# like the G7 Pro, live input arrives over evdev (a standard gamepad), so the
+# reader must route it through the evdev path — otherwise the Cyclone 0x12
+# heuristic (reader.py) brands a perfectly live pad "not in Xbox mode" forever.
+#
+# The vendor config channel is NOT reverse-engineered (and, like the G7 Pro's
+# PC/HID face, may be inert on Linux), so this profile deliberately exposes NO
+# register addresses: read_fields() is empty, the config editor offers nothing,
+# and the send_cmd recognized-model guard (vendors/gamesir/control.py) means no
+# state-changing write can reach the device. Add the register map here once a
+# capture of the official app is decoded.
+#
+# 0x1082 is included alongside the documented 0x1010: a unit in the wild
+# enumerated as 3537:1082 "GameSir-G7 SE Controller for Xbox" (doctor report),
+# plausibly a hardware revision — recognizing both is harmless.
+G7_SE = ControllerProfile(
+    name='GameSir G7 SE',
+    short='G7 SE',
+    usb_products=(0x1010, 0x1082),
+    wired_products=(0x1010, 0x1082),    # wired-only model; no wireless dongle
+    input_style='evdev',                # GIP input on the standard gamepad node
+    profile_banks=(),                   # no editable config until the vendor
+                                        # channel is reverse-engineered
+)
+
+
 # --- G7 Pro 8K : GameSir G7 Pro 8K (3537:10c7 wired / 3537:10c8 wireless) ----
 # Reverse-engineered 2026-07-07 from live vendor-channel probing + 11 USBPcap
 # captures of the official app (see the `g7-pro-8k` memory + "Controller Testing/
@@ -484,7 +512,7 @@ G7_8K = ControllerProfile(
 
 
 # --- registry + detection ----------------------------------------------------
-ALL = (CYCLONE, G7, G7_PRO, G7_8K)
+ALL = (CYCLONE, G7, G7_PRO, G7_SE, G7_8K)
 DEFAULT = CYCLONE
 
 
