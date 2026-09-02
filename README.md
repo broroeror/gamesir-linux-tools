@@ -51,13 +51,13 @@ theme; click it (or the caption link) to step through them one at a time:
   <em><a href="docs/screenshots/README.md">Browse the screenshot tour ▶</a></em>
 </p>
 
-**Version:** `0.2.0-dev` — Deadband: multi-device (Cyclone 2 + G7 Pro 8K PC
+**Version:** `0.2.0` — Deadband: multi-device (Cyclone 2 + G7 Pro 8K PC
 controllers, G502 X mouse), the full Qt/QML app (lighting + keyframe editor,
 config editor, remaps, macros, backup/restore), built-in diagnostics,
 one-command install, an [AUR package](https://aur.archlinux.org/packages/deadband-git),
 and a [community NixOS flake](https://codeberg.org/Epaphroditus/gamesir-linux-tools-nix).
 Tracks `main` (the AUR `-git` package builds from the latest commit); last tagged
-snapshot is `v0.1.0-alpha.2`.
+snapshot is `v0.2.0`.
 **Going deeper?** The **[Manual](MANUAL.md)** is the user guide — how to use each
 feature, troubleshooting & recovery, and an FAQ. **[RESEARCH.md](RESEARCH.md)** is the
 developer side — protocol, architecture, the diagnostic tools, and per-controller
