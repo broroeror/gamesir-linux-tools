@@ -80,6 +80,32 @@ def _ms(v):
     return max(0, min(0xFFFF, int(v or 0)))
 
 
+def _speed(macrodef):
+    """Playback speed multiplier, higher = faster: every hold/delay is divided by it.
+    The mouse's macro engine spends a little time per step, so a recorded macro plays
+    back slightly slower than it was typed; this dials that out without touching the
+    captured timings. Absent or 1.0 leaves the body byte-identical, so existing
+    macros are unaffected (and still hit the identical-skip path)."""
+    if not isinstance(macrodef, dict) or macrodef.get('speed') in (None, ''):
+        return 1.0
+    try:
+        sp = float(macrodef['speed'])
+    except (TypeError, ValueError):
+        raise ValueError('macro "speed" must be a number')
+    if not 0.25 <= sp <= 4.0:
+        raise ValueError(f'macro speed {sp}x is out of range (0.25x-4x)')
+    return sp
+
+
+def _ms_at(v, speed):
+    """A timing field scaled by `speed`. A nonzero wait never scales away to 0 — a
+    key hold that becomes an instant press+release can go unseen by the target app."""
+    ms = _ms(v)
+    if ms and speed != 1.0:
+        ms = max(1, min(0xFFFF, int(round(ms / speed))))
+    return ms
+
+
 def build_macro_body(macrodef):
     """Structured macro def -> macro bytecode (terminated with END). A key/click step
     emits press, an optional HOLD delay, release, then an optional DELAY-after; text
@@ -87,6 +113,7 @@ def build_macro_body(macrodef):
     step or an empty macro (the def comes from untrusted JSON, so every field error is
     normalized to ValueError for the callers' `except`)."""
     m = macros.Macro()
+    sp = _speed(macrodef)
     n = 0
     for s in _macro_steps(macrodef):
         if not isinstance(s, dict):
@@ -99,13 +126,15 @@ def build_macro_body(macrodef):
                     raise ValueError('key step needs a non-empty "combo" string')
                 mods, key = macros.parse_combo(combo)
                 m.press_key(key, mods)
-                if _ms(s.get('hold')):
-                    m.pause(_ms(s.get('hold')))
+                hold = _ms_at(s.get('hold'), sp)
+                if hold:
+                    m.pause(hold)
                 m.release_key(key, mods)
             elif t == 'click':
                 m.mouse_down(int(s.get('button', 1) or 1))
-                if _ms(s.get('hold')):
-                    m.pause(_ms(s.get('hold')))
+                hold = _ms_at(s.get('hold'), sp)
+                if hold:
+                    m.pause(hold)
                 m.mouse_up(int(s.get('button', 1) or 1))
             elif t == 'scroll':
                 m.scroll(int(s.get('delta', 1) or 1))       # +up / -down (i8)
@@ -123,8 +152,9 @@ def build_macro_body(macrodef):
                 m.type(text)
             else:
                 raise ValueError(f'unknown macro step: {t!r}')
-            if _ms(s.get('delay')):
-                m.pause(_ms(s.get('delay')))
+            after = _ms_at(s.get('delay'), sp)
+            if after:
+                m.pause(after)
         except (KeyError, TypeError, AttributeError) as e:
             raise ValueError(f'bad macro step {t!r}: {e}')
         n += 1

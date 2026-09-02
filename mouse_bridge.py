@@ -346,8 +346,9 @@ class MouseBridge(QObject):
 
     @Slot(int, result='QVariantMap')
     def stagedMacro(self, button):
-        """The staged macro def for a button ({'steps':[...],'repeat':bool}), or an
-        empty map — lets the macros tab resume editing a macro already in the queue."""
+        """The staged macro def for a button ({'steps':[...], 'repeat':bool,
+        'speed':float}), or an empty map — lets the macros tab resume editing a
+        macro already in the queue."""
         return dict(self._pending_macros.get(int(button), {}))
 
     @Property('QVariantList', constant=True)
@@ -468,8 +469,9 @@ class MouseBridge(QObject):
     @Slot(int, str)
     def stageMacro(self, button, macro_json):
         """Queue a MACRO for `button` (primary bank). `macro_json` is the editor's
-        JSON: {"steps":[...], "repeat":bool}. Validated (built) here so a bad macro
-        is caught before Apply. Supersedes any plain bind staged on this button."""
+        JSON: {"steps":[...], "repeat":bool, "speed":float}. Validated (built) here
+        so a bad macro is caught before Apply (an out-of-range speed included).
+        Supersedes any plain bind staged on this button."""
         if not (0 <= int(button) < (self._button_count or 16)):
             return                                       # ignore an out-of-range button
         try:

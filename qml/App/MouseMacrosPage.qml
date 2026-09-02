@@ -16,8 +16,17 @@ Item {
     property int btn: -1
     property var steps: []
     property bool repeat: false
+    property real speed: 1.0        // playback multiplier, higher = faster
     property int sel: -1
     property var clip: null
+
+    readonly property var speedSteps: [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
+    function speedLabel(v) { return (Math.round(v * 100) / 100) + "\u00d7" }
+    function cycleSpeed() {
+        var i = page.speedSteps.indexOf(page.speed)
+        page.speed = page.speedSteps[(i < 0 ? 2 : i + 1) % page.speedSteps.length]
+        page.touch()
+    }
 
     readonly property var clickNames: ({ 1: "Left Click", 2: "Right Click", 3: "Middle Click", 4: "Back", 5: "Forward" })
     readonly property bool committedMacro: page.btn >= 0 && mouse.bindings[String(page.btn)] === "Macro"
@@ -29,6 +38,7 @@ Item {
         var m = page.btn >= 0 ? mouse.stagedMacro(page.btn) : ({})
         page.steps = (m && m.steps) ? m.steps.map(function (s) { return Object.assign({}, s) }) : []
         page.repeat = m && m.repeat === true
+        page.speed = (m && m.speed) ? m.speed : 1.0
         page.sel = page.steps.length ? 0 : -1
     }
     Component.onCompleted: {
@@ -43,7 +53,8 @@ Item {
     function restage() {
         if (page.btn < 0) return
         if (page.steps.length)
-            mouse.stageMacro(page.btn, JSON.stringify({ steps: page.steps, repeat: page.repeat }))
+            mouse.stageMacro(page.btn, JSON.stringify({ steps: page.steps, repeat: page.repeat,
+                                                        speed: page.speed }))
         else
             mouse.unstageItem("macro:" + page.btn)
     }
@@ -209,6 +220,11 @@ Item {
                         width: parent.width; spacing: 6; bottomPadding: 2
                         PillButton { label: "+ Add event"; onClicked: page.addEvent() }
                         PillButton { label: "⏺ Record"; highlight: page.recording; onClicked: page.startRecord() }
+                        PillButton {
+                            label: "Speed " + page.speedLabel(page.speed)
+                            highlight: page.speed !== 1.0
+                            onClicked: page.cycleSpeed()
+                        }
                     }
                     Text {
                         visible: page.steps.length === 0
