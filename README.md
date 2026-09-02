@@ -76,7 +76,7 @@ can't positively identify. Fork it and customize it however you like.
 > an Xbox-only pad whose config channel Linux doesn't expose — input works, config
 > is blocked. See [RESEARCH.md](RESEARCH.md).)
 > Other GameSir controllers, other Logitech mice, other dongles, and firmware
-> revisions we haven't seen are **unsupported and untested** and may misbehave. The
+> revisions I haven't seen are **unsupported and untested** and may misbehave. The
 > app won't send config writes to a device it can't positively recognize, but
 > please don't treat it as proven-safe on hardware it has never seen. Use it at
 > your own risk.
