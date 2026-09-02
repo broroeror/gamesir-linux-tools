@@ -162,14 +162,26 @@ class MouseBridge(QObject):
         whole sectors, so listing all five costs ~15 transactions instead of 80.
         An unnamed profile gets a positional fallback label, since G HUB leaves
         the name blank unless someone types one."""
+        # the mouse's own factory profiles, so "reset" restores what it shipped
+        # with instead of a default layout invented here; [] on devices with none
+        oob = [h[0] for h in getattr(dev, 'oob_headers', lambda: [])()]
         out = []
         for i, (sector, enabled) in enumerate(dev.profile_headers(), start=1):
             try:
                 name = dev.profile_name(sector)
             except Exception:
                 name = ''
+            # pair profile N with factory profile N; a device shipping a single
+            # OOB profile uses it for every slot
+            if len(oob) >= i:
+                factory = oob[i - 1]
+            elif len(oob) == 1:
+                factory = oob[0]
+            else:
+                factory = 0
             out.append({'index': i, 'sector': sector, 'name': name,
-                        'label': name or f'Profile {i}', 'enabled': bool(enabled)})
+                        'label': name or f'Profile {i}', 'enabled': bool(enabled),
+                        'factory': factory})
         return out
 
     @staticmethod
@@ -271,6 +283,53 @@ class MouseBridge(QObject):
                 self._profileDone.emit(True, f'switched to {self._label_for(sector)}', now)
             except Exception as e:
                 self._profileDone.emit(False, f'could not switch profile: {e}', 0)
+
+    @Property(bool, notify=profilesChanged)
+    def resetSupported(self):
+        """True when the mouse exposes a factory profile to restore from. The
+        reset action stays hidden otherwise rather than offering a button that
+        cannot work."""
+        return any(p.get('factory') for p in self._profiles)
+
+    @Slot()
+    def resetProfile(self):
+        """Restore the SELECTED profile to the mouse's factory copy (off-thread).
+        Everything in that profile goes back: buttons, G-Shift, DPI, rate, name."""
+        if self._busy:
+            return
+        target = self._selected
+        factory = 0
+        for p in self._profiles:
+            if p['sector'] == target:
+                factory = p.get('factory') or 0
+        if not factory:
+            self._set_status('this mouse has no factory profile to restore from')
+            return
+        self._busy = True
+        self.busyChanged.emit()
+        self._pending = {}                 # the queue was staged against the old
+        self._pending_sensor = {}          # contents; a reset makes it meaningless
+        self._pending_macros = {}
+        self.pendingChanged.emit()
+        threading.Thread(target=self._reset_worker, args=(target, factory),
+                         daemon=True).start()
+
+    def _reset_worker(self, sector, factory):
+        with self._io:
+            dev = hidpp.find_device()
+            if dev is None:
+                self._profileDone.emit(False, 'mouse not accessible — connected and permitted?', 0)
+                return
+            try:
+                with dev:
+                    info = dev.onboard_info()
+                    headers = dev.profile_headers()
+                    hdr = [h for h in headers if h[0] == sector] or [(sector, 1)]
+                    ok, msg = logi_config.reset_profile_to_oob(
+                        dev, info, headers, sector, factory, backup_headers=hdr)
+                self._profileDone.emit(ok, msg, self._active)
+            except Exception as e:
+                self._profileDone.emit(False, f'reset failed: {e}', 0)
 
     @Slot(int, str)
     def renameProfile(self, sector, name):

@@ -46,8 +46,14 @@ class FM(QObject):
         # "Profile N" fallback the bar uses when G HUB never set one
         names = ["FPS", "Work", "", "Photo", ""]
         return [{'index': i + 1, 'sector': i + 1, 'name': n,
-                 'label': n or f'Profile {i + 1}', 'enabled': True}
+                 'label': n or f'Profile {i + 1}', 'enabled': True,
+                 'factory': 0x0100 + i + 1}
                 for i, n in enumerate(names)]
+
+    @Property(bool, notify=profilesChanged)
+    def resetSupported(self): return True
+    @Slot()
+    def resetProfile(self): pass
 
     @Property(int, notify=profilesChanged)
     def selectedProfile(self): return 2      # editing P2 while the mouse runs P1

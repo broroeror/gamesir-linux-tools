@@ -21,6 +21,14 @@ Window {
     // Which device the app drives: the controller shell or the G502 X mouse. The
     // device picker flips this, which swaps the nav tabs + content below.
     property string activeDevice: "controller"       // "controller" | "mouse"
+    // Name of the mouse profile currently being edited — used by the reset
+    // button's label, confirm prompt and tooltip so they always agree.
+    readonly property string selectedProfileLabel: {
+        for (var i = 0; i < mouse.profiles.length; i++)
+            if (mouse.profiles[i].sector === mouse.selectedProfile)
+                return mouse.profiles[i].label
+        return "this profile"
+    }
     readonly property var controllerTabs: ["Rebinds", "Sticks", "Motion", "Triggers", "Vibration", "Lights", "Macros"]
     readonly property var mouseTabs: ["Buttons", "DPI", "Macros"]
     readonly property var tabs: activeDevice === "mouse" ? mouseTabs : controllerTabs
@@ -290,7 +298,10 @@ Window {
                              && mouse.selectedProfile > 0
                              && mouse.selectedProfile !== mouse.activeProfile
                     enabled: !mouse.busy
-                    label: win.width < 1150 ? "▶" : "▶ Make active"   // match the bar's threshold
+                    // Higher text threshold than the profile bar on purpose: the
+                    // NAMES are what deserve the width, so these two collapse to
+                    // icons first rather than pushing the status pill off the bar.
+                    label: win.width < 1450 ? "▶" : "▶ Make active"
                     onClicked: mouse.makeActive(mouse.selectedProfile)
                     HoverHandler { id: makeActiveHover }
                     QQC.ToolTip {
@@ -299,6 +310,29 @@ Window {
                         delay: 400
                         text: "Switch the mouse to the profile you're editing.\n" +
                               "You can also cycle profiles with the button on the mouse."
+                    }
+                }
+
+                // Restore the selected profile from the mouse's OWN factory copy
+                // in ROM — a real factory restore, not defaults invented by us.
+                // Hidden on a device that exposes no out-of-box profile.
+                ConfirmButton {
+                    id: mouseResetBtn
+                    Layout.alignment: Qt.AlignVCenter
+                    visible: win.activeDevice === "mouse" && mouse.present
+                             && mouse.resetSupported && mouse.selectedProfile > 0
+                    enabled: !mouse.busy
+                    label: win.width < 1450 ? "↺" : "↺ Reset profile"
+                    confirmLabel: "Reset " + win.selectedProfileLabel + "?"
+                    onConfirmed: mouse.resetProfile()
+                    HoverHandler { id: mouseResetHover }
+                    QQC.ToolTip {
+                        parent: mouseResetBtn
+                        visible: mouseResetHover.hovered
+                        delay: 400
+                        text: "Restores " + win.selectedProfileLabel + " to the mouse's\n" +
+                              "factory settings: buttons, G-Shift, DPI, rate and name.\n" +
+                              "Your current settings are backed up first."
                     }
                 }
 

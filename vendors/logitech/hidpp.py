@@ -52,6 +52,9 @@ FEATURE_ADJUSTABLE_DPI = 0x2201
 # bytes 0x20/0x40/0x50 = index 2/4/5.)
 OB_GET_INFO = 0x00           # fn 0  getOnboardProfilesInfo
 OB_GET_MODE = 0x02           # fn 2  getOnboardMode (0x01 on-board / 0x02 host)
+RAM_DIRECTORY = 0x0000       # the live profile directory
+ROM_DIRECTORY = 0x0100       # the factory (out-of-box) directory
+
 OB_SET_CURRENT_PROFILE = 0x03  # fn 3  setCurrentProfile             [MUTATES]
 OB_GET_CURRENT_PROFILE = 0x04  # fn 4  getCurrentProfile
 OB_MEMORY_READ = 0x05        # fn 5  memoryRead
@@ -259,10 +262,29 @@ class Hidpp:
         is blank; each entry is 4 bytes [sector(BE), enabled, pad], terminated
         by 0xFFFF."""
         idx = self.get_feature_index(FEATURE_ONBOARD_PROFILES)
-        base = 0x0000
-        first = self._mem_read16(idx, base, 0)
-        if first[0:4] in (b'\x00\x00\x00\x00', b'\xff\xff\xff\xff'):
-            base = 0x0100                      # fall back to ROM
+        first = self._mem_read16(idx, RAM_DIRECTORY, 0)
+        base = (ROM_DIRECTORY
+                if first[0:4] in (b'\x00\x00\x00\x00', b'\xff\xff\xff\xff')
+                else RAM_DIRECTORY)
+        return self._directory(idx, base)
+
+    def oob_headers(self):
+        """The OUT-OF-BOX (factory) directory in ROM: [(sector, enabled), ...].
+
+        These are the profiles the mouse shipped with, which is what "reset to
+        defaults" should restore — far better than synthesizing a default layout
+        and calling it factory. `onboard_info()['oob_count']` says how many to
+        expect. Returns [] when the device has none, so callers can hide the
+        reset action rather than offering one that can't work."""
+        idx = self.get_feature_index(FEATURE_ONBOARD_PROFILES)
+        try:
+            return self._directory(idx, ROM_DIRECTORY)
+        except Exception:
+            return []
+
+    def _directory(self, idx, base):
+        """Walk one directory sector: 4-byte [sector(BE), enabled, pad] entries,
+        terminated by 0xFFFF."""
         headers = []
         offset = 0
         while True:
