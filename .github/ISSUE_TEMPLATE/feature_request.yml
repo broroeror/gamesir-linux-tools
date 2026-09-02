@@ -1,0 +1,30 @@
+name: Idea or feature request
+description: Suggest something Deadband could do
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideas are welcome, including half-formed ones. No need to justify it in
+        detail — a sentence about what you'd want to do is plenty.
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like Deadband to do?
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Which device is this for?
+      placeholder: Cyclone 2, G502 X, a controller not supported yet…
+
+  - type: markdown
+    attributes:
+      value: |
+        **Asking about a device that isn't supported yet?** That's a fair request,
+        and worth opening. The honest constraint is that adding a device means
+        owning one to reverse-engineer and test against, so support tends to
+        follow whatever hardware is on hand — but knowing what people want helps.

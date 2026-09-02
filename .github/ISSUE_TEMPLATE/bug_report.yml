@@ -1,0 +1,80 @@
+name: Something isn't working
+description: Report a bug or a device that won't behave
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time — bug reports are genuinely how this project
+        finds out what breaks on hardware and setups I don't have.
+
+        Fill in what you can. Nothing here is mandatory except the first box; if
+        you're not sure about a field, skip it.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what you got instead.
+      placeholder: |
+        I set a macro on L4, hit Apply, and the button does nothing when I press it.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: device
+    attributes:
+      label: Which device?
+      options:
+        - GameSir Cyclone 2
+        - GameSir G7 Pro 8K PC
+        - Logitech G502 X LIGHTSPEED
+        - Another device (tell us which in the box above)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install Deadband?
+      options:
+        - AUR package (deadband-git)
+        - From source / git clone
+        - Nix flake (community)
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics report
+      description: |
+        This is the single most useful thing you can include — it usually points
+        straight at the cause and saves a round of back-and-forth.
+
+        In the app: **Settings → Help & Diagnostics → Diagnostics…**, then
+        **Copy report**. Or from a terminal, without launching the GUI:
+
+        ```
+        deadband --doctor
+        ```
+
+        It reports device permissions, which hidapi backend is in use, and your
+        distro — no personal information.
+      render: shell
+
+  - type: input
+    id: system
+    attributes:
+      label: Distro and desktop
+      description: Only if you didn't paste a diagnostics report above.
+      placeholder: Arch, KDE Plasma 6.7 on Wayland
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: |
+        Screenshots, terminal output, or anything that seemed relevant. If the app
+        printed an error, paste it here.
