@@ -267,6 +267,41 @@ Window {
                 // widest live content.
                 ProfileBar { compact: win.width < 1320; visible: win.activeDevice === "controller" }
 
+                // The mouse's own onboard profiles (5 slots, named, stored on the
+                // device). Picking one changes what the pages EDIT; making it the
+                // running profile is a separate, explicit action.
+                MouseProfileBar {
+                    id: mouseProfiles
+                    // Lower threshold than the controller's bar on purpose: five
+                    // pills, and the NAMES are the reason to have them, so keep
+                    // full labels down to widths where they still fit.
+                    compact: win.width < 1150
+                    Layout.alignment: Qt.AlignVCenter
+                    visible: win.activeDevice === "mouse" && mouse.present
+                             && mouse.profiles.length > 0
+                }
+
+                // Only meaningful when you're editing a profile the mouse isn't
+                // running — otherwise it's a no-op button, so it stays hidden.
+                PillButton {
+                    id: makeActiveBtn
+                    Layout.alignment: Qt.AlignVCenter
+                    visible: win.activeDevice === "mouse" && mouse.present
+                             && mouse.selectedProfile > 0
+                             && mouse.selectedProfile !== mouse.activeProfile
+                    enabled: !mouse.busy
+                    label: win.width < 1150 ? "▶" : "▶ Make active"   // match the bar's threshold
+                    onClicked: mouse.makeActive(mouse.selectedProfile)
+                    HoverHandler { id: makeActiveHover }
+                    QQC.ToolTip {
+                        parent: makeActiveBtn
+                        visible: makeActiveHover.hovered
+                        delay: 400
+                        text: "Switch the mouse to the profile you're editing.\n" +
+                              "You can also cycle profiles with the button on the mouse."
+                    }
+                }
+
                 // Reset the ACTIVE profile to its factory defaults — lives beside
                 // the profile pills since it acts on whichever profile is selected
                 // (moved here from the Rebinds page). Hidden for controllers with

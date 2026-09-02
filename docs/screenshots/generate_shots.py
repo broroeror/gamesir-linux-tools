@@ -38,7 +38,25 @@ import bridge as B  # noqa: E402
 class FM(QObject):
     presenceChanged = Signal(); bindingsChanged = Signal(); sensorChanged = Signal()
     statusChanged = Signal(); busyChanged = Signal(); pendingChanged = Signal()
-    applyStatusChanged = Signal()
+    applyStatusChanged = Signal(); profilesChanged = Signal()
+
+    @Property('QVariantList', notify=profilesChanged)
+    def profiles(self):
+        # named + unnamed, so the shot shows both the stored name and the
+        # "Profile N" fallback the bar uses when G HUB never set one
+        names = ["FPS", "Work", "", "Photo", ""]
+        return [{'index': i + 1, 'sector': i + 1, 'name': n,
+                 'label': n or f'Profile {i + 1}', 'enabled': True}
+                for i, n in enumerate(names)]
+
+    @Property(int, notify=profilesChanged)
+    def selectedProfile(self): return 2      # editing P2 while the mouse runs P1
+    @Slot(int)
+    def selectProfile(self, sector): pass
+    @Slot(int)
+    def makeActive(self, sector): pass
+    @Slot(int, str)
+    def renameProfile(self, sector, name): pass
 
     @Property(bool, notify=presenceChanged)
     def present(self): return True

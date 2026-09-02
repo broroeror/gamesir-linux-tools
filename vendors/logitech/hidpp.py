@@ -52,6 +52,7 @@ FEATURE_ADJUSTABLE_DPI = 0x2201
 # bytes 0x20/0x40/0x50 = index 2/4/5.)
 OB_GET_INFO = 0x00           # fn 0  getOnboardProfilesInfo
 OB_GET_MODE = 0x02           # fn 2  getOnboardMode (0x01 on-board / 0x02 host)
+OB_SET_CURRENT_PROFILE = 0x03  # fn 3  setCurrentProfile             [MUTATES]
 OB_GET_CURRENT_PROFILE = 0x04  # fn 4  getCurrentProfile
 OB_MEMORY_READ = 0x05        # fn 5  memoryRead
 OB_ADDR_WRITE = 0x06         # fn 6  begin sector write (addr + length)  [MUTATES]
@@ -190,6 +191,20 @@ class Hidpp:
         d = self.request(idx, OB_GET_CURRENT_PROFILE)
         return (d[0] << 8) | d[1]
 
+    def set_current_profile(self, sector):
+        """feature 0x8100 fn 0x30 — make `sector` the active profile.
+
+        Sends the sector id back in exactly the encoding `current_profile()`
+        reads, so the two are self-consistent. Note the spec is ambiguous here:
+        profile N lives in sector N on this device, so a 1-based profile INDEX
+        and a sector id are numerically identical and can't be told apart from
+        the wire. Changes the active profile only — it writes no flash, so the
+        worst case is an error reply, not a damaged profile."""
+        idx = self.get_feature_index(FEATURE_ONBOARD_PROFILES)
+        self.request(idx, OB_SET_CURRENT_PROFILE,
+                     bytes([(sector >> 8) & 0xFF, sector & 0xFF]))
+        return self.current_profile()          # report what the device actually did
+
     def battery(self):
         """feature 0x1004 (unified battery) getStatus -> {'percent', 'charging'},
         or None if the feature is absent/unreadable. Best-effort; never raises so a
@@ -261,6 +276,22 @@ class Hidpp:
             if offset > 15 * 4:                # safety: directory can't be huge
                 break
         return headers
+
+    def profile_name(self, sector):
+        """The profile's stored name, read WITHOUT pulling the whole sector.
+
+        The name lives at bytes 160..208 (UTF-16LE, up to 24 chars), so three
+        16-byte reads get it instead of the sixteen a full sector costs. That
+        matters because the profile bar names every profile on each refresh.
+        Returns '' for a blank/undecodable name rather than raising -- a junk
+        name must not stop the profile list from loading."""
+        idx = self.get_feature_index(FEATURE_ONBOARD_PROFILES)
+        try:
+            raw = b''.join(self._mem_read16(idx, sector, off)
+                           for off in (160, 176, 192))
+            return raw.decode('utf-16le').rstrip('\x00').rstrip('\ufffd').strip()
+        except Exception:
+            return ''
 
     def _mem_read16(self, feature_index, sector, offset):
         """One 16-byte memory read (fn 0x50) at (sector, offset)."""

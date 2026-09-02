@@ -494,6 +494,68 @@ def apply_bindings(dev, info, headers, sector, button_changes=None,
     return True, f'applied {n} change{"" if n == 1 else "s"} (backup {os.path.basename(path)})'
 
 
+NAME_OFFSET, NAME_LEN = 160, 48          # UTF-16LE, up to 24 chars
+
+
+def rename_profile(dev, info, headers, sector, name, backup_headers=None):
+    """Rename one onboard profile. Same shape as apply_bindings — snapshot first,
+    gate on exactly which bytes moved, write, read back — but the gate here allows
+    ONLY the name region and the CRC, so a malformed name can't reach a binding.
+
+    An empty name writes 48 zero bytes: `OnboardProfile.to_bytes()` deliberately
+    preserves the raw name region when the name is blank (this device pads with
+    0x00, not the 0xFF Solaar assumes), so clearing has to be explicit."""
+    size = info['sector_size']
+    if sector not in [h[0] for h in headers]:
+        return False, f'sector 0x{sector:04x} is not a profile'
+    name = str(name).strip()
+    if len(name) > 24:
+        return False, 'a profile name can be at most 24 characters'
+    try:
+        name.encode('utf-16le')
+    except UnicodeEncodeError:
+        return False, 'that name has characters the mouse cannot store'
+
+    raw = dev.read_sector(sector, size)
+    prof = onboard.OnboardProfile.decode(raw, sector=sector)
+    if not prof.crc_ok:
+        return False, 'profile CRC not OK on read — aborting'
+    prof.name = name
+    new_bytes = bytearray(prof.to_bytes())
+    if not name:                                   # explicit clear (see docstring)
+        new_bytes[NAME_OFFSET:NAME_OFFSET + NAME_LEN] = bytes(NAME_LEN)
+        new_bytes[-2:] = onboard.crc16_ccitt(bytes(new_bytes[:-2])).to_bytes(2, 'big')
+    new_bytes = bytes(new_bytes)
+
+    offs = remap.diff_offsets(raw, new_bytes)
+    expected = set(range(NAME_OFFSET, NAME_OFFSET + NAME_LEN)) | {size - 2, size - 1}
+    safe = (onboard.OnboardProfile.decode(new_bytes).crc_ok
+            and set(offs).issubset(expected)
+            and onboard.OnboardProfile.decode(raw).to_bytes() == raw)
+    if not safe:
+        return False, f'safety gate failed (changed bytes {offs}) — not writing'
+    if not offs:
+        return True, 'name unchanged'
+
+    try:
+        remap.backup_all(dev, info,
+                         backup_headers if backup_headers is not None else headers)
+    except OSError as e:
+        return False, f'could not save the safety backup ({e}) — nothing was changed'
+    try:
+        dev.write_sector(sector, new_bytes)
+        if dev.read_sector(sector, size) != new_bytes:
+            dev.write_sector(sector, raw)                  # revert
+            return False, 'read-back mismatch — reverted to original'
+    except Exception as e:
+        try:
+            dev.write_sector(sector, raw)
+        except Exception as e2:
+            return False, f'write failed ({e}) AND restore failed ({e2})'
+        return False, f'write failed ({e}) — reverted to original'
+    return True, f'renamed to "{name}"' if name else 'name cleared'
+
+
 def apply_binding(dev, info, headers, sector, button, new_binding, backup_headers=None):
     """Single primary-button convenience wrapper over apply_bindings (see it for the
     gate + safety). Kept for callers that change one button at a time."""

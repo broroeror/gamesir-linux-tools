@@ -63,6 +63,7 @@ DPI_FALLBACK = {'min': 100, 'max': 25600, 'step': 50}
 
 class MouseBridge(QObject):
     presenceChanged = Signal()   # present / permission / activeProfile changed
+    profilesChanged = Signal()   # the profile list / which one is selected changed
     bindingsChanged = Signal()   # the per-button binding map changed
     sensorChanged = Signal()     # DPI stages / indices / report rate / range changed
     statusChanged = Signal()     # last action result text changed
@@ -74,7 +75,8 @@ class MouseBridge(QObject):
     # signal from another thread to this (GUI-thread) object is delivered as a
     # queued connection, so the handlers run on the GUI thread and it's safe to
     # touch the exposed state there.
-    _refreshDone = Signal(bool, str, int, int, int, bool, 'QVariantMap')  # present, perm, active, count, battery, wireless, binds
+    _refreshDone = Signal(bool, str, int, int, int, bool, 'QVariantMap', 'QVariantList')  # present, perm, active, count, battery, wireless, binds, profiles
+    _profileDone = Signal(bool, str, int)                      # ok, message, active-after
     _remapDone = Signal(bool, str, 'QVariantMap')               # ok, status, binds
     _applyDone = Signal(bool, str, 'QVariantMap')               # ok, status, binds
     _macroSlotsDone = Signal(int)                              # free macro sector count
@@ -85,6 +87,8 @@ class MouseBridge(QObject):
         self._present = False
         self._permission = 'unknown'    # ok | no-access | absent | unknown
         self._active = 0
+        self._profiles = []             # [{index, sector, name, enabled}] from the directory
+        self._selected = 0              # sector being EDITED (0 = follow the active one)
         self._button_count = 0
         self._battery = -1              # state-of-charge %, -1 = unknown
         self._wireless = False
@@ -112,6 +116,7 @@ class MouseBridge(QObject):
         self._applyDone.connect(self._on_apply)
         self._macroSlotsDone.connect(self._on_macro_slots)
         self._reclaimDone.connect(self._on_reclaim)
+        self._profileDone.connect(self._on_profile_switch)
 
         # light hotplug poll: enumerate (no open) every few seconds; a full read
         # happens only on a connect transition or an explicit refresh().
@@ -148,6 +153,24 @@ class MouseBridge(QObject):
             self._present = False
             self._permission = 'absent'
             self.presenceChanged.emit()
+
+    @staticmethod
+    def _read_profiles(dev):
+        """The onboard profile directory as [{index, sector, name, enabled}].
+
+        Names come from `profile_name()` (three 16-byte reads each) rather than
+        whole sectors, so listing all five costs ~15 transactions instead of 80.
+        An unnamed profile gets a positional fallback label, since G HUB leaves
+        the name blank unless someone types one."""
+        out = []
+        for i, (sector, enabled) in enumerate(dev.profile_headers(), start=1):
+            try:
+                name = dev.profile_name(sector)
+            except Exception:
+                name = ''
+            out.append({'index': i, 'sector': sector, 'name': name,
+                        'label': name or f'Profile {i}', 'enabled': bool(enabled)})
+        return out
 
     @staticmethod
     def _read_both(dev, active, size):
@@ -194,6 +217,104 @@ class MouseBridge(QObject):
     @Property(int, notify=presenceChanged)
     def activeProfile(self):
         return self._active
+
+    @Property('QVariantList', notify=profilesChanged)
+    def profiles(self):
+        """The onboard profiles: [{index, sector, name, label, enabled}]."""
+        return list(self._profiles)
+
+    @Property(int, notify=profilesChanged)
+    def selectedProfile(self):
+        """Sector of the profile being EDITED — not necessarily the active one."""
+        return self._selected
+
+    @Slot(int)
+    def selectProfile(self, sector):
+        """Choose which profile the pages edit. Costs no device write: it just
+        re-reads that sector. Refused while edits are staged, because the queue
+        was built against the profile it was staged on and silently retargeting
+        it would write someone's rebinds into the wrong profile."""
+        sector = int(sector)
+        if sector == self._selected or sector not in [p['sector'] for p in self._profiles]:
+            return
+        if self._pending or self._pending_sensor or self._pending_macros:
+            self._set_status('apply or discard your staged changes before switching profile')
+            return
+        self._selected = sector
+        self.profilesChanged.emit()
+        self.refresh()                        # re-read bindings for the new target
+
+    @Slot(int)
+    def makeActive(self, sector):
+        """Make `sector` the profile the mouse actually uses (a device write, but
+        not a flash write). Off-thread; the result lands in the Apply toast."""
+        if self._busy:
+            return
+        self._busy = True
+        self.busyChanged.emit()
+        threading.Thread(target=self._profile_worker, args=(int(sector),),
+                         daemon=True).start()
+
+    def _profile_worker(self, sector):
+        with self._io:
+            dev = hidpp.find_device()
+            if dev is None:
+                self._profileDone.emit(False, 'mouse not accessible — connected and permitted?', 0)
+                return
+            try:
+                with dev:
+                    now = dev.set_current_profile(sector)   # returns what the device reports
+                if now != sector:
+                    self._profileDone.emit(
+                        False, f'the mouse stayed on profile sector 0x{now:04x}', now)
+                    return
+                self._profileDone.emit(True, f'switched to {self._label_for(sector)}', now)
+            except Exception as e:
+                self._profileDone.emit(False, f'could not switch profile: {e}', 0)
+
+    @Slot(int, str)
+    def renameProfile(self, sector, name):
+        """Rename a profile (a flash write, so it's gated + backed up like any
+        other). Off-thread; the result lands in the Apply toast."""
+        if self._busy:
+            return
+        self._busy = True
+        self.busyChanged.emit()
+        threading.Thread(target=self._rename_worker,
+                         args=(int(sector), str(name)), daemon=True).start()
+
+    def _rename_worker(self, sector, name):
+        with self._io:
+            dev = hidpp.find_device()
+            if dev is None:
+                self._profileDone.emit(False, 'mouse not accessible — connected and permitted?', 0)
+                return
+            try:
+                with dev:
+                    info = dev.onboard_info()
+                    headers = dev.profile_headers()
+                    hdr = [h for h in headers if h[0] == sector] or [(sector, 1)]
+                    ok, msg = logi_config.rename_profile(
+                        dev, info, headers, sector, name, backup_headers=hdr)
+                self._profileDone.emit(ok, msg, self._active)
+            except Exception as e:
+                self._profileDone.emit(False, f'rename failed: {e}', 0)
+
+    def _label_for(self, sector):
+        for p in self._profiles:
+            if p['sector'] == sector:
+                return p['label']
+        return f'sector 0x{sector:04x}'
+
+    def _on_profile_switch(self, ok, message, active_now):
+        self._busy = False
+        self.busyChanged.emit()
+        self._apply_status = ('✓ ' if ok else '⚠ ') + message
+        self.applyStatusChanged.emit()
+        if ok:
+            self._active = active_now
+            self.presenceChanged.emit()
+        self.refresh()
 
     @Property(int, notify=presenceChanged)
     def buttonCount(self):
@@ -364,21 +485,28 @@ class MouseBridge(QObject):
             dev = hidpp.find_device()
             if dev is None:
                 perm = 'no-access' if pid is not None else 'absent'
-                self._refreshDone.emit(False, perm, 0, 0, -1, wireless, {})
+                self._refreshDone.emit(False, perm, 0, 0, -1, wireless, {}, [])
                 return
             try:
                 with dev:
                     info = dev.onboard_info()
                     active = dev.current_profile()
-                    binds = self._read_both(dev, active, info['sector_size'])
+                    profiles = self._read_profiles(dev)
+                    # show whichever profile the user picked, defaulting to the
+                    # active one (and falling back to it if the pick vanished)
+                    target = self._selected or active
+                    if target not in [p['sector'] for p in profiles]:
+                        target = active
+                    binds = self._read_both(dev, target, info['sector_size'])
                     binds['range'] = getattr(dev, 'dpi_range', lambda: None)()
                     bat = getattr(dev, 'battery', lambda: None)()
                 pct = bat['percent'] if bat else -1
-                self._refreshDone.emit(True, 'ok', active, info['button_count'], pct, wireless, binds)
+                self._refreshDone.emit(True, 'ok', active, info['button_count'], pct,
+                                       wireless, binds, profiles)
             except Exception as e:
-                self._refreshDone.emit(False, f'read error: {e}', 0, 0, -1, wireless, {})
+                self._refreshDone.emit(False, f'read error: {e}', 0, 0, -1, wireless, {}, [])
 
-    def _remap_worker(self, button, spec):
+    def _remap_worker(self, button, spec, target):
         try:
             binding = logi_config.binding_from_spec(spec)
         except ValueError as e:
@@ -393,7 +521,9 @@ class MouseBridge(QObject):
                 with dev:
                     info = dev.onboard_info()
                     headers = dev.profile_headers()
-                    active = dev.current_profile()
+                    # edits go to the profile the user picked, which is NOT always
+                    # the one the mouse is currently running
+                    active = target or dev.current_profile()
                     active_hdr = [h for h in headers if h[0] == active] or [(active, 1)]
                     ok, msg = logi_config.apply_binding(
                         dev, info, headers, active, button, binding,
@@ -404,10 +534,16 @@ class MouseBridge(QObject):
                 self._remapDone.emit(False, f'error: {e}', {})
 
     # ------------------------------------------------- GUI-thread result handlers
-    def _on_refresh(self, present, perm, active, count, battery, wireless, binds):
+    def _on_refresh(self, present, perm, active, count, battery, wireless, binds, profiles):
         self._permission = perm
         self._present = present
         self._active = active
+        sectors = [p['sector'] for p in profiles]
+        if self._profiles != profiles:
+            self._profiles = profiles
+        if self._selected not in sectors:      # first read, or the pick disappeared
+            self._selected = active if active in sectors else (sectors[0] if sectors else 0)
+        self.profilesChanged.emit()
         self._button_count = count
         self._battery = battery
         self._wireless = wireless
@@ -449,7 +585,8 @@ class MouseBridge(QObject):
             return
         self._busy = True
         self.busyChanged.emit()
-        threading.Thread(target=self._remap_worker, args=(button, spec), daemon=True).start()
+        threading.Thread(target=self._remap_worker,
+                         args=(button, spec, self._selected), daemon=True).start()
 
     # ------------------------------------------------- staged (batched) editing
     @Slot(str, int, str)
@@ -627,9 +764,10 @@ class MouseBridge(QObject):
         sensor_snapshot = dict(self._pending_sensor)
         macro_snapshot = dict(self._pending_macros)  # {button:int -> macrodef}
         threading.Thread(target=self._apply_worker,
-                         args=(snapshot, sensor_snapshot, macro_snapshot), daemon=True).start()
+                         args=(snapshot, sensor_snapshot, macro_snapshot,
+                               self._selected), daemon=True).start()
 
-    def _apply_worker(self, snapshot, sensor_snapshot, macro_snapshot):
+    def _apply_worker(self, snapshot, sensor_snapshot, macro_snapshot, target):
         try:
             button_changes, gshift_changes = {}, {}
             for key, spec in snapshot.items():
@@ -659,7 +797,9 @@ class MouseBridge(QObject):
                 with dev:
                     info = dev.onboard_info()
                     headers = dev.profile_headers()
-                    active = dev.current_profile()
+                    # edits go to the profile the user picked, which is NOT always
+                    # the one the mouse is currently running
+                    active = target or dev.current_profile()
                     active_hdr = [h for h in headers if h[0] == active] or [(active, 1)]
                     ok, msg = logi_config.apply_edits(
                         dev, info, headers, active,
