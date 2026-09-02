@@ -282,10 +282,14 @@ write-verify-retry; only the active profile + lighting are guaranteed (banks
 `0x02`–`0x04`, the stored profiles, appear read-only on this controller).
 
 **Mouse (G502 X):** remaps, keyboard bindings, the G-Shift layer + trigger, DPI
-stages, and report rate are verified on hardware. The onboard-macro editor's
-newest pieces — keystroke recording, multi-sector chaining for long macros, and
-reclaiming unused macro slots — are implemented with offline verification and
-are still gathering on-hardware mileage.
+stages, report rate, and the onboard-macro editor are verified on hardware —
+including keystroke recording with live timing, macros long enough to chain
+across several flash sectors, and the scroll / media / F13–F24 step types.
+Because flash can't be rewritten in place, re-assigning a macro strands its old
+sector; an apply now sweeps stranded sectors automatically, so editing a
+button's macro costs no net slots (there's a manual sweep on the Macros tab
+too). Macro playback runs slightly slower than recorded — the mouse's macro
+engine spends a little time per step.
 
 **Mouse-mode gotcha (KDE Plasma 6.7):** after a dongle replug, the sticks may start
 driving the desktop cursor — that's **KWin's Game Controller plugin** reading the
