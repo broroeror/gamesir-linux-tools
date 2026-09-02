@@ -64,7 +64,10 @@ developer side — protocol, architecture, the diagnostic tools, and per-control
 findings. See also **[CONTROLLER_MAP.md](CONTROLLER_MAP.md)** (what each control
 reports to Linux) and **[TODO.md](TODO.md)** (roadmap + open questions).
 
-This is a hobby reverse-engineering project; fork it and customize it however you like.
+This is a spare-time project. I am one person, so fixes land when they land.
+It isn't careless with your hardware, though: every config write is backed up
+first and read back to verify, and the app refuses to write to a device it
+can't positively identify. Fork it and customize it however you like.
 
 > ### ⚠️ Tested hardware
 > Everything here has only been developed and verified on a **GameSir Cyclone 2**,
