@@ -33,6 +33,9 @@ alongside. It covers:
   polling-rate editor, and an onboard-macro editor (build sequences or record
   them from your keyboard with live timing) — edits stage into a queue and apply
   in one verified write.
+- **Mouse profiles** — all five onboard profiles: pick which one you're editing,
+  name them, switch which one the mouse runs, and restore any of them to the
+  mouse's own factory copy.
 - **Demo mode** — preview one of each supported controller in software, no
   hardware connected.
 - **Diagnostics** — a built-in doctor that pinpoints permission, udev, and
@@ -292,7 +295,15 @@ Because flash can't be rewritten in place, re-assigning a macro strands its old
 sector; an apply now sweeps stranded sectors automatically, so editing a
 button's macro costs no net slots (there's a manual sweep on the Macros tab
 too). Macro playback runs slightly slower than recorded — the mouse's macro
-engine spends a little time per step.
+engine spends a little time per step, which the per-macro speed control offsets.
+
+**Newer, not yet confirmed on hardware:** the profile bar (selecting, renaming,
+switching the running profile) and restoring a profile to the mouse's factory
+copy. These are built on the same gated, backed-up, read-back-verified write
+path as everything above and are tested against a simulated device, but they
+haven't been exercised on a real mouse yet. Switching the running profile is
+the least certain piece — the spec is ambiguous about how that call is
+addressed, and the app reports it if the mouse doesn't move.
 
 **Mouse-mode gotcha (KDE Plasma 6.7):** after a dongle replug, the sticks may start
 driving the desktop cursor — that's **KWin's Game Controller plugin** reading the
