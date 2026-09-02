@@ -181,10 +181,21 @@ def classify_open_failure(node):
 
 
 # --------------------------------------------------------------------- report
+def _version():
+    """App version (plus the git commit when running from a checkout). Never
+    raises -- a missing version must not cost someone their whole report."""
+    try:
+        from version import build_id
+        return build_id()
+    except Exception:
+        return '?'
+
+
 def collect():
     """Gather the full diagnostic picture (structured)."""
     rep = {
         'app': 'Deadband',
+        'version': _version(),
         'os': _os_release(),
         'nixos': is_nixos(),
         'kernel': platform.release(),
@@ -284,6 +295,7 @@ def format_report(rep):
     """The structured report as paste-into-an-issue text."""
     L = []
     L.append('## Deadband diagnostic report')
+    L.append(f'- Deadband {rep.get("version", "?")}')
     L.append(f'- OS: {rep["os"]}  (kernel {rep["kernel"]})')
     L.append(f'- Session: {rep["session"]} / {rep["desktop"]}')
     L.append(f'- Python {rep["python"]}, hidapi {rep.get("hidapi_version", "?")} '

@@ -33,7 +33,7 @@ from mouse_bridge import MouseBridge
 import kwin
 import mousegrab
 
-__version__ = '0.2.0-dev'
+from version import __version__          # noqa: E402  (kept here for QML)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 QML_DIR = os.path.join(HERE, 'qml')
