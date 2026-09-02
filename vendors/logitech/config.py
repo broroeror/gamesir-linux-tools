@@ -485,10 +485,11 @@ def apply_edits(dev, info, headers, sector, button_changes=None, gshift_changes=
     and size is validated and total free-slot capacity is checked up front, so a
     doomed batch (bad index, empty/oversized macro, not enough slots) fails BEFORE
     touching flash and never orphans a slot. v1: one sector per macro (no cross-
-    sector chaining); reassigning/clearing a macro orphans its old sector (harmless;
-    flash can't be erased here yet). If a macro write's read-back fails mid-batch (a
-    hardware hiccup) the profile is never written and any already-written sectors are
-    harmless orphans."""
+    sector chaining). Reassigning/clearing a macro strands its old sector, so a
+    successful macro apply ends by sweeping every now-unreferenced sector — editing
+    one button's macro costs no net slots. If a macro write's read-back fails
+    mid-batch (a hardware hiccup) the profile is never written and any already-
+    written sectors are harmless orphans the next apply will sweep."""
     button_changes = dict(button_changes or {})
     macro_changes = macro_changes or {}
     size = info['sector_size']
@@ -565,10 +566,23 @@ def apply_edits(dev, info, headers, sector, button_changes=None, gshift_changes=
 
     if not button_changes and not gshift_changes and not sensor:
         return True, 'no changes needed'          # all staged edits were no-ops
-    return apply_bindings(dev, info, headers, sector,
-                          button_changes=button_changes, gshift_changes=gshift_changes,
-                          sensor=sensor, backup_headers=backup_headers,
-                          existing_backup=backup_path)
+    ok, msg = apply_bindings(dev, info, headers, sector,
+                             button_changes=button_changes, gshift_changes=gshift_changes,
+                             sensor=sensor, backup_headers=backup_headers,
+                             existing_backup=backup_path)
+    # Flash can't be rewritten in place, so REPLACING a button's macro writes a new
+    # sector and strands the old one. Users reasonably expect editing one button's
+    # macro to cost nothing, so sweep the strays now that the profile no longer
+    # points at them. Only ever blanks sectors nothing references, and a failure
+    # here can't undo a write that already succeeded.
+    if ok and macro_changes:
+        try:
+            freed_ok, freed, _ = reclaim_orphan_macros(dev, info, headers)
+            if freed_ok and freed:
+                msg += f' · reclaimed {freed} slot{"" if freed == 1 else "s"}'
+        except Exception:
+            pass
+    return ok, msg
 
 
 # Binding constructors the UI offers, expressed as onboard.Button factories.

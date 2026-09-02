@@ -204,6 +204,12 @@ Item {
                     title: "Sequence"
                     headerValue: page.steps.length + " step" + (page.steps.length === 1 ? "" : "s")
                     Layout.preferredWidth: 360; Layout.minimumWidth: 300; Layout.alignment: Qt.AlignTop
+                    // pinned above the list so they stay put as steps are added
+                    Row {
+                        width: parent.width; spacing: 6; bottomPadding: 2
+                        PillButton { label: "+ Add event"; onClicked: page.addEvent() }
+                        PillButton { label: "⏺ Record"; highlight: page.recording; onClicked: page.startRecord() }
+                    }
                     Text {
                         visible: page.steps.length === 0
                         width: parent.width; wrapMode: Text.WordWrap
@@ -263,11 +269,6 @@ Item {
                             TapHandler { onTapped: page.sel = index }
                         }
                     }
-                    Row {
-                        width: parent.width; spacing: 6; topPadding: 2
-                        PillButton { label: "+ Add event"; onClicked: page.addEvent() }
-                        PillButton { label: "⏺ Record"; highlight: page.recording; onClicked: page.startRecord() }
-                    }
                 }
 
                 // -------- RIGHT: button picker + always-on step editor --------
@@ -322,12 +323,14 @@ Item {
                                 }
                             }
                         }
-                        // running low on flash slots: offer to blank the orphans
-                        // (sectors left behind by macro edits/clears that nothing
-                        // references any more — incl. old G HUB leftovers)
+                        // blank the orphans: sectors left behind by macro edits/clears
+                        // that nothing references any more (incl. old G HUB leftovers).
+                        // Applying a macro sweeps these automatically — this is the
+                        // manual sweep, so keep it visible instead of surfacing it only
+                        // once slots run low (where nobody can find it).
                         Row {
                             width: parent.width; spacing: 8; topPadding: 4
-                            visible: mouse.macroSlotsFree >= 0 && mouse.macroSlotsFree <= 2
+                            visible: mouse.macroSlotsFree >= 0
                             PillButton {
                                 label: "♻ Free unused slots"
                                 enabled: !mouse.busy
