@@ -26,6 +26,7 @@ import vendors.gamesir.models.g7_8k.led as led8k
 import vendors.gamesir.motion as motion
 import vendors.gamesir.macro as macro
 import vendors.gamesir.config as cfg
+from vendors.gamesir.models.g7pro import protocol as g7pro
 import controller_profile as profiles
 import kf_cache
 import kwin
@@ -184,6 +185,8 @@ class GamesirBridge(QObject):
         self._config = {}               # friendly key -> loaded value
         self._pending = {}              # addr -> {'data','label','display'}
         self._apply_status = ''         # transient Apply read-back result (UI hint)
+        self._g7_dock = None
+        self._g7_dock_loading = False
         self._diag_report = ''          # last diagnostics report text
         self._diag_busy = False
         self._diagDone.connect(self._on_diag_done)
@@ -261,7 +264,8 @@ class GamesirBridge(QObject):
                state['a'], state['b'], state['x'], state['y'],
                state['lb'], state['rb'], state['ls'], state['rs'],
                state['view'], state['menu'],
-               state['l4'], state['r4'], state['m'], state['home'], state['share'])
+               state['l4'], state['l5'], state['r4'], state['r5'],
+               state['m'], state['home'], state['share'])
         if sig != self._input_sig:
             self._input_sig = sig
             self.inputChanged.emit()
@@ -275,6 +279,9 @@ class GamesirBridge(QObject):
             self._apply_profile(profiles.active())
             self.controllerChanged.emit()
 
+        if state.get('edit_profile') is None and state.get('profile'):
+            state['edit_profile'] = state['profile']
+
         # Driving session changed: a different physical unit's vendor channel is
         # now open (or none). Drop every per-unit cache so nothing from one unit
         # is shown or written against another; the pollers re-read for the newly
@@ -287,9 +294,9 @@ class GamesirBridge(QObject):
             self._reset_device_caches()
 
         sig = (state['connected'], state['mode_ok'], state['battery'],
-               state['charging'], state['profile'], state['led_slot'],
+               state['charging'], state['profile'], state.get('edit_profile'), state['led_slot'],
                state['firmware'], state['controller'], state['wired'],
-               state.get('access'))
+               state.get('access'), state.get('config_claimed'), state.get('config_status'))
         if sig != self._status_sig:
             self._status_sig = sig
             self.statusChanged.emit()
@@ -316,6 +323,8 @@ class GamesirBridge(QObject):
         self._loaded_profile = None
         self._config_loading = None
         self._config = {}
+        self._g7_dock = None
+        self._g7_dock_loading = False
         if self._pending:
             self._pending = {}
             self.pendingChanged.emit()
@@ -576,7 +585,7 @@ class GamesirBridge(QObject):
             return          # reader hasn't bound the selected unit's vendor
                             # session yet (or an evdev model, e.g. G7, that has no
                             # vendor read channel): don't read/attribute its regs
-        prof = state['profile']
+        prof = state.get('edit_profile') or state['profile']
         bank = self._prof.profile_bank(prof)
         if (bank is not None and prof != self._loaded_profile
                 and self._config_loading is None):
@@ -584,13 +593,38 @@ class GamesirBridge(QObject):
             if self._pending:
                 self._pending = {}
                 self.pendingChanged.emit()
-            reqs = [(bank, addr, ln) for addr, ln in self._prof.read_fields()]
-            reqs += [(bank, addr, 2) for _n, addr in self._prof.REMAP_SLOTS]
+            if self._prof is profiles.G7_PRO:
+                reqs = g7pro.blob_requests(bank)
+                if self._g7_dock is None and not self._g7_dock_loading:
+                    reqs += g7pro.blob_requests(0x20, g7pro.DOCK_BLOB_SIZE)
+                    self._g7_dock_loading = True
+            else:
+                reqs = [(bank, addr, ln) for addr, ln in self._prof.read_fields()]
+                reqs += [(bank, addr, 2) for _n, addr in self._prof.REMAP_SLOTS]
             control.request_regs(reqs)
             self._config_loading = bank
 
         bank = self._config_loading
         if bank is None:
+            return
+        if self._prof is profiles.G7_PRO:
+            blob = g7pro.stitch_blob(bank, g7pro.PROFILE_BLOB_SIZE, control.reg_result)
+            if blob is None:
+                return
+            if self._g7_dock is None:
+                dock = g7pro.stitch_blob(0x20, g7pro.DOCK_BLOB_SIZE, control.reg_result)
+                if dock is None:
+                    return
+                self._g7_dock = g7pro.decode_dock(dock)
+                self._g7_dock_loading = False
+            self._config_loading = None
+            cand = g7pro.decode_profile(blob)
+            cand.update(self._g7_dock or {})
+            if self._analog_collapsed(cand):
+                self._loaded_profile = None
+                return
+            self._config = cand
+            self.configLoaded.emit()
             return
         vals = {addr: control.reg_result(bank, addr)
                 for addr, _ln in self._prof.read_fields()}
@@ -728,7 +762,27 @@ class GamesirBridge(QObject):
 
     @Property(int, notify=statusChanged)
     def profile(self):
-        return int(state['profile']) if state['profile'] else 0
+        value = state.get('edit_profile') or state.get('profile')
+        return int(value) if value else 0
+
+    @Property(int, notify=statusChanged)
+    def activeProfile(self):
+        return int(state['profile']) if state.get('profile') else 0
+
+    @Property(bool, notify=statusChanged)
+    def configClaimed(self):
+        return bool(state.get('config_claimed'))
+
+    @Property(str, notify=statusChanged)
+    def configStatus(self):
+        return state.get('config_status') or ''
+
+    @Property(str, notify=statusChanged)
+    def modeMessage(self):
+        if profiles.active() is profiles.G7_NATIVE:
+            return 'Hold MENU (START) + SHARE to switch the controller to XInput mode.'
+        return ('Not in Xbox mode. Use the controller\'s Start / pause buttons '
+                'to switch to Xbox/XInput mode so the app can read it.')
 
     @Property(int, notify=statusChanged)
     def ledSlot(self):
@@ -840,6 +894,18 @@ class GamesirBridge(QObject):
         Cyclone keyframe controls against a model that doesn't have them."""
         return profiles.active().lighting_style if profiles.is_recognized() else 'none'
 
+    @Property(str, notify=controllerChanged)
+    def deviceSettingsStyle(self):
+        return profiles.active().device_settings_style if profiles.is_recognized() else 'none'
+
+    @Property(bool, notify=controllerChanged)
+    def hairThresholdsSupported(self):
+        return bool(profiles.active().supports_hair_thresholds)
+
+    @Property(bool, notify=controllerChanged)
+    def isG7Pro(self):
+        return profiles.is_recognized() and profiles.active() is profiles.G7_PRO
+
     @Property(bool, notify=controllerChanged)
     def hasMotion(self):
         return profiles.is_recognized() and profiles.active().has_motion
@@ -890,15 +956,16 @@ class GamesirBridge(QObject):
                     self._bind_demo(prof)
             return
         if cid and cid != state['selected']:
+            state['config_wanted'] = True
             state['selected'] = cid
 
     # ------------------------------------------------------------------ demo mode
     # One synthetic controller per supported model, so users can browse the whole
     # UI (per-controller pages, capability gating, controller render) with no
     # hardware plugged in. Ordered fully-supported first.
-    # Only the models this app FULLY supports (Cyclone 2 + G7 Pro 8K). The plain
-    # G7 / G7 Pro (evdev-only, no working vendor write channel) are excluded — demo
-    # would imply a config surface the app can't actually drive for them.
+    # The raw-USB G7 Pro is excluded from demo for now because its editor reads
+    # whole 480-byte semantic blobs; the older synthetic-register demo backend
+    # only emulates individual hidraw register reads.
     _DEMO_MODELS = (profiles.CYCLONE, profiles.G7_8K)
 
     @staticmethod
@@ -958,6 +1025,7 @@ class GamesirBridge(QObject):
         state['driving'] = self._demo_id(prof)
         state['controller'] = prof.short
         state['profile'] = 1
+        state['edit_profile'] = 1
         state['firmware'] = 'demo'
 
     @Property(bool, notify=demoModeChanged)
@@ -1428,6 +1496,10 @@ class GamesirBridge(QObject):
 
     @Slot(int, result=str)
     def targetLabel(self, code):
+        if self._prof is profiles.G7_PRO:
+            items = (list(g7pro.GAMEPAD_TARGETS) + list(cfg.KEYBOARD_TARGETS)
+                     + list(g7pro.NUMPAD_TARGETS) + list(g7pro.MOUSE_TARGETS))
+            return dict((c, n) for n, c in items).get(code, '0x%02x' % code)
         return cfg.target_label(code)
 
     @Property('QVariantList', constant=True)
@@ -1435,18 +1507,23 @@ class GamesirBridge(QObject):
         """Rows of {name, code, w} for a keyboard-shaped picker."""
         return cfg.keyboard_rows()
 
-    @Property('QVariantList', constant=True)
+    @Property('QVariantList', notify=controllerChanged)
     def numpadRows(self):
         """Rows of {name, code, w} for the numpad/media/nav picker."""
+        if self._prof is profiles.G7_PRO:
+            return [[{'name': n, 'code': c, 'w': w} for n, c, w in row]
+                    for row in g7pro.NUMPAD_ROWS]
         return cfg.numpad_rows()
 
-    @Property('QVariantList', constant=True)
+    @Property('QVariantList', notify=controllerChanged)
     def mouseTargets(self):
-        return [{'name': n, 'code': c} for n, c in cfg.MOUSE_TARGETS]
+        items = g7pro.MOUSE_TARGETS if self._prof is profiles.G7_PRO else cfg.MOUSE_TARGETS
+        return [{'name': n, 'code': c} for n, c in items]
 
-    @Property('QVariantList', constant=True)
+    @Property('QVariantList', notify=controllerChanged)
     def buttonTargets(self):
-        return [{'name': n, 'code': c} for n, c in cfg.REMAP_TARGETS if c != 0xff]
+        items = g7pro.GAMEPAD_TARGETS if self._prof is profiles.G7_PRO else cfg.REMAP_TARGETS
+        return [{'name': n, 'code': c} for n, c in items if c != 0xff]
 
     @Property(int, notify=controllerChanged)
     def macroMax(self):
@@ -1789,15 +1866,19 @@ class GamesirBridge(QObject):
 
     @Property('QVariantList', notify=pendingChanged)
     def pendingList(self):
-        return [self._pending[a]['label'] + ': ' + self._pending[a]['display']
-                for a in sorted(self._pending)]
+        return [r['label'] + ': ' + r['display']
+                for _key, r in sorted(self._pending.items(), key=lambda item: str(item[0]))]
 
-    def _queue(self, addr, data, label, display):
+    def _queue(self, addr, data, label, display, bank=None, key=None):
         if not profiles.is_recognized():
             return          # unrecognised/absent controller: never write registers
-        if self._prof.profile_bank(state['profile']) is None:
+        edit = state.get('edit_profile') or state.get('profile')
+        if bank is None and self._prof.profile_bank(edit) is None:
             return
-        self._pending[addr] = {'data': list(data), 'label': label, 'display': str(display)}
+        bank = bank if bank is not None else self._prof.profile_bank(edit)
+        pkey = key if key is not None else (bank, addr)
+        self._pending[pkey] = {'addr': addr, 'bank': bank, 'data': list(data),
+                               'label': label, 'display': str(display)}
         self.pendingChanged.emit()
 
     # The write-side slots below no-op when the active profile lacks the field
@@ -1831,12 +1912,14 @@ class GamesirBridge(QObject):
         if side not in self._hair_addr:
             return
         name, data = cfg.HAIR_MODES[index]
+        if self._prof is profiles.G7_PRO:
+            data = [data[0]]
         self._queue(self._hair_addr[side], list(data), side.upper() + ' hair-trigger', name)
 
     @Slot(str, int)
     def setHairMin(self, side, value):
         """Hair-trigger min threshold (byte at the hair block +1)."""
-        if side not in self._hair_addr:
+        if side not in self._hair_addr or not self._prof.supports_hair_thresholds:
             return
         v = max(0, min(100, int(value)))
         self._queue(self._hair_addr[side] + 1, [v], side.upper() + ' hair min', v)
@@ -1844,7 +1927,7 @@ class GamesirBridge(QObject):
     @Slot(str, int)
     def setHairMax(self, side, value):
         """Hair-trigger max threshold (byte at the hair block +2)."""
-        if side not in self._hair_addr:
+        if side not in self._hair_addr or not self._prof.supports_hair_thresholds:
             return
         v = max(0, min(100, int(value)))
         self._queue(self._hair_addr[side] + 2, [v], side.upper() + ' hair max', v)
@@ -1871,7 +1954,8 @@ class GamesirBridge(QObject):
 
     @Property('QVariantList', constant=True)
     def remapTargets(self):
-        return list(cfg.REMAP_ITEMS)
+        targets = self._prof.REMAP_TARGETS if self._prof is profiles.G7_PRO else cfg.REMAP_TARGETS
+        return [cfg.REMAP_NONE] + [name for name, _code in targets]
 
     @Slot(str, str)
     def setRemap(self, source, target):
@@ -1889,6 +1973,51 @@ class GamesirBridge(QObject):
         data = [0x00, 0x00] if code < 0 else [0x01, code & 0xff]
         label = cfg.REMAP_NONE if code < 0 else cfg.target_label(code)
         self._queue(addr, data, 'Rebind ' + source, label)
+
+    @Slot(str, int)
+    def setG7Extra(self, name, value):
+        """Stage one approved G7-only setting using its documented encoding."""
+        if self._prof is not profiles.G7_PRO:
+            return
+        x = self._prof.extras
+        profile = self._prof.profile_bank(state.get('edit_profile') or state.get('profile'))
+        simple = {
+            'vib_trigger_l': (x['VIB_TRIG_L'], max(0, min(100, value))),
+            'vib_trigger_r': (x['VIB_TRIG_R'], max(0, min(100, value))),
+            'st_sensitivity': (x['ST_SENS'], max(0, min(100, value))),
+            'rs_sensitivity': (x['RS_SENS'], max(0, min(100, value))),
+            'st_resolution': (x['ST_RESOLUTION'], 12 - max(8, min(12, value))),
+            'rs_resolution': (x['RS_RESOLUTION'], 12 - max(8, min(12, value))),
+            'st_invert_x': (x['ST_INVERT_X'], 1 if value else 0),
+            'st_invert_y': (x['ST_INVERT_Y'], 1 if value else 0),
+            'rs_invert_x': (x['RS_INVERT_X'], 1 if value else 0),
+            'rs_invert_y': (x['RS_INVERT_Y'], 1 if value else 0),
+            'dpad_swap': (x['DPAD_SWAP'], 1 if value else 0),
+            'dpad_lock': (x['DPAD_LOCK'], 1 if value else 0),
+        }
+        if name in simple:
+            addr, encoded = simple[name]
+            self._config[name] = value
+            self._queue(addr, [encoded], name.replace('_', ' ').title(), value,
+                        bank=profile, key=('g7', profile, name))
+            return
+        if name in ('vib_force_l', 'vib_sync_l', 'vib_force_r', 'vib_sync_r'):
+            side = name[-1]
+            self._config[name] = bool(value)
+            force = bool(self._config.get('vib_force_' + side))
+            sync = bool(self._config.get('vib_sync_' + side))
+            addr = x['VIB_MODE_L' if side == 'l' else 'VIB_MODE_R']
+            encoded = (1 if force else 0) | (2 if sync else 0)
+            self._queue(addr, [encoded], side.upper() + ' trigger Force/Sync',
+                        ('Force ' if force else '') + ('Sync' if sync else ''),
+                        bank=profile, key=('g7', profile, 'vib_flags_' + side))
+            return
+        if name in ('dock_auto', 'dock_brightness'):
+            addr = x['DOCK_AUTO' if name == 'dock_auto' else 'DOCK_BRIGHT']
+            encoded = (1 if value else 0) if name == 'dock_auto' else max(0, min(100, value))
+            self._config[name] = value
+            self._queue(addr, [encoded], name.replace('_', ' ').title(), value,
+                        bank=0x20, key=('g7', 0x20, name))
 
     def _curve_block(self, key, name, intensity=100, points=None):
         """Build the curve block for `key` in the ACTIVE profile's format: a
@@ -1956,11 +2085,13 @@ class GamesirBridge(QObject):
 
     @Slot()
     def applyConfig(self):
-        bank = self._prof.profile_bank(state['profile'])
-        if bank is None:
+        edit = state.get('edit_profile') or state.get('profile')
+        default_bank = self._prof.profile_bank(edit)
+        if default_bank is None:
             return
-        changes = [(a, r['data']) for a, r in self._pending.items()]
-        for addr, data in changes:
+        changes = [(r.get('bank', default_bank), r['addr'], r['data'])
+                   for r in self._pending.values()]
+        for _bank, addr, data in changes:
             self._fold(addr, data)
 
         style = self._prof.write_style     # capture: don't reframe if we switch
@@ -1968,18 +2099,30 @@ class GamesirBridge(QObject):
         self._set_apply_status('Applying…')
         def run():
             written = []
-            for addr, data in changes:
+            for bank, addr, data in changes:
                 # write_reg refuses once the handle is rebound, so a controller
                 # switch mid-Apply drops the remaining edits rather than writing
                 # them to the newly-selected unit.
                 if not control.write_reg(bank, addr, list(data), write_style=style, gen=gen):
                     break
-                written.append((addr, list(data)))
+                expected = list(data)
+                if (self._prof is profiles.G7_PRO and addr in g7pro.TRIGGER_REMAPS
+                        and expected[:2] == [0, 0]):
+                    expected = [0]
+                elif (self._prof is profiles.G7_PRO
+                      and addr in {a for _n, a in g7pro.REMAP_SLOTS}
+                      and expected[:2] == [0, 0]):
+                    expected = [0]
+                written.append((bank, addr, expected))
                 time.sleep(0.03)   # these controllers DROP back-to-back vendor
                                    # commands (a multi-byte curve block right after
                                    # another edit is the classic casualty); pace
                                    # each write like the reset path already does
-            self._verify_applied(bank, written, gen)
+            self._verify_applied(written, gen)
+            if self._prof is profiles.G7_PRO:
+                self._loaded_profile = None
+                if any(bank == 0x20 for bank, _addr, _data in written):
+                    self._g7_dock = None
         threading.Thread(target=run, daemon=True).start()
         self._pending = {}
         self.pendingChanged.emit()
@@ -1988,7 +2131,7 @@ class GamesirBridge(QObject):
         self._apply_status = msg
         self.applyStatusChanged.emit()
 
-    def _verify_applied(self, bank, written, gen):
+    def _verify_applied(self, written, gen):
         """Read every just-written register straight back and compare to what we
         sent — the only way to KNOW an edit landed on the hardware (a write that's
         silently dropped, e.g. the pad not in Xbox mode or a dongle that doesn't
@@ -1999,31 +2142,31 @@ class GamesirBridge(QObject):
             self._set_apply_status('')
             return
         # queue fresh reads (clears any stale cached value for these addrs)
-        control.request_regs([(bank, addr, len(data)) for addr, data in written])
-        pending = {addr for addr, _ in written}
+        control.request_regs([(bank, addr, len(data)) for bank, addr, data in written])
+        pending = {(bank, addr) for bank, addr, _ in written}
         got = {}
         deadline = time.time() + 2.5
         while pending and time.time() < deadline and gen == control.generation():
-            for addr, data in written:
-                if addr in pending:
+            for bank, addr, data in written:
+                if (bank, addr) in pending:
                     r = control.reg_result(bank, addr)
                     if r is not None:
-                        got[addr] = list(r)
-                        pending.discard(addr)
+                        got[(bank, addr)] = list(r)
+                        pending.discard((bank, addr))
             time.sleep(0.04)
 
         ok, bad, unknown = 0, [], 0
-        for addr, data in written:
-            r = got.get(addr)
+        for bank, addr, data in written:
+            r = got.get((bank, addr))
             if r is None:
                 unknown += 1
             elif r[:len(data)] == data:
                 ok += 1
             else:
-                bad.append((addr, data, r[:len(data)]))
+                bad.append((bank, addr, data, r[:len(data)]))
 
         total = len(written)
-        for addr, data, r in bad:
+        for bank, addr, data, r in bad:
             print('[apply] MISMATCH @%s bank%d: wrote %s, read %s'
                   % (self._addr_name(addr), bank,
                      ' '.join('%02x' % b for b in data),
@@ -2164,7 +2307,29 @@ class GamesirBridge(QObject):
     # ------------------------------------------------------------- user actions
     @Slot(int)
     def setProfile(self, n):
-        control.set_profile(n)
+        if n not in self._prof.profile_banks:
+            return
+        if self._prof is profiles.G7_PRO:
+            state['edit_profile'] = n
+            self._loaded_profile = None
+            self._config_loading = None
+            if self._pending:
+                self._pending = {}
+                self.pendingChanged.emit()
+            self.statusChanged.emit()
+        else:
+            state['edit_profile'] = n
+            control.set_profile(n)
+
+    @Slot(bool)
+    def setConfigClaimed(self, claimed):
+        """Claim/release the selected G7 interface; the reader performs cleanup."""
+        if self._prof is not profiles.G7_PRO:
+            return
+        state['config_wanted'] = bool(claimed)
+        state['config_status'] = ('Connecting configuration…' if claimed
+                                  else 'Releasing controller to games…')
+        self.statusChanged.emit()
 
     @Slot()
     def rumbleTest(self):

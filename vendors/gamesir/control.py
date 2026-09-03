@@ -105,6 +105,24 @@ def rumble_test():
 
 
 _g7_seq = 0            # rolling sequence for the G7's enveloped writes
+_g7_seq_lock = threading.Lock()
+
+
+def _send_g7(command, *payload, gen=None, probe=False):
+    """Send one sequenced G7 command through the current claimed USB handle."""
+    global _g7_seq
+    with _g7_seq_lock:
+        _g7_seq = (_g7_seq + 1) & 0xff
+        seq = _g7_seq
+    return send_cmd(0x0F, 0x00, seq, command, *payload, gen=gen, probe=probe)
+
+
+def g7_heartbeat(gen=None):
+    return _send_g7(0x02, 0xF2, 0x00, gen=gen, probe=True)
+
+
+def g7_query_info(selector, gen=None):
+    return _send_g7(0x01, selector, gen=gen, probe=True)
 
 
 def write_reg(bank, addr, data, write_style=None, gen=None):
@@ -135,7 +153,107 @@ def write_reg(bank, addr, data, write_style=None, gen=None):
     g7 = (write_style or profiles.active().write_style) == 'g7'
     chunk_len = 55 if g7 else 48    # inner block caps at 60B (5B header + 55 data)
     with _wseq_lock:
-        return _write_reg_chunks(bank, addr, data, g7, gen, chunk_len)
+        if g7:
+            return _write_g7_safe(bank, addr, list(data), gen)
+        return _write_reg_chunks(bank, addr, data, False, gen, chunk_len)
+
+
+def _g7_addressed(bank, addr, data, gen=None, declared_len=None):
+    """Write addressed bytes, splitting at both packet and register-page edges.
+
+    The receiver drops the continuation of a page-crossing write unless a
+    heartbeat separates the two packets, so each continuation gets the same
+    heartbeat pacing as the hardware-tested protocol client.
+    """
+    data = list(data)
+    pos = 0
+    first = True
+    while pos < len(data) or (first and not data):
+        a = addr + pos
+        room = min(55, 0x100 - (a & 0xff))
+        chunk = data[pos:pos + room]
+        ln = declared_len if first and declared_len is not None else len(chunk)
+        if not _send_g7(0x3C, 0x03, bank, (a >> 8) & 0xff, a & 0xff,
+                        ln, *chunk, gen=gen):
+            return False
+        first = False
+        if not chunk:
+            break
+        pos += len(chunk)
+        time.sleep(0.03)
+        if pos < len(data):
+            if not g7_heartbeat(gen):
+                return False
+            time.sleep(0.03)
+    return True
+
+
+def read_reg_sync(bank, addr, length, gen=None, timeout=2.5):
+    """Queue one read for the reader-owned session and wait for its fresh reply."""
+    request_regs([(bank, addr, length)])
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if gen is not None and gen != generation():
+            return None
+        got = reg_result(bank, addr)
+        if got is not None:
+            return list(got[:length])
+        time.sleep(0.025)
+    return None
+
+
+def _write_g7_safe(bank, addr, data, gen):
+    """Apply G7 firmware quirks while keeping ``write_reg``'s public contract."""
+    from vendors.gamesir.models.g7pro import protocol as g7
+    if gen is not None and gen != generation():
+        return False
+    if not g7_heartbeat(gen):
+        return False
+    time.sleep(0.03)
+
+    # Deadzone writes span neighbouring storage.  Preserve a fresh suffix rather
+    # than replaying capture-time constants and silently reverting another edit.
+    if addr in g7.LONG_SUFFIX and len(data) == 1:
+        suffix = read_reg_sync(bank, addr + 1, g7.LONG_SUFFIX[addr], gen=gen)
+        if suffix is None:
+            return False
+        ok = _g7_addressed(bank, addr, data + suffix, gen)
+    # Swap left-stick/D-pad is the same long-form family and fills one packet.
+    elif addr == 0x002B and data:
+        # Bytes 0x2b and 0x2c are both owned by this toggle; preserve the
+        # collateral range beginning at 0x2d, not a shifted copy beginning at
+        # 0x2c (which would move every neighbouring setting by one byte).
+        suffix = read_reg_sync(bank, addr + 2, 53, gen=gen)
+        if suffix is None:
+            return False
+        val = 1 if data[0] else 0
+        ok = _g7_addressed(bank, addr, [val, val] + suffix, gen)
+    # Unbind uses the allocation length 2 but only one trailing zero byte.
+    elif addr in {a for _n, a in g7.REMAP_SLOTS} and data[:2] == [0, 0]:
+        ok = _g7_addressed(bank, addr, [0], gen, declared_len=2)
+    # Custom mode is selected separately, then initialise its documented
+    # scale/origin bytes and write the three interior points at +4/+6/+8. The
+    # scale write matters on an untouched profile, whose entire curve block can
+    # still be zero; point-only writes would leave the curve marked unconfigured.
+    elif addr in (0x0144, 0x0164, 0x00DC, 0x00F8) and data and data[0] == 3:
+        ok = _g7_addressed(bank, addr, [3, 0], gen, declared_len=1)
+        if ok:
+            if not g7_heartbeat(gen):
+                ok = False
+            else:
+                time.sleep(0.03)
+                ok = _g7_addressed(bank, addr + 1, data[1:4], gen)
+        for off in (4, 6, 8):
+            if ok:
+                if not g7_heartbeat(gen):
+                    ok = False
+                    break
+                time.sleep(0.03)
+                ok = _g7_addressed(bank, addr + off, data[off:off + 2], gen)
+    else:
+        ok = _g7_addressed(bank, addr, data, gen)
+    time.sleep(0.03)
+    return bool(ok and g7_heartbeat(gen))
 
 
 def _write_reg_chunks(bank, addr, data, g7, gen, chunk_len):
@@ -146,8 +264,7 @@ def _write_reg_chunks(bank, addr, data, g7, gen, chunk_len):
         a = addr + i
         inner = (0x03, bank, (a >> 8) & 0xFF, a & 0xFF, len(chunk), *chunk)
         if g7:
-            _g7_seq = (_g7_seq + 1) & 0xFF
-            ok = send_cmd(0x0F, 0x00, _g7_seq, 0x3C, *inner, gen=gen)
+            ok = _send_g7(0x3C, *inner, gen=gen)
         else:
             ok = send_cmd(0x0F, *inner, gen=gen)
         if not ok:
@@ -218,12 +335,16 @@ def pump_reads():
                 cmd = _inflight['cmd']
         elif _read_q:
             bank, addr, length = _read_q.popleft()
-            cmd = (0x0F, 0x04, bank, (addr >> 8) & 0xFF, addr & 0xFF, length)
+            cmd = (bank, addr, length)
             _inflight = {'key': (bank, addr), 'cmd': cmd, 't': now}
     if cmd:
-        send_cmd(*cmd, probe=True)   # reader's own register-read pump: a read,
-                                     # never a state change, so it bypasses the
-                                     # recognized-model guard
+        bank, addr, length = cmd
+        if profiles.active().write_style == 'g7':
+            _send_g7(0x05, 0x04, bank, (addr >> 8) & 0xff, addr & 0xff,
+                     length, probe=True)
+        else:
+            send_cmd(0x0F, 0x04, bank, (addr >> 8) & 0xFF, addr & 0xFF,
+                     length, probe=True)
 
 
 # --- demo mode: answer register reads with defaults (no hardware) -------------

@@ -14,22 +14,19 @@ RS mirror +0x20). Only the block BASE addresses move between models. Likewise th
 curve-block format, hair-trigger modes, trajectory codes and remap TARGET codes
 are shared. So a profile is mostly: {USB PID, a handful of base addresses}.
 
-Two profiles are defined:
+Profiles include:
   * CYCLONE  - GameSir Cyclone 2 (3537:0575 / 3537:100b). Sourced from the
                existing, battle-tested `gamesir_config` so there is a single
                source of truth for the Cyclone and nothing changes for it.
-  * G7       - GameSir G7 (3537:10ba). From the G7 USB-capture RE (see the
-               `g7-protocol-findings` memory).
-
-Runtime wiring (making the bridge apply/read against the active profile, plus
-the G7 write envelope and GIP input parsing) is the next stage; this module is
-the data + detection foundation and is safe to import without touching Cyclone.
+  * G7 Pro   - wired (3537:109b) or dongle (3537:109c), via claimed raw USB.
+  * G7 Pro 8K PC - its separate hidraw register map and feature set.
 """
 
 from dataclasses import dataclass, field
 from typing import Optional
 
 import vendors.gamesir.config as _cy
+from vendors.gamesir.models.g7pro import protocol as _g7
 
 
 # --- shared enums / block formats (identical across the vendor family) -------
@@ -69,6 +66,7 @@ class ControllerProfile:
                                            # discriminator (the Cyclone uses bcdDevice).
     write_style: str = 'cyclone'           # 'cyclone' bare 0f03 / 'g7' enveloped
     input_style: str = 'cyclone_0x12'      # 'cyclone_0x12' (vendor hidraw) / 'evdev'
+    transport: str = 'hidraw'              # 'hidraw' or claimed vendor-class USB
     dz_wide: bool = False                   # analog stick/trigger deadzones are
                                            # 16-bit big-endian = percent×10 (0..1000,
                                            # the 8K high-rate block) vs 8-bit % (Cyclone)
@@ -95,6 +93,8 @@ class ControllerProfile:
     lighting_style: str = 'none'    # 'cyclone_keyframe' / 'simple_8k' / 'none'
     has_motion: bool = False        # gyro Aim/Tilt config (8K)
     has_macros: bool = False        # per-paddle macro editor
+    supports_hair_thresholds: bool = True
+    device_settings_style: str = 'none'
 
     # vibration
     VIB_L: Optional[int] = None
@@ -285,18 +285,21 @@ CYCLONE = ControllerProfile(
 )
 
 
-# --- G7 : from the G7 USB-capture reverse-engineering ------------------------
-# Config rides the same register protocol as the Cyclone but wrapped in a
-# sequenced envelope (write_style='g7'); input is GIP on the interrupt endpoint.
-# Trigger LT base 0x00cf (RT +0x1c), stick LS base 0x013d (RS +0x20). The block
-# internal offsets match the Cyclone, only the bases differ.
-G7 = ControllerProfile(
-    name='GameSir G7',
-    short='G7',
-    usb_products=(0x10ba,),
+# --- G7 Pro wired / wireless -------------------------------------------------
+# 109b (wired) and 109c (dongle) are configuration-ready vendor interfaces.
+# 100a is a transitional HID identity changed automatically before configuration.
+# 1022 is detected separately so the UI can give the physical Menu+Share mode
+# instruction, but is never written.
+G7_PRO = ControllerProfile(
+    name='GameSir G7 Pro',
+    short='G7 Pro',
+    usb_products=(_g7.PID_WIRED, _g7.PID_DONGLE, _g7.PID_HID),
     write_style='g7',
-    input_style='evdev',
-    profile_banks=(1,),                     # single editable bank observed
+    input_style='g7_usb',
+    transport='usb_vendor',
+    profile_banks=(1, 2, 3, 4),
+    supports_hair_thresholds=False,
+    device_settings_style='g7pro',
     VIB_L=0x0020, VIB_R=0x0021,             # grip vibration L/R
     POLL_RATE=0x0030,                       # report rate (encoding differs)
     LT_DZ_MIN=0x00cf, LT_DZ_MAX=0x00d0,
@@ -305,50 +308,31 @@ G7 = ControllerProfile(
     ST_TRAJ=0x013d, ST_DZ_MIN=0x013f, ST_DZ_MAX=0x0140,
     ST_ADZ_MIN=0x0141, ST_ADZ_MAX=0x0142,
     ST_CURVE=0x0144, RS_OFFSET=0x20,
-    # Button remaps: same stride/target codes as the Cyclone, plus L5/R5 paddles.
-    REMAP_SLOTS=(
-        ('Dpad Up',    0x0042),
-        ('RS',         0x0073),
-        ('A',          0x007a),
-        ('B',          0x0081),
-        ('L4',         0x00b2),
-        ('L5',         0x00b9),
-        ('R4',         0x00c0),
-        ('R5',         0x00c7),
-    ),
-    # G7-only registers, kept here until the editor grows fields for them.
+    REMAP_SLOTS=_g7.REMAP_SLOTS,
+    REMAP_TARGETS=_g7.GAMEPAD_TARGETS,
     extras={
         'VIB_TRIG_L': 0x0022, 'VIB_TRIG_R': 0x0023,   # trigger-motor strength
-        'VIB_MODE_L': 0x0024, 'VIB_MODE_R': 0x0025,   # 0 off/1 force/2 sync
+        'VIB_MODE_L': 0x0024, 'VIB_MODE_R': 0x0025,   # bit0 force / bit1 sync
         'DPAD_SWAP': 0x002b, 'DPAD_LOCK': 0x002d,
-        'RESOLUTION': 0x0032,                          # 04=12-bit / 00=8-bit
-        'LT_HAIR_MIN': 0x00d9, 'LT_HAIR_MAX': 0x00da,
-        'RT_HAIR_MIN': 0x00f5, 'RT_HAIR_MAX': 0x00f6,
+        'ST_RESOLUTION': 0x0032, 'RS_RESOLUTION': 0x0052,
         'ST_INVERT_X': 0x0151, 'ST_INVERT_Y': 0x0152, 'ST_SENS': 0x0153,
         'RS_INVERT_X': 0x0171, 'RS_INVERT_Y': 0x0172, 'RS_SENS': 0x0173,
         'DOCK_AUTO': 0x01f6, 'DOCK_BRIGHT': 0x01f9,    # bank 0x20
     },
 )
 
-
-# --- G7 Pro : GameSir G7 Pro (3537:1022) ------------------------------------
-# 1022 is the G7 Pro's Linux-default PC/HID identity (HID gamepad on one interface,
-# keyboard/mouse/consumer + a vendor 0xfff0 collection on another). Live input comes
-# over evdev. The config protocol IS reverse-engineered (see RESEARCH.md) — it lives
-# on the pad's *other* identity, the GIP/Xbox 0x10ba face captured as the `G7` profile
-# above. It's left unset HERE because on Linux the pad only ever presents 1022, whose
-# vendor channel is INERT (stalls reads, ignores writes); reaching the config-capable
-# 10ba identity needs a reset-level mode switch Linux can't trigger.
-# NOTE: `G7`(0x10ba) and `G7_PRO`(0x1022) are two USB faces of ONE physical device;
-# collapsing them into a single G7 Pro profile w/ two identities is a pending TODO.
-G7_PRO = ControllerProfile(
+# Wrong-mode identity: detection/help only, deliberately no writable fields.
+G7_NATIVE = ControllerProfile(
     name='GameSir G7 Pro',
     short='G7 Pro',
-    usb_products=(0x1022,),
-    write_style='g7',
+    usb_products=(_g7.PID_NATIVE,),
+    write_style='none',
     input_style='evdev',
-    profile_banks=(1,),
+    profile_banks=(),
 )
+
+# Compatibility name for code/tests that referred to the old misidentified G7.
+G7 = G7_PRO
 
 
 # --- G7 Pro 8K : GameSir G7 Pro 8K (3537:10c7 wired / 3537:10c8 wireless) ----
@@ -484,7 +468,7 @@ G7_8K = ControllerProfile(
 
 
 # --- registry + detection ----------------------------------------------------
-ALL = (CYCLONE, G7, G7_PRO, G7_8K)
+ALL = (CYCLONE, G7_PRO, G7_NATIVE, G7_8K)
 DEFAULT = CYCLONE
 
 

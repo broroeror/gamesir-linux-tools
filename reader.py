@@ -8,7 +8,9 @@ Survives unplugging the cable (it keeps working over the 2.4GHz dongle), mode
 switches, and hidraw node renumbering on re-enumeration.
 """
 
+import errno
 import fcntl
+import math
 import os
 import select
 import struct
@@ -22,6 +24,26 @@ from vendors.gamesir.enhanced import parse_enhanced
 from gs_state import state
 import vendors.gamesir.control as control
 import controller_profile as profiles
+from vendors.gamesir.models.g7pro import protocol as g7pro
+
+
+_active_g7_handle = None
+_g7_transition_last = {}
+_G7_TRANSITION_INTERVAL = 5.0
+_G7_TRANSITION_TIMEOUT = 10.0
+
+
+def release_controller():
+    """Best-effort synchronous release used by the GUI shutdown hook."""
+    global _active_g7_handle
+    state['config_wanted'] = False
+    handle = _active_g7_handle
+    if handle is not None:
+        try:
+            handle.close()
+        except Exception:
+            pass
+        _active_g7_handle = None
 
 
 def _is_wired(prof, pid, bcd):
@@ -35,6 +57,8 @@ def _is_wired(prof, pid, bcd):
         declares which ids are the wired face (an idle dongle reads 0x0575).
       * Cyclone: the controller's own firmware is the 3.x namespace, the dongle's is
         1.x — so a bcdDevice >= 2.0 is the wired controller, below it is the dongle."""
+    if prof is profiles.G7_PRO:
+        return g7pro.connection_kind(pid)
     if prof is not None and prof.wired_products:
         return pid in prof.wired_products
     if prof is profiles.CYCLONE and bcd:
@@ -106,7 +130,7 @@ def _label(ctrl):
     `live` distinguishes a real controller from a plugged-in but EMPTY dongle (which
     otherwise shows as a phantom controller); `wired` drives the connection icon."""
     prof = profiles.detect_one(ctrl['pid'], ctrl.get('product'))
-    bcd = device_bcd(ctrl['nodes'][0]) if ctrl['nodes'] else None
+    bcd = ctrl.get('bcd') or (device_bcd(ctrl['nodes'][0]) if ctrl['nodes'] else None)
     return {'id': ctrl['id'], 'name': prof.short if prof else 'Unknown',
             'port': ctrl['port'], 'pid': ctrl['pid'],
             'live': _probe_live(ctrl, prof),
@@ -170,6 +194,7 @@ def read_session(device, driving_id):
                 continue
             if data[0] == 0x10 and data[1] == 0x0C:     # get-profile reply
                 state['profile'] = data[2]
+                state['edit_profile'] = data[2]
                 continue
             if data[0] == 0x10 and data[1] == 0x05:     # read-register reply
                 bank = data[2]
@@ -242,6 +267,9 @@ def read_controller():
             state['selected'] = None
             state['driving'] = None
             state['access'] = None      # nothing found ≠ found-but-blocked
+            state['edit_profile'] = None
+            state['config_claimed'] = False
+            state['config_status'] = ''
             profiles.set_active(None)   # nothing connected: mark unrecognised
             time.sleep(1.0)
             continue
@@ -250,15 +278,43 @@ def read_controller():
         state['selected'] = sel['id']
         if sel['id'] != last_id:
             state['profile'] = None    # different unit: don't carry the old one's
+            state['edit_profile'] = None
             last_id = sel['id']        # profile number onto it (drives bank select)
         prof = profiles.detect_one(sel['pid'], sel.get('product'))
         profiles.set_active(prof)                      # rest of app follows this
         state['controller'] = prof.short if prof else None
         # Pin the version to THIS physical unit (bcdDevice on one of its nodes),
         # not the first device with this pid — matters with two identical units.
-        _bcd = device_bcd(sel['nodes'][0]) if sel['nodes'] else None
-        state['firmware'] = firmware_version(sel['nodes'][0]) if sel['nodes'] else None
+        _bcd = sel.get('bcd') or (device_bcd(sel['nodes'][0]) if sel['nodes'] else None)
+        state['firmware'] = firmware_version(sel['nodes'][0]) if sel['nodes'] else (
+            f'{_bcd >> 8:x}.{_bcd & 0xff:02x}' if _bcd else None)
         state['wired'] = _is_wired(prof, sel['pid'], _bcd)   # wired / dongle hint
+
+        if prof is profiles.G7_PRO:
+            state['connected'] = True
+            if state.get('config_wanted', True):
+                if sel['pid'] in g7pro.TRANSITION_PIDS:
+                    transition_g7_identity(sel)
+                else:
+                    read_session_g7usb(sel)
+            else:
+                state['config_status'] = 'Released to games'
+                read_session_evdev(sel['id'])
+            if state.get('demo'):
+                continue
+            state['connected'] = False
+            state['mode_ok'] = False
+            time.sleep(0.3)
+            continue
+
+        if prof is profiles.G7_NATIVE:
+            state['connected'] = True
+            state['mode_ok'] = False
+            state['config_status'] = 'Hold MENU (START) + SHARE to switch to XInput mode'
+            read_session_evdev(sel['id'], force_wrong_mode=True)
+            state['connected'] = False
+            time.sleep(0.3)
+            continue
 
         # G7-family: input arrives over evdev (standard gamepad), not a vendor
         # hidraw stream, so read that instead of the Cyclone 0x12 path.
@@ -383,7 +439,7 @@ def _absinfo(fd, code):
     return (mn, mx) if mx > mn else None
 
 
-def read_session_evdev(driving_id):
+def read_session_evdev(driving_id, force_wrong_mode=False):
     """Read one G7-family controller's live input over evdev until it errors, is
     unplugged, or the user selects another controller. Maps standard gamepad
     events into the shared `state` (sticks/triggers normalised to 0..255)."""
@@ -415,12 +471,14 @@ def read_session_evdev(driving_id):
         time.sleep(1.0)
         return
 
-    state['mode_ok'] = True
+    state['mode_ok'] = not force_wrong_mode
     hat = {'x': 0, 'y': 0}
     last_scan = time.time()
     try:
         while True:
             if state.get('demo'):                       # demo mode took over
+                break
+            if profiles.active() is profiles.G7_PRO and state.get('config_wanted'):
                 break
             now = time.time()
             if now - last_scan > 1.0:
@@ -466,6 +524,197 @@ def read_session_evdev(driving_id):
             except OSError:
                 pass
         state['mode_ok'] = False
+
+
+def _connected_age(sysfs):
+    """Seconds since this USB identity enumerated, or None if unavailable."""
+    try:
+        with open(os.path.join(sysfs, 'power', 'connected_duration')) as stream:
+            return int(stream.read().strip()) / 1000.0
+    except (OSError, ValueError):
+        try:
+            return max(0.0, time.time() - os.stat(sysfs).st_ctime)
+        except OSError:
+            return None
+
+
+def transition_g7_identity(ctrl):
+    """Move the G7's 100a HID identity to wired 109b or dongle 109c."""
+    global _active_g7_handle
+    usbmeta = ctrl.get('usb') or {}
+    now = time.monotonic()
+    age = _connected_age(usbmeta.get('sysfs', ''))
+    wait = max(0.0, _g7_transition_last.get(ctrl['id'], 0.0)
+               + _G7_TRANSITION_INTERVAL - now)
+    if age is not None:
+        wait = max(wait, _G7_TRANSITION_INTERVAL - age)
+    deadline = time.monotonic() + wait
+    while time.monotonic() < deadline:
+        if not state.get('config_wanted', True) or state.get('demo'):
+            return False
+        remaining = deadline - time.monotonic()
+        state['config_status'] = (
+            f'Preparing configuration transition… {math.ceil(remaining)}s')
+        time.sleep(min(0.1, max(0.0, remaining)))
+
+    handle = None
+    state['config_status'] = 'Switching controller to configuration identity…'
+    _g7_transition_last[ctrl['id']] = time.monotonic()
+    try:
+        handle = g7pro.open_transition_device(
+            usbmeta['bus'], usbmeta['address'], usbmeta['sysfs'])
+        _active_g7_handle = handle
+        state['config_claimed'] = True
+        state['access'] = 'ok'
+        g7pro.send_handshake(handle)
+    except Exception as exc:
+        state['config_status'] = 'Configuration transition failed: ' + str(exc)
+        state['access'] = ('no-access' if getattr(exc, 'errno', None)
+                           in (errno.EACCES, errno.EPERM) else None)
+        state['config_wanted'] = False
+        return False
+    finally:
+        if handle is not None:
+            try:
+                handle.close()
+            except Exception:
+                pass
+        if _active_g7_handle is handle:
+            _active_g7_handle = None
+        state['config_claimed'] = False
+
+    state['config_status'] = 'Waiting for controller to re-enumerate…'
+    deadline = time.monotonic() + _G7_TRANSITION_TIMEOUT
+    while time.monotonic() < deadline:
+        if not state.get('config_wanted', True) or state.get('demo'):
+            return False
+        devices = _rescan()
+        current = next((item for item in devices if item['id'] == ctrl['id']), None)
+        if current is not None:
+            if current['pid'] in g7pro.CONFIG_PIDS:
+                state['config_status'] = 'Connecting configuration…'
+                return True
+            if current['pid'] == g7pro.PID_NATIVE:
+                state['config_status'] = (
+                    'Hold MENU (START) + SHARE to switch to XInput mode')
+                state['config_wanted'] = False
+                return False
+            if current['pid'] not in g7pro.TRANSITION_PIDS:
+                state['config_status'] = (
+                    f'Controller reappeared with unsupported USB ID '
+                    f'{g7pro.VID:04x}:{current["pid"]:04x}')
+                state['config_wanted'] = False
+                return False
+        time.sleep(0.2)
+    state['config_status'] = (
+        'Timed out waiting for configuration identity 109b or 109c')
+    state['config_wanted'] = False
+    return False
+
+
+def read_session_g7usb(ctrl):
+    """Own a ready G7 vendor interface and multiplex config/live input."""
+    global _active_g7_handle
+    usbmeta = ctrl.get('usb') or {}
+    try:
+        handle = g7pro.open_device(usbmeta['bus'], usbmeta['address'],
+                                   usbmeta['sysfs'])
+    except Exception as exc:
+        state['config_claimed'] = False
+        state['config_status'] = str(exc)
+        state['access'] = ('no-access' if getattr(exc, 'errno', None)
+                           in (errno.EACCES, errno.EPERM) else None)
+        state['mode_ok'] = False
+        state['config_wanted'] = False
+        return
+
+    _active_g7_handle = handle
+    control.set_device(handle)
+    state['driving'] = ctrl['id']
+    state['config_claimed'] = True
+    state['config_status'] = 'Configuring · controller unavailable to games'
+    state['access'] = 'ok'
+    state['edit_profile'] = state.get('edit_profile') or state.get('profile') or 1
+    gen = control.generation()
+    last_heartbeat = last_info = last_scan = 0.0
+    info_toggle = 0
+    session_started = time.monotonic()
+    saw_vendor = False
+    standard_frames = 0
+    telemetry_error = False
+    session_error = False
+    try:
+        for _ in range(3):
+            control.g7_heartbeat(gen)
+            time.sleep(0.05)
+        while state.get('config_wanted', True):
+            if state.get('demo'):
+                break
+            now = time.time()
+            control.pump_reads()
+            if now - last_heartbeat >= 0.45:
+                control.g7_heartbeat(gen)
+                last_heartbeat = now
+            if now - last_info >= 2.0:
+                control.g7_query_info(0x0B if info_toggle == 0 else 0x09, gen)
+                info_toggle ^= 1
+                last_info = now
+            if now - last_scan >= 1.0:
+                last_scan = now
+                ids = [c['id'] for c in _rescan()]
+                if ctrl['id'] not in ids or state.get('selected') not in (None, ctrl['id']):
+                    break
+            report = handle.read(64, timeout_ms=120)
+            if not report:
+                continue
+            if g7pro.is_standard_input(report):
+                standard_frames += 1
+                if (not saw_vendor and standard_frames >= 3
+                        and time.monotonic() - session_started >= 1.5):
+                    telemetry_error = True
+                    state['config_wanted'] = False
+                    state['config_status'] = (
+                        f'USB identity {ctrl["pid"]:04x} returned standard XInput '
+                        'reports instead of configuration telemetry')
+                    break
+                continue
+            if len(report) >= 5 and report[0] == 0x10 \
+                    and report[3] == g7pro.RESPONSE_MARKER:
+                saw_vendor = True
+            if g7pro.parse_input(report, state):
+                continue
+            if len(report) >= 9 and report[0] == 0x10 and report[3] == 0x3C:
+                if report[4] == 0x05:
+                    bank = report[5]
+                    addr = (report[6] << 8) | report[7]
+                    ln = report[8]
+                    control.store_reg_result(bank, addr, list(report[9:9 + ln]))
+                elif report[4] == 0x0C and len(report) > 5:
+                    active = report[5]
+                    if 1 <= active <= 4:
+                        state['profile'] = active
+                        if state.get('edit_profile') is None:
+                            state['edit_profile'] = active
+                elif report[4] == 0x0A:
+                    fw = g7pro.firmware_from_payload(report[5:])
+                    if fw:
+                        state['firmware'] = fw
+    except Exception as exc:
+        session_error = True
+        state['config_wanted'] = False
+        state['config_status'] = 'USB session ended: ' + str(exc)
+    finally:
+        control.clear_device()
+        try:
+            handle.close()
+        except Exception:
+            pass
+        if _active_g7_handle is handle:
+            _active_g7_handle = None
+        state['driving'] = None
+        state['config_claimed'] = False
+        if not state.get('config_wanted') and not telemetry_error and not session_error:
+            state['config_status'] = 'Released to games'
 
 
 # --- press-to-select --------------------------------------------------------

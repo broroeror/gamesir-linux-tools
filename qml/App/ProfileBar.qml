@@ -1,7 +1,7 @@
 import QtQuick
 
-// Profile 1-4 selector. Highlights the controller's *actual* active profile
-// (bridge.profile) and switches on tap (bridge.setProfile).
+// Dynamic profile selector. G7 Pro highlights the bank being edited and marks
+// the independently-reported active hardware profile with a small dot.
 Row {
     id: root
     // Compact mode shrinks the pills ("P1".."P4") so the top bar fits at narrow
@@ -9,7 +9,7 @@ Row {
     property bool compact: false
     spacing: compact ? 5 : 8
     Repeater {
-        model: 4
+        model: bridge.profileCount
         delegate: Rectangle {
             required property int index
             property int n: index + 1
@@ -27,6 +27,13 @@ Row {
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontM
                 font.weight: parent.active ? Font.DemiBold : Font.Normal
+            }
+            Rectangle {
+                visible: bridge.isG7Pro && bridge.activeProfile === parent.n
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom; anchors.bottomMargin: 2
+                width: 5; height: 5; radius: 3
+                color: parent.active ? "white" : Theme.ok
             }
             HoverHandler { id: hov }
             TapHandler { onTapped: bridge.setProfile(parent.n) }

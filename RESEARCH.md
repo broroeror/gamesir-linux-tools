@@ -14,9 +14,9 @@ re-tread them. This is a hobby RE effort; corrections and additions welcome.
 | Controller | USB IDs (VID 0x3537) | Input on Linux | Config editor on Linux | Firmware flash | Verdict |
 |---|---|---|---|---|---|
 | **Cyclone 2** | `0575` / `100b` / `1053` | ✅ vendor `0x12` | ✅ full | ✅ (JieLi BR23) | **Fully supported** |
-| **G7 Pro** | `1022` (PC/HID) · `100a`/`10ba`/`10bb` (Xbox/GIP) | ✅ evdev | ❌ blocked (see below) | — (different chip) | **Input only** |
+| **G7 Pro** | `109b` (wired config) · `109c` (dongle config) · `100a` (transition) · `1022` (native/GIP) | ✅ evdev or claimed USB telemetry | ✅ four profiles + core/extras | — (different chip) | **Supported on 109b/109c** |
 | G7 SE *(not owned)* | `1010` | ✅ mainline `xpad` | n/a | — | Reference only |
-| G7 Pro 8K *(incoming)* | TBD | TBD | *likely ✅* — uses **Connect** | TBD | To be tested |
+| **G7 Pro 8K PC** | `10c5`–`10c8` edition pairs | ✅ vendor `0x12` | ✅ full incl. motion/macros/lights | ❌ | **Fully supported** |
 | 8BitDo *(future)* | — | — | — | — | Not started |
 
 The shared thread: **GameSir's config protocol is a register read/write protocol on
@@ -80,79 +80,42 @@ editor, backup/restore, and reversible firmware up/downgrade.
 
 ---
 
-## GameSir G7 Pro — input works, config blocked (and why)
+## GameSir G7 Pro — configuration over `3537:109b` / `3537:109c`
 
-The G7 Pro was a deep investigation. Short version: **input works on Linux; the config
-editor does not, and can't be made to without host-controller-level work — the reason
-is a USB reset-level personality switch that Linux can't trigger.**
+The earlier “input only” conclusion was based on the controller's `3537:1022`
+native/GIP identity. Holding **MENU (START)+SHARE** together leaves that mode. The
+controller may first enumerate as transitional HID identity `3537:100a`; Deadband
+then sends the official-app `gamesirapp` handshake as five two-character chunks,
+with a flush between chunks, and waits on the same physical USB port for it to
+reappear. The configuration-ready result is `3537:109b` when wired or `3537:109c`
+through the dongle.
 
-> Note: earlier captures/notes in this project labelled "G7" are actually the **G7 Pro**
-> in its Xbox mode — the plain G7 is a separate, older model we don't own.
+On both ready identities interface 0 is vendor class (`0xff`) with interrupt OUT
+`0x02` and IN `0x82`. Linux binds `xpad` to that interface, so configuration
+requires a temporary native libusb claim: Deadband detaches `xpad`, configures the
+controller, and reattaches it on release. The transport binds the system C runtime
+directly and uses no Python USB package. The controller therefore cannot be used by
+a game while Deadband owns the interface; the UI makes this state explicit. A
+20-byte standard XInput stream is rejected as the wrong configuration channel
+instead of being displayed as zeroed battery and controls.
 
-### Two personalities
+Packets are 64 bytes: `0f 00 <seq> <command> ...`. Heartbeat is command `02`,
+writes use `3c`, and chunked reads use `05 04 <category> <offsetHi> <offsetLo>
+<length>`. Replies and the unprompted input/IMU/battery stream share report `0x10`
+and are distinguished by their echoed marker. Each default profile is a 480-byte
+category (`01`–`04`); dock configuration is global category `20`.
 
-The G7 Pro is a **tri-mode** pad (Xbox / PC / mobile-wireless, per its product
-listings), and it presents a *different USB device* depending on the host:
+Deadband exposes all 21 default-layer remap sources, stick/trigger deadzones and
+curves, trajectory, report rate, stick resolution/inversion/sensitivity, four
+vibration motors plus Force/Sync flags, D-pad swap/diagonal lock, and dock power/
+brightness. Long-form deadzone and D-pad writes carry neighbouring register bytes,
+so the app reads and replays a fresh suffix before every such write rather than
+using capture-time constants. Schema-4 backups store only these documented fields.
 
-| Identity | Interface | Where it appears | Config channel |
-|---|---|---|---|
-| `3537:1022` | HID composite (gamepad + vendor `0xfff0`) | **Linux** only (wired *and* 2.4 GHz) — the ETW trace found no `1022` phase on Windows | present but **inert** |
-| `3537:100a` | GIP (Xbox) | Windows, initial | — |
-| `3537:10ba` | GIP (Xbox) | Windows, wired, after handshake | **live** (Nexus configures here) |
-| `3537:10bb` | GIP (Xbox) | Windows, via 2.4 GHz receiver | live |
-
-### The config protocol (fully reverse-engineered)
-
-In its Xbox/GIP mode the G7 Pro speaks the **same register protocol as the Cyclone**,
-wrapped in a sequenced envelope on report `0x0F`, interrupt endpoint `0x02`:
-
-```
-0f 00 <seq> 3c | <inner cmd>          inner = 03/04/… exactly as the Cyclone
-```
-
-From the Nexus captures we mapped the bank-`0x01` register layout — grip/trigger
-vibration, dpad options, report rate, stick resolution, trigger blocks (LT base
-`0x00cf`, RT = `+0x1c`), stick blocks (LS base `0x013d`, RS = `+0x20`), and the 7-byte
-button-remap slots with their target codes (`A=0x09, B=0x0a, X=0x0b, … LT=0x13,
-RT=0x14`). So the protocol is **not** the problem.
-
-### The wall: a reset-level mode fingerprint
-
-The problem is that Linux only ever gets the `1022` "PC/HID" personality, whose vendor
-channel (`hidraw14`, output `0x0F`, input `0x10`/`0x12`) is **inert** — it stalls
-register reads *and* ignores register writes (verified wired and wireless). The
-config-capable GIP mode only appears to Windows. We chased how the pad decides, and
-ruled every accessible mechanism out:
-
-- **Not a replayable command.** `1022` *stalls* the vendor requests the Windows
-  handshake uses, so the `100a→10ba` sequence can't be driven from `1022`.
-- **Not a race window.** `usbmon` of a Linux replug shows `1022` returned at the very
-  first descriptor (address 0) — no transient `100a`.
-- **Not the enumeration scheme.** Toggling `usbcore old_scheme_first` had no effect
-  (Linux already reads the full 64-byte device descriptor first, like Windows).
-- **Not the Microsoft OS descriptor.** The pad *does* carry a `0xEE` MS-OS string
-  descriptor (`MSFT100`, vendor code `0x90`) — a classic mode-switch fingerprint — but
-  an **ETW trace** (which captures the address-0 window USBPcap can't) proved it's a
-  red herring: on Windows the pad is `3537:100a` **from its first descriptor**, with no
-  `1022` phase and **no `0xEE` request anywhere in the trace**.
-- **Not persistent state.** Linux always re-gets `1022`, so it's re-decided each plug-in.
-
-**Conclusion:** the Xbox-vs-PC choice is made *below the descriptor layer* — at the USB
-bus-reset/electrical level, based purely on which host controller performs the reset.
-Nothing in Linux software (userspace or a kernel quirk) can key on it. Only a hardware
-USB analyzer could observe the difference, and a "fix" would be host-controller/firmware
-level — out of scope. **This is a genuine, exhaustively-characterized wall.**
-
-### What works anyway
-
-Input is fully functional over evdev (sticks, buttons, dpad, triggers; the L4/R4/L5/R5
-paddles are firmware-only and need the vendor channel, so they don't surface). And
-because the G7 Pro stores **profiles on the device** (Nexus writes whole profile banks
-— seen in the captures), config set in Nexus on Windows should carry over to Linux,
-since the firmware applies the active profile before it emits HID reports. *(That's how
-on-device profiles work; we haven't specifically A/B-tested a Windows-set change showing
-up on Linux.)* You just can't edit it from Linux. No RGB on this model (confirmed by the
-owner), so there's no lighting gap.
+Not yet exposed: the shared Shift layer, per-button Continuous Trigger, advanced
+directional/mouse stick output, G7 motion configuration, Bluetooth, and the native
+`1022` protocol. Protocol mapping was cross-checked against the Apache-licensed
+`pyg7` research in [questionablesyntax/g7ctl](https://github.com/questionablesyntax/g7ctl).
 
 ---
 
@@ -257,11 +220,10 @@ lighting and captured factory images; addresses and capabilities are profile dat
   settled the G7 Pro question.
 
 **Analysis.** Linux-side decoders and read-only probes were written to unwrap the
-Xbox-mode envelope, decode register writes out of the captures, and poke the `1022`
-vendor channel. Each mode-switch hypothesis above (replayable command, race window,
-enumeration scheme, MS-OS descriptor, unconfigured window) was checked with a small,
-non-destructive experiment and ruled out — the record of those negative results is the
-point of this document.
+Xbox-mode envelope, decode register writes out of the captures, and distinguish the
+`1022`, `100a`, `109b`, and `109c` identities. Comparing official-app traffic
+identified the replayable `gamesirapp` transition handshake used at `100a`; the
+physical MENU (START)+SHARE combination is still required to leave `1022`.
 
 **Decoders & probes (this repo).** All under `research/`, run from the repo root,
 non-destructive unless noted:
@@ -276,9 +238,10 @@ non-destructive unless noted:
 - **Input / mouse-mode:** `gamesir_input_diag.py` (grab evdev nodes one at a time to
   find which one the compositor reads for the cursor), `gamesir_input_map.py` (raw
   input → evdev codes).
-- **G7 Pro mode-switch:** `gamesir_g7pro_probe.py` (read-only vendor-channel probe)
-  plus the `g7pro_msos_*` / `g7pro_modeswitch` / `g7pro_write_test` experiments that
-  ruled out each mode-switch hypothesis above.
+- **G7 Pro identity/transition:** `gamesir_g7pro_probe.py` (read-only vendor-channel
+  probe) plus the `g7pro_msos_*` / `g7pro_modeswitch` / `g7pro_write_test`
+  experiments used to separate physical mode switching from the `100a` software
+  handshake.
 
 The register/config protocol is normal controller configuration, not firmware; these
 tools never touch the bootloader.

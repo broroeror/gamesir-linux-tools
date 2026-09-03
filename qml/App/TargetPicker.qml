@@ -222,14 +222,24 @@ Item {
                 Rectangle {
                     x: 8; y: 70; width: 24; height: 26; radius: 5; color: mouseItem.fill(0xcb)
                     border.color: Theme.cardBorder; border.width: 1
-                    Text { anchors.centerIn: parent; text: "4"; color: Theme.text; font.pixelSize: Theme.fontS }
+                    Text {
+                        anchors.centerIn: parent
+                        text: (bridge.isG7Pro,
+                               bridge.targetLabel(0xcb).replace("Mouse ", ""))
+                        color: Theme.text; font.pixelSize: Theme.fontS
+                    }
                     HoverHandler { onHoveredChanged: mouseItem.hov = hovered ? 0xcb : -1 }
                     TapHandler { onTapped: tp.choose(0xcb) }
                 }
                 Rectangle {
                     x: 8; y: 100; width: 24; height: 26; radius: 5; color: mouseItem.fill(0xcc)
                     border.color: Theme.cardBorder; border.width: 1
-                    Text { anchors.centerIn: parent; text: "5"; color: Theme.text; font.pixelSize: Theme.fontS }
+                    Text {
+                        anchors.centerIn: parent
+                        text: (bridge.isG7Pro,
+                               bridge.targetLabel(0xcc).replace("Mouse ", ""))
+                        color: Theme.text; font.pixelSize: Theme.fontS
+                    }
                     HoverHandler { onHoveredChanged: mouseItem.hov = hovered ? 0xcc : -1 }
                     TapHandler { onTapped: tp.choose(0xcc) }
                 }

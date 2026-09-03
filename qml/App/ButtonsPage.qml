@@ -9,6 +9,8 @@ Item {
     id: page
     property string sel: "A"
     property var localRemap: ({})        // staged overrides shown before Save
+    property bool dpadSwap: false
+    property bool dpadLock: false
 
     function targetCode(src) {                    // -1 = unmapped (Default)
         if (localRemap[src] !== undefined) return localRemap[src]
@@ -23,7 +25,11 @@ Item {
         var m = Object.assign({}, localRemap); m[src] = code; localRemap = m
         bridge.setRemapCode(src, code)
     }
-    Connections { target: bridge; function onConfigLoaded() { page.localRemap = ({}) } }
+    Connections { target: bridge; function onConfigLoaded() {
+        page.localRemap = ({})
+        if (bridge.config.dpad_swap !== undefined) page.dpadSwap = bridge.config.dpad_swap
+        if (bridge.config.dpad_lock !== undefined) page.dpadLock = bridge.config.dpad_lock
+    } }
 
     // Scroll fallback: fills the viewport in a tall window (content stretches to
     // height via the Math.max below), and scrolls vertically once the stacked
@@ -175,6 +181,26 @@ Item {
                         width: parent.width; spacing: 6
                         PillButton { label: "⌨ Keyboard"; onClicked: rebindPicker.open("keyboard") }
                         PillButton { label: "🖱 Mouse";    onClicked: rebindPicker.open("mouse") }
+                    }
+                }
+
+                Card {
+                    visible: bridge.isG7Pro; title: "D-pad options"; Layout.fillWidth: true
+                    Row {
+                        width: parent.width
+                        Text { text: "Swap left stick / D-pad"; color: Theme.textDim }
+                        Item { width: parent.width - 190; height: 1 }
+                        ToggleSwitch { checked: page.dpadSwap
+                            onToggled: { page.dpadSwap = checked
+                                         bridge.setG7Extra("dpad_swap", checked ? 1 : 0) } }
+                    }
+                    Row {
+                        width: parent.width
+                        Text { text: "Diagonal lock"; color: Theme.textDim }
+                        Item { width: parent.width - 120; height: 1 }
+                        ToggleSwitch { checked: page.dpadLock
+                            onToggled: { page.dpadLock = checked
+                                         bridge.setG7Extra("dpad_lock", checked ? 1 : 0) } }
                     }
                 }
 

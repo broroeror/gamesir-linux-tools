@@ -20,7 +20,10 @@ slots+power, or the 8K's flat bank-0x20 'fields'. JSON shape:
     "lighting": { "active_slot": {...}, "slots": {...}, "power": {...} }   # Cyclone
              OR { "fields": { "Light mode": {"addr": "0x0000", "bytes": [1]}, ... } } }  # 8K
 
-Restore reads this schema plus the older schema-1 (addr-keyed) and schema-2.
+G7 Pro schema 4 uses the same envelope but stores decoded, documented settings
+rather than raw register entries or unknown bytes,
+then restores through the same safe semantic write path. Restore also accepts
+the older schema 1-3 formats used by the hidraw controllers.
 """
 
 import json
@@ -36,8 +39,9 @@ from gs_state import state
 import vendors.gamesir.models.g7_8k.led as led8k
 import vendors.gamesir.motion as motion
 import vendors.gamesir.macro as macro
+from vendors.gamesir.models.g7pro import protocol as g7pro
 
-SCHEMA = 3          # 3 adds motion + macros to profiles and model-aware lighting
+SCHEMA = 4          # 4 adds semantic G7 Pro profiles + global dock settings
                     # (8K = flat 'fields'); restore still reads schema 1 and 2.
 DEVICE_FAMILY = 'GameSir'      # for messages; the snapshot stores the exact model
 LED_SLOTS = (0, 1, 2, 3, 4)
@@ -111,6 +115,8 @@ def export_async(path, on_progress=None, on_done=None):
     """Queue every snapshot read, wait for the replies, build the JSON image and
     write it to `path`. Runs on a daemon thread. on_progress(done, total) fires as
     replies arrive; on_done(ok, message) fires once at the end."""
+    if ctrl.active() is ctrl.G7_PRO:
+        return _export_g7_async(path, on_progress, on_done)
     reqs = _all_requests()
     keys = [(bank, addr) for bank, addr, _ln in reqs]
     total = len(keys)
@@ -170,6 +176,50 @@ def export_async(path, on_progress=None, on_done=None):
     threading.Thread(target=run, daemon=True).start()
 
 
+def _export_g7_async(path, on_progress=None, on_done=None):
+    """Export only documented G7 settings; retain no unknown blob bytes."""
+    reqs = []
+    for bank in ctrl.G7_PRO.profile_banks:
+        reqs += g7pro.blob_requests(bank)
+    reqs += g7pro.blob_requests(0x20, g7pro.DOCK_BLOB_SIZE)
+    total = len(reqs)
+
+    def run():
+        control.request_regs(reqs)
+        deadline = time.time() + READ_TIMEOUT
+        while time.time() < deadline:
+            done = sum(control.reg_result(b, a) is not None for b, a, _ln in reqs)
+            if on_progress:
+                on_progress(done, total)
+            if done == total:
+                break
+            time.sleep(0.1)
+        profiles = {}
+        for bank in ctrl.G7_PRO.profile_banks:
+            blob = g7pro.stitch_blob(bank, g7pro.PROFILE_BLOB_SIZE, control.reg_result)
+            if blob is None:
+                if on_done: on_done(False, 'Timed out reading G7 Pro profile data.')
+                return
+            profiles[str(bank)] = g7pro.decode_profile(blob)
+        dock_blob = g7pro.stitch_blob(0x20, g7pro.DOCK_BLOB_SIZE, control.reg_result)
+        if dock_blob is None:
+            if on_done: on_done(False, 'Timed out reading G7 Pro dock settings.')
+            return
+        data = {'schema': 4, 'device': ctrl.G7_PRO.name,
+                'exported': datetime.now().isoformat(timespec='seconds'),
+                'profiles': profiles, 'device_settings': g7pro.decode_dock(dock_blob),
+                'lighting': {}}
+        try:
+            with open(path, 'w') as fh:
+                json.dump(data, fh, indent=2)
+        except OSError as exc:
+            if on_done: on_done(False, f'Could not write file: {exc}')
+            return
+        if on_done: on_done(True, f'Saved G7 Pro snapshot to {path}')
+
+    threading.Thread(target=run, daemon=True).start()
+
+
 def _entry(addr, byts):
     """A labelled backup entry: keeps the raw register address + bytes so restore
     stays exact, while the dict key (the field name) makes the file readable."""
@@ -219,7 +269,7 @@ def load(path):
     older schema-1 (addr-keyed) layout."""
     with open(path) as fh:
         data = json.load(fh)
-    if not isinstance(data, dict) or data.get('schema') not in (1, 2, 3):
+    if not isinstance(data, dict) or data.get('schema') not in (1, 2, 3, 4):
         raise ValueError(f'Not a {DEVICE_FAMILY} backup (schema 1-{SCHEMA})')
     if 'profiles' not in data or 'lighting' not in data:
         raise ValueError('Backup is missing profiles/lighting')
@@ -258,6 +308,104 @@ def _writes_from(data):
         if 'active_slot' in lighting:
             sel = lighting['active_slot']
             writes.append((led.LED_BANK, int(sel['addr'], 16), list(sel['bytes'])))
+    return writes
+
+
+def _g7_writes_from(data):
+    """Validate schema-4 semantic data and turn only documented fields into writes."""
+    if data.get('device') != ctrl.G7_PRO.name:
+        raise ValueError('G7 Pro backup does not match the connected controller')
+    p = ctrl.G7_PRO
+    x = p.extras
+    writes = []
+
+    def byte(obj, key, lo=0, hi=100):
+        value = obj.get(key)
+        if isinstance(value, bool) or not isinstance(value, int) or not lo <= value <= hi:
+            raise ValueError(f'invalid G7 Pro backup value for {key}')
+        return value
+
+    scalar = {
+        'vib_l': p.VIB_L, 'vib_r': p.VIB_R, 'poll': p.POLL_RATE,
+        'st_traj': p.ST_TRAJ, 'rs_traj': p.RS_TRAJ,
+        'st_dz_min': p.ST_DZ_MIN, 'st_dz_max': p.ST_DZ_MAX,
+        'st_adz_min': p.ST_ADZ_MIN, 'st_adz_max': p.ST_ADZ_MAX,
+        'rs_dz_min': p.RS_DZ_MIN, 'rs_dz_max': p.RS_DZ_MAX,
+        'rs_adz_min': p.RS_ADZ_MIN, 'rs_adz_max': p.RS_ADZ_MAX,
+        'lt_dz_min': p.LT_DZ_MIN, 'lt_dz_max': p.LT_DZ_MAX,
+        'lt_adz_min': p.LT_ADZ_MIN, 'lt_adz_max': p.LT_ADZ_MAX,
+        'rt_dz_min': p.RT_DZ_MIN, 'rt_dz_max': p.RT_DZ_MAX,
+        'rt_adz_min': p.RT_ADZ_MIN, 'rt_adz_max': p.RT_ADZ_MAX,
+        'vib_trigger_l': x['VIB_TRIG_L'], 'vib_trigger_r': x['VIB_TRIG_R'],
+        'st_sensitivity': x['ST_SENS'], 'rs_sensitivity': x['RS_SENS'],
+    }
+    for bank in p.profile_banks:
+        obj = data.get('profiles', {}).get(str(bank))
+        if not isinstance(obj, dict):
+            raise ValueError(f'G7 Pro backup is missing profile {bank}')
+        for key, addr in scalar.items():
+            hi = 2 if key == 'poll' else (1 if key.endswith('_traj') else 100)
+            value = byte(obj, key, 0, hi)
+            if key.startswith('vib_') and key not in ('vib_force_l', 'vib_force_r') \
+                    and value not in (0, 25, 50, 75, 100):
+                raise ValueError(f'{key} must be one of 0/25/50/75/100')
+            writes.append((bank, addr, [value]))
+        for side, addr in (('lt', p.LT_HAIR), ('rt', p.RT_HAIR)):
+            idx = byte(obj, side + '_hair', 0, 2)
+            writes.append((bank, addr, [[0x00, 0x81, 0x82][idx]]))
+        for side, addr in (('st', p.ST_CURVE), ('rs', p.RS_CURVE),
+                           ('lt', p.LT_CURVE), ('rt', p.RT_CURVE)):
+            curve = obj.get(side + '_curve')
+            if not isinstance(curve, dict) or not isinstance(curve.get('points'), list) \
+                    or len(curve['points']) != 3:
+                raise ValueError(f'invalid {side} curve in G7 Pro backup')
+            typ = byte(curve, 'type', 0, 3)
+            intensity = byte(curve, 'intensity', 0, 100)
+            if intensity not in (0, 100):
+                raise ValueError(f'invalid {side} curve scale')
+            flat = []
+            for point in curve['points']:
+                if not isinstance(point, list) or len(point) != 2:
+                    raise ValueError(f'invalid {side} curve point')
+                flat += [int(point[0]), int(point[1])]
+            if any(v < 0 or v > 255 for v in flat):
+                raise ValueError(f'invalid {side} curve point')
+            writes.append((bank, addr, [typ, intensity, 0, 0] + flat))
+        for side in ('st', 'rs'):
+            resolution = byte(obj, side + '_resolution', 8, 12)
+            writes.append((bank, x[side.upper() + '_RESOLUTION'], [12 - resolution]))
+            for axis in ('x', 'y'):
+                key = side + '_invert_' + axis
+                if not isinstance(obj.get(key), bool):
+                    raise ValueError(f'invalid {key}')
+                writes.append((bank, x[side.upper() + '_INVERT_' + axis.upper()],
+                               [1 if obj[key] else 0]))
+        for side in ('l', 'r'):
+            force, sync = obj.get('vib_force_' + side), obj.get('vib_sync_' + side)
+            if not isinstance(force, bool) or not isinstance(sync, bool):
+                raise ValueError('invalid trigger vibration flags')
+            writes.append((bank, x['VIB_MODE_' + side.upper()],
+                           [(1 if force else 0) | (2 if sync else 0)]))
+        for key, addr in (('dpad_swap', x['DPAD_SWAP']), ('dpad_lock', x['DPAD_LOCK'])):
+            if not isinstance(obj.get(key), bool):
+                raise ValueError(f'invalid {key}')
+            writes.append((bank, addr, [1 if obj[key] else 0]))
+        remaps = obj.get('remap')
+        if not isinstance(remaps, dict):
+            raise ValueError('G7 Pro backup is missing remaps')
+        for name, addr in p.REMAP_SLOTS:
+            code = remaps.get(name)
+            if isinstance(code, bool) or not isinstance(code, int) or not -1 <= code <= 255:
+                raise ValueError(f'invalid remap for {name}')
+            writes.append((bank, addr, [0, 0] if code < 0 else [1, code]))
+    dock = data.get('device_settings')
+    if not isinstance(dock, dict) or not isinstance(dock.get('dock_auto'), bool):
+        raise ValueError('G7 Pro backup is missing dock settings')
+    brightness = byte(dock, 'dock_brightness')
+    if brightness not in (0, 25, 50, 75, 100):
+        raise ValueError('dock brightness must be one of 0/25/50/75/100')
+    writes += [(0x20, x['DOCK_AUTO'], [1 if dock['dock_auto'] else 0]),
+               (0x20, x['DOCK_BRIGHT'], [brightness])]
     return writes
 
 
@@ -325,6 +473,11 @@ def apply_backup(data, on_progress=None, on_done=None):
 
     Raises ValueError (before spawning the worker) on a backup whose write plan
     escapes the controller's known register map -- see _validate_writes."""
+    if data.get('schema') == 4:
+        if ctrl.active() is not ctrl.G7_PRO:
+            raise ValueError('schema-4 backup requires a connected G7 Pro')
+        writes = _g7_writes_from(data)
+        return _apply_g7_backup(data, writes, on_progress, on_done)
     writes = _writes_from(data)
     _validate_writes(writes)
     units = _expand_units(writes)
@@ -396,5 +549,45 @@ def apply_backup(data, on_progress=None, on_done=None):
             else:
                 on_done(False, f'Restored {len(confirmed)}/{total}; {len(pending)} '
                                'blocks could not be confirmed - click Restore again.')
+
+    threading.Thread(target=run, daemon=True).start()
+
+
+def _apply_g7_backup(data, writes, on_progress=None, on_done=None):
+    """Restore documented fields once, then verify from fresh full blobs."""
+    total = len(writes)
+
+    def run():
+        gen = control.generation()
+        for index, (bank, addr, byts) in enumerate(writes):
+            if not control.write_reg(bank, addr, byts, write_style='g7', gen=gen):
+                if on_done: on_done(False, f'G7 Pro restore stopped at {index}/{total}.')
+                return
+            if on_progress: on_progress(index + 1, total)
+        reqs = []
+        for bank in ctrl.G7_PRO.profile_banks:
+            reqs += g7pro.blob_requests(bank)
+        reqs += g7pro.blob_requests(0x20, g7pro.DOCK_BLOB_SIZE)
+        control.request_regs(reqs)
+        deadline = time.time() + READ_TIMEOUT
+        while time.time() < deadline:
+            if gen != control.generation():
+                break
+            if all(control.reg_result(b, a) is not None for b, a, _ln in reqs):
+                break
+            time.sleep(0.1)
+        mismatches = []
+        for bank in ctrl.G7_PRO.profile_banks:
+            blob = g7pro.stitch_blob(bank, g7pro.PROFILE_BLOB_SIZE, control.reg_result)
+            if blob is None or g7pro.decode_profile(blob) != data['profiles'][str(bank)]:
+                mismatches.append(f'profile {bank}')
+        dock_blob = g7pro.stitch_blob(0x20, g7pro.DOCK_BLOB_SIZE, control.reg_result)
+        if dock_blob is None or g7pro.decode_dock(dock_blob) != data['device_settings']:
+            mismatches.append('dock settings')
+        if on_done:
+            if mismatches:
+                on_done(False, 'G7 Pro restore could not verify: ' + ', '.join(mismatches))
+            else:
+                on_done(True, 'Restored and verified all four G7 Pro profiles and dock settings.')
 
     threading.Thread(target=run, daemon=True).start()
