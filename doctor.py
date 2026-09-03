@@ -30,6 +30,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # vendors we care about: GameSir controllers + the Logitech mouse work
 VENDOR_NAMES = {0x3537: 'GameSir', 0x046D: 'Logitech'}
 
+G7_IDENTITIES = {
+    0x109B: 'wired configuration',
+    0x109C: 'dongle configuration',
+    0x100A: 'HID transition',
+    0x1022: 'native/GIP',
+}
+
 UDEV_RULES = {
     'GameSir': ('/etc/udev/rules.d/70-gamesir.rules',
                 os.path.join(HERE, '70-gamesir.rules')),
@@ -191,6 +198,14 @@ def _version():
         return '?'
 
 
+def _same_file(left, right):
+    try:
+        with open(left, 'rb') as a, open(right, 'rb') as b:
+            return a.read() == b.read()
+    except OSError:
+        return False
+
+
 def collect():
     """Gather the full diagnostic picture (structured)."""
     rep = {
@@ -205,6 +220,7 @@ def collect():
         'hidapi_backend': _hidapi_backend(),
         'rules': {},
         'nodes': [],
+        'usb_devices': [],
         'verdict': [],
     }
     try:
@@ -212,11 +228,18 @@ def collect():
         rep['hidapi_version'] = getattr(hid, '__version__', '?')
     except Exception:
         rep['hidapi_version'] = 'IMPORT FAILED'
+    try:
+        from vendors.gamesir.usb_transport import BACKEND, library_version
+        version = library_version()
+        rep['raw_usb_backend'] = BACKEND + (f' — {version}' if version else ' — unavailable')
+    except Exception:
+        rep['raw_usb_backend'] = 'native libusb-1.0 — unavailable'
 
     for label, (installed, source) in UDEV_RULES.items():
         rep['rules'][label] = {
             'installed': os.path.exists(installed),
             'source_present': os.path.exists(source),
+            'current': _same_file(installed, source),
         }
 
     for n in _sysfs_nodes():
@@ -224,13 +247,28 @@ def collect():
         entry.update(open_ladder(n['node']))
         rep['nodes'].append(entry)
 
+    try:
+        from gs_common import find_controllers
+        for dev in find_controllers():
+            if dev.get('pid') not in G7_IDENTITIES:
+                continue
+            meta = dev.get('usb') or {}
+            node = '/dev/bus/usb/%03d/%03d' % (meta.get('bus', 0), meta.get('address', 0))
+            rep['usb_devices'].append({
+                'pid': dev['pid'], 'identity': G7_IDENTITIES[dev['pid']],
+                'product': dev.get('product', ''), 'port': dev['port'],
+                'node': node, 'access': os.access(node, os.R_OK | os.W_OK),
+            })
+    except Exception:
+        pass
+
     # ---- overall verdicts, most-specific first ----
     gsnodes = [n for n in rep['nodes'] if n['vid'] == 0x3537]
-    if not gsnodes:
+    if not gsnodes and not rep['usb_devices']:
         rep['verdict'].append(
             'No GameSir device is enumerated. If one is plugged in, that is a '
             'kernel/USB-level problem (check `dmesg`), not an app problem.')
-    elif all(n['verdict'] == 'no-access' for n in gsnodes):
+    elif gsnodes and all(n['verdict'] == 'no-access' for n in gsnodes):
         rule = rep['rules'].get('GameSir', {})
         if rep.get('nixos'):
             rep['verdict'].append(
@@ -243,10 +281,10 @@ def collect():
                 f'"{UDEV_RULES["GameSir"][1]}";\n'
                 'then `sudo nixos-rebuild switch` and UNPLUG AND REPLUG the '
                 'controller.')
-        elif not rule.get('installed'):
+        elif not rule.get('installed') or not rule.get('current'):
             rep['verdict'].append(
                 'GameSir device found but NOT openable (permission denied), and '
-                'the udev rule is NOT installed. Fix:\n'
+                'the current udev rule is NOT installed. Fix:\n'
                 f'    sudo cp "{UDEV_RULES["GameSir"][1]}" /etc/udev/rules.d/\n'
                 '    sudo udevadm control --reload-rules && sudo udevadm trigger\n'
                 'then UNPLUG AND REPLUG the controller.')
@@ -282,6 +320,33 @@ def collect():
         rep['verdict'].append(msg)
     elif any(n['verdict'] == 'ok' for n in gsnodes):
         rep['verdict'].append('GameSir device access: OK.')
+    if rep['usb_devices']:
+        ready = [n for n in rep['usb_devices'] if n['pid'] in (0x109B, 0x109C)]
+        transition = [n for n in rep['usb_devices'] if n['pid'] == 0x100A]
+        native = [n for n in rep['usb_devices'] if n['pid'] == 0x1022]
+        if ready:
+            if any(n['access'] for n in ready):
+                kinds = ', '.join(sorted({n['identity'].split()[0] for n in ready}))
+                rep['verdict'].append(
+                    f'G7 Pro {kinds} configuration access: OK.')
+            else:
+                rep['verdict'].append(
+                    'G7 Pro configuration identity found, but raw USB access is '
+                    'denied; install the current 70-gamesir.rules and replug it.')
+        elif transition:
+            if any(n['access'] for n in transition):
+                rep['verdict'].append(
+                    'G7 Pro 100a HID identity found; Deadband can transition it '
+                    'automatically to 109b/109c for configuration.')
+            else:
+                rep['verdict'].append(
+                    'G7 Pro 100a HID identity found, but the automatic transition '
+                    'is blocked by raw USB permissions; install the current '
+                    '70-gamesir.rules and replug it.')
+        elif native:
+            rep['verdict'].append(
+                'G7 Pro 1022 native/GIP identity found. Input is available, but '
+                'configuration requires holding MENU (START) + SHARE together.')
 
     monodes = [n for n in rep['nodes'] if n['vid'] == 0x046D]
     if monodes and all(n['verdict'] == 'no-access' for n in monodes):
@@ -300,9 +365,11 @@ def format_report(rep):
     L.append(f'- Session: {rep["session"]} / {rep["desktop"]}')
     L.append(f'- Python {rep["python"]}, hidapi {rep.get("hidapi_version", "?")} '
              f'— backend: {rep["hidapi_backend"]}')
+    L.append(f'- Raw USB: {rep.get("raw_usb_backend", "?")}')
     for label, r in rep['rules'].items():
-        L.append(f'- udev rule ({label}): '
-                 + ('installed' if r['installed'] else 'NOT INSTALLED'))
+        status = ('NOT INSTALLED' if not r['installed'] else
+                  'installed' if r.get('current') else 'installed, OUTDATED')
+        L.append(f'- udev rule ({label}): {status}')
     L.append('')
     L.append('### Devices')
     if not rep['nodes']:
@@ -314,6 +381,10 @@ def format_report(rep):
         L.append(f'    perms: {n["perms"]}')
         L.append(f'    os.open: {n["os_open"]}   hidapi: {n["hid_open"]}'
                  f'   → {n["verdict"].upper()}')
+    for n in rep.get('usb_devices', []):
+        L.append(f'- {n["node"]}  GameSir {n["pid"]:04x} '
+                 f'({n.get("identity", "unknown")})  "{n["product"]}" port {n["port"]}')
+        L.append('    raw USB access: ' + ('OK' if n['access'] else 'PERMISSION DENIED'))
     L.append('')
     L.append('### Verdict')
     for v in rep['verdict'] or ['Nothing conclusive — attach this report to the issue.']:

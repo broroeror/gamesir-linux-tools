@@ -18,6 +18,10 @@ Item {
     property int curveType: 0          // 0..2 preset, 3 custom
     property int intensity: 100         // preset strength: 100 standard, 0 inverse, 50 linear
     property int typeIdx: 0            // trajectory or hair-mode index
+    property int g7Resolution: 12
+    property int g7Sensitivity: 50
+    property bool g7InvertX: false
+    property bool g7InvertY: false
 
     // The square graph is sized by WIDTH (height==width), so a short+wide window
     // would blow it up past what fits and push the card off-screen. Let the two
@@ -97,6 +101,12 @@ Item {
         intenSlider.value = intensity
         curve.setPoints(cv && cv.points ? cv.points : [[40, 41], [128, 128], [215, 214]])
         typeIdx = isStick ? c[side + "_traj"] : c[side + "_hair"]
+        if (isStick && bridge.isG7Pro) {
+            g7Resolution = c[side + "_resolution"]
+            g7Sensitivity = c[side + "_sensitivity"]
+            g7InvertX = c[side + "_invert_x"]
+            g7InvertY = c[side + "_invert_y"]
+        }
         if (!isStick) {                       // hair-trigger min/max thresholds
             if (c[side + "_hair_min"] !== undefined) hairRange.lo = c[side + "_hair_min"]
             if (c[side + "_hair_max"] !== undefined) hairRange.hi = c[side + "_hair_max"]
@@ -207,7 +217,9 @@ Item {
                 // S-curve). 100 = standard, 50 = linear, 0 = inverse.
                 Column {
                     width: parent.width; spacing: 6; topPadding: 6
-                    visible: root.curveType === 1 || root.curveType === 2
+                    // G7 stores byte +1 as a fixed curve scale/configured marker,
+                    // not the Cyclone/8K adjustable-intensity field.
+                    visible: !bridge.isG7Pro && (root.curveType === 1 || root.curveType === 2)
                     Row {
                         width: parent.width
                         Text { text: "Intensity"; color: Theme.textDim
@@ -253,7 +265,7 @@ Item {
                 // Adjustable min/max thresholds — only meaningful for Adaptive/Fixed.
                 Column {
                     width: parent.width; spacing: 6; topPadding: 6
-                    visible: !root.isStick && root.typeIdx !== 0
+                    visible: !root.isStick && root.typeIdx !== 0 && bridge.hairThresholdsSupported
                     Row {
                         width: parent.width
                         Text { text: "Threshold"; color: Theme.textDim
@@ -268,6 +280,46 @@ Item {
                         onMoved: { bridge.setHairMin(root.side, lo)
                                    bridge.setHairMax(root.side, hi) }
                     }
+                }
+            }
+
+            Card {
+                visible: root.isStick && bridge.isG7Pro
+                title: "Stick hardware"; Layout.fillWidth: true
+                Text { text: "Resolution"; color: Theme.textDim; font.family: Theme.fontFamily }
+                Flow {
+                    width: parent.width; spacing: 6
+                    Repeater {
+                        model: [8, 9, 10, 11, 12]
+                        delegate: PillButton {
+                            required property int modelData; label: modelData + "-bit"
+                            highlight: root.g7Resolution === modelData
+                            onClicked: { root.g7Resolution = modelData
+                                         bridge.setG7Extra(root.side + "_resolution", modelData) }
+                        }
+                    }
+                }
+                Row {
+                    spacing: 14
+                    Row { spacing: 6; Text { text: "Invert X"; color: Theme.textDim }
+                        ToggleSwitch { checked: root.g7InvertX
+                            onToggled: { root.g7InvertX = checked
+                                         bridge.setG7Extra(root.side + "_invert_x", checked ? 1 : 0) } } }
+                    Row { spacing: 6; Text { text: "Invert Y"; color: Theme.textDim }
+                        ToggleSwitch { checked: root.g7InvertY
+                            onToggled: { root.g7InvertY = checked
+                                         bridge.setG7Extra(root.side + "_invert_y", checked ? 1 : 0) } } }
+                }
+                Row {
+                    width: parent.width
+                    Text { text: "X / Y sensitivity"; color: Theme.textDim }
+                    Item { width: parent.width - 150; height: 1 }
+                    Text { text: root.g7Sensitivity + "%"; color: Theme.text }
+                }
+                AccentSlider {
+                    width: parent.width; from: 0; to: 100; value: root.g7Sensitivity
+                    onMoved: { root.g7Sensitivity = Math.round(value)
+                               bridge.setG7Extra(root.side + "_sensitivity", root.g7Sensitivity) }
                 }
             }
 

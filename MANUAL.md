@@ -1,4 +1,4 @@
-# GameSir Cyclone 2 (Linux) — Manual
+# Deadband — Linux device configuration manual
 
 The user guide for the **[GameSir Cyclone 2 Linux app](README.md)**: how to use each
 feature, how to get out of trouble, and the questions that tend to come up. For
@@ -14,9 +14,12 @@ the app's architecture, and reverse-engineering findings, see
 
 ## Using the app
 
-Launch it from your app menu as **Deadband**, or run `deadband` from
-a terminal. Everything below assumes the controller is connected and in **Xbox mode**
-(use the Start / pause buttons) — the header shows a warning until it is.
+Launch it from your app menu as **Deadband**, or run `deadband` from a terminal.
+Everything below assumes the controller is connected and in **Xbox / XInput
+mode**. A G7 Pro at `3537:100a` is transitioned automatically to wired `3537:109b`
+or dongle `3537:109c`. If it shows `3537:1022`, hold **MENU (START)+SHARE**
+together; use the Start / pause mode control on the other supported GameSir
+controllers. The header shows a warning until the expected identity is available.
 
 ### Live input view
 
@@ -29,8 +32,8 @@ confirm a control works — and to watch a config change take effect as you make
 
 The controller stores **four profiles**. The app shows the active one and lets you
 switch between them (1–4); a **rumble test** button fires both motors so you can
-check your vibration settings. Switching here is the same as the on-controller
-gesture.
+check your vibration settings. On the G7 Pro, the pills choose which stored bank
+to edit without changing the profile currently active on the controller.
 
 ### Lighting
 
@@ -55,8 +58,8 @@ Tune how the sticks and triggers behave, per profile:
 - **Vibration** — left / right motor strength.
 - **Poll rate.**
 
-Edits read the active profile's current values and **write live** — there's no Apply
-step, changes persist to the controller immediately. Take a **backup** first if
+Edits read the selected profile's current values and are staged in the pending bar.
+Choose **Apply** to persist the batch to the controller. Take a **backup** first if
 you're experimenting (see below).
 
 ### Button remap
@@ -66,13 +69,14 @@ restore the default. Remaps are part of the profile, so a backup captures them.
 
 ### Backup / Restore
 
-**Backup / Restore → Export** snapshots **all four profiles + lighting** to a JSON
-file (default name `gamesir_backup_<date>.json`). To restore, pick that file — an
+**Backup / Restore → Export** snapshots **all four profiles + device settings** to a JSON
+file (default name `deadband_<model>_<timestamp>.json`). To restore, pick that file — an
 inline **"Write loaded backup to controller"** button appears; it writes every block
 back, reads it back to confirm, re-sends anything that didn't take, and reports a
-clear pass/fail. Only the active profile + lighting are guaranteed — the stored
-profiles 2–4 are read-only on this controller (the status line says so). Think of
-this as your undo button: snapshot before experimenting, restore to return.
+clear pass/fail. The G7 Pro backup is semantic: it contains only the settings the
+app understands, including its dock settings, and can address all four banks
+directly. Think of this as your undo button: snapshot before experimenting,
+restore to return.
 
 ### Mouse-mode toggle
 
@@ -88,16 +92,18 @@ udev rule isn't applying, or the compositor grabbed the sticks. Start here.
 
 ### The app can't see the controller ("not connected" / empty input)
 
-- **Is it in Xbox / XInput mode?** Use the Start / pause buttons. The vendor channel
-  only exists in Xbox mode; in PS4/DS4 and Switch modes the `0x12` stream reads
-  all-zero and the header shows the mode warning. This is the most common cause.
+- **Is it in Xbox / XInput mode?** A G7 Pro at `3537:100a` transitions
+  automatically. For `3537:1022`, hold **MENU (START)+SHARE** together to expose
+  wired `3537:109b` or dongle `3537:109c`. Use the Start / pause mode control for
+  the other supported GameSir controllers. The header shows the appropriate warning.
 - **Is the udev rule installed and applied?** From the repo directory:
   ```sh
   sudo cp 70-gamesir.rules /etc/udev/rules.d/
   sudo udevadm control --reload-rules && sudo udevadm trigger
   ```
-  Then confirm your ACL landed: `getfacl /dev/hidraw0` should show a
-  `user:<you>:rw-` line.
+  Unplug and replug the controller, then confirm its node has a `user:<you>:rw-`
+  ACL. G7 Pro configuration uses `/dev/bus/usb/BBB/DDD`; other models use
+  `/dev/hidrawN`.
 - **Filename-ordering gotcha.** The rule must sort *before* `73-seat-late.rules`
   (the rule that actually applies the `uaccess` ACL). The shipped `70-` prefix is
   correct — don't renumber it to `73`+, or the ACL is silently never granted.
@@ -109,10 +115,10 @@ udev rule isn't applying, or the compositor grabbed the sticks. Start here.
 
 ### The "not in Xbox mode" warning won't clear
 
-The controller is in PS4/DS4 or Switch mode, where the vendor protocol is inert.
-Use the Start / pause buttons to switch to Xbox mode; the warning clears once the
-`0x12` stream carries live data. Mode switching is a hardware button combo (a full
-USB re-enumeration), not something the app can send for you.
+The controller is using an identity where its supported configuration protocol is
+unavailable. On a G7 Pro, Deadband automatically handles `3537:100a`; for
+`3537:1022`, hold **MENU (START)+SHARE** together to reach wired `3537:109b` or
+dongle `3537:109c`. On the other controllers, use the Start / pause mode control.
 
 ### Settings don't stick, or a restore reports unconfirmed blocks
 

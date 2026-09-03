@@ -40,19 +40,22 @@ missing=()
 command -v python3 >/dev/null || missing+=("python")
 python3 -c 'import PySide6' 2>/dev/null || missing+=("pyside6")
 python3 -c 'import hid'     2>/dev/null || missing+=("python-hidapi")
+python3 -c 'import ctypes.util; assert ctypes.util.find_library("usb-1.0")' \
+  2>/dev/null || missing+=("libusb")
 if [ ${#missing[@]} -ne 0 ]; then
   echo
   echo "==> Missing dependencies: ${missing[*]}"
   if command -v pacman >/dev/null; then
     echo "    These can be installed with (uses sudo):"
-    echo "        sudo pacman -S --needed python pyside6 python-hidapi"
+    echo "        sudo pacman -S --needed python pyside6 python-hidapi libusb"
     if confirm "    Run that now?"; then
-      sudo pacman -S --needed python pyside6 python-hidapi
+      sudo pacman -S --needed python pyside6 python-hidapi libusb
     else
       echo "    Skipped. Install them yourself, then re-run this script."; exit 1
     fi
   else
-    echo "   Install PySide6 and hidapi for Python 3, then re-run this script:"
+    echo "   Install the system libusb-1.0 runtime plus PySide6 and hidapi for"
+    echo "   Python 3, then re-run this script:"
     echo "       pip install --user PySide6"
     echo "       HIDAPI_WITH_HIDRAW=1 pip install --user --no-binary :all: hidapi"
     echo "   (The HIDAPI_WITH_HIDRAW=1 matters: pip's source build DEFAULTS to the"
@@ -97,7 +100,8 @@ esac
 
 # 2. udev rule (one-time sudo, optional) -----------------------------------
 RULE_OK=1
-if [ ! -f /etc/udev/rules.d/70-gamesir.rules ]; then
+if [ ! -f /etc/udev/rules.d/70-gamesir.rules ] || \
+   ! cmp -s "$REPO/70-gamesir.rules" /etc/udev/rules.d/70-gamesir.rules; then
   echo
   echo "==> Controller access (udev rule)"
   echo "    To open the controller without running the app as root, one file is"
@@ -108,7 +112,7 @@ if [ ! -f /etc/udev/rules.d/70-gamesir.rules ]; then
   if confirm "    Run these now?"; then
     if sudo cp "$REPO/70-gamesir.rules" /etc/udev/rules.d/ \
        && sudo udevadm control --reload-rules && sudo udevadm trigger; then
-      echo "    Installed."
+      echo "    Installed. Unplug and replug the controller once before use."
     else
       RULE_OK=0
       echo "    !! udev step failed — continuing without it (see the note below)."
@@ -122,7 +126,7 @@ if [ ! -f /etc/udev/rules.d/70-gamesir.rules ]; then
     echo "      • launch it with sudo (not recommended)."
   fi
 else
-  echo "==> udev rule already installed"
+  echo "==> current udev rule already installed"
 fi
 
 # 3. launcher ---------------------------------------------------------------

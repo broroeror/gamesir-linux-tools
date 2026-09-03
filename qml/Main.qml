@@ -29,7 +29,9 @@ Window {
                 return mouse.profiles[i].label
         return "this profile"
     }
-    readonly property var controllerTabs: ["Rebinds", "Sticks", "Motion", "Triggers", "Vibration", "Lights", "Macros"]
+    readonly property var controllerTabs: bridge.isG7Pro
+        ? ["Rebinds", "Sticks", "Triggers", "Vibration", "Device"]
+        : ["Rebinds", "Sticks", "Motion", "Triggers", "Vibration", "Lights", "Macros"]
     readonly property var mouseTabs: ["Buttons", "DPI", "Macros"]
     readonly property var tabs: activeDevice === "mouse" ? mouseTabs : controllerTabs
     // Card vertical-compression is global (only one page shows at a time); reset it
@@ -77,6 +79,10 @@ Window {
             if (!mouse.present && win.activeDevice === "mouse")
                 win.activeDevice = "controller"
         }
+    }
+    Connections {
+        target: bridge
+        function onControllerChanged() { win.currentTab = 0; Theme.vComp = 1 }
     }
     function setDensity(d) { Theme.density = d; appearance.density = d }
 
@@ -274,6 +280,13 @@ Window {
                 // and the status text ran under the gear. 1320 leaves headroom for the
                 // widest live content.
                 ProfileBar { compact: win.width < 1320; visible: win.activeDevice === "controller" }
+
+                PillButton {
+                    visible: win.activeDevice === "controller" && bridge.isG7Pro
+                    label: bridge.configClaimed ? "Release to games" : "Configure controller"
+                    highlight: bridge.configClaimed
+                    onClicked: bridge.setConfigClaimed(!bridge.configClaimed)
+                }
 
                 // The mouse's own onboard profiles (5 slots, named, stored on the
                 // device). Picking one changes what the pages EDIT; making it the
@@ -560,19 +573,19 @@ Window {
             // Buttons tab (front page): live controller + remap + reset.
             ButtonsPage {
                 anchors.fill: parent
-                visible: win.currentTab === 0
+                visible: win.tabs[win.currentTab] === "Rebinds"
             }
 
             // Vibration tab.
             VibrationPage {
                 anchors.fill: parent
-                visible: win.currentTab === 4
+                visible: win.tabs[win.currentTab] === "Vibration"
             }
 
             // Sticks tab.
             AxisConfigPage {
                 anchors.fill: parent
-                visible: win.currentTab === 1
+                visible: win.tabs[win.currentTab] === "Sticks"
                 isStick: true
                 sideKeys: [["Left Stick", "st"], ["Right Stick", "rs"]]
             }
@@ -580,7 +593,7 @@ Window {
             // Triggers tab.
             AxisConfigPage {
                 anchors.fill: parent
-                visible: win.currentTab === 3
+                visible: win.tabs[win.currentTab] === "Triggers"
                 isStick: false
                 sideKeys: [["Left Trigger", "lt"], ["Right Trigger", "rt"]]
             }
@@ -591,15 +604,15 @@ Window {
             // drive a controller with a different lighting layout.
             LightsPage {
                 anchors.fill: parent
-                visible: win.currentTab === 5 && bridge.lightingStyle === "cyclone_keyframe"
+                visible: win.tabs[win.currentTab] === "Lights" && bridge.lightingStyle === "cyclone_keyframe"
             }
             Lights8kPage {
                 anchors.fill: parent
-                visible: win.currentTab === 5 && bridge.lightingStyle === "simple_8k"
+                visible: win.tabs[win.currentTab] === "Lights" && bridge.lightingStyle === "simple_8k"
             }
             Item {
                 anchors.fill: parent
-                visible: win.currentTab === 5 && bridge.lightingStyle === "none"
+                visible: win.tabs[win.currentTab] === "Lights" && bridge.lightingStyle === "none"
                 Card {
                     anchors.centerIn: parent
                     width: 440
@@ -618,11 +631,11 @@ Window {
             // Macros tab — per-paddle macro editor (Cyclone L4/R4, 8K adds L5/R5).
             MacroPage {
                 anchors.fill: parent
-                visible: win.currentTab === 6 && bridge.hasMacros
+                visible: win.tabs[win.currentTab] === "Macros" && bridge.hasMacros
             }
             Item {
                 anchors.fill: parent
-                visible: win.currentTab === 6 && !bridge.hasMacros
+                visible: win.tabs[win.currentTab] === "Macros" && !bridge.hasMacros
                 Card {
                     anchors.centerIn: parent
                     width: 440
@@ -642,11 +655,11 @@ Window {
             // placeholder for models whose motion isn't reverse-engineered.
             MotionPage {
                 anchors.fill: parent
-                visible: win.currentTab === 2 && bridge.hasMotion
+                visible: win.tabs[win.currentTab] === "Motion" && bridge.hasMotion
             }
             Item {
                 anchors.fill: parent
-                visible: win.currentTab === 2 && !bridge.hasMotion
+                visible: win.tabs[win.currentTab] === "Motion" && !bridge.hasMotion
                 Card {
                     anchors.centerIn: parent
                     width: 440
@@ -658,6 +671,51 @@ Window {
                         color: Theme.textDim
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontM
+                    }
+                }
+            }
+
+            G7DevicePage {
+                anchors.fill: parent
+                visible: win.tabs[win.currentTab] === "Device" && bridge.isG7Pro
+            }
+
+            Rectangle {
+                id: g7ReleasedOverlay
+                anchors.fill: parent; z: 100
+                visible: bridge.isG7Pro && !bridge.configClaimed
+                color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 0.92)
+                readonly property bool claimInProgress:
+                    bridge.configStatus.indexOf("Preparing") === 0
+                    || bridge.configStatus.indexOf("Switching") === 0
+                    || bridge.configStatus.indexOf("Waiting") === 0
+                    || bridge.configStatus.indexOf("Connecting") === 0
+                readonly property bool claimFailed:
+                    bridge.configStatus.length > 0
+                    && bridge.configStatus !== "Released to games"
+                    && bridge.configStatus.indexOf("Releasing") !== 0
+                    && !g7ReleasedOverlay.claimInProgress
+                Card {
+                    anchors.centerIn: parent; width: 460
+                    title: g7ReleasedOverlay.claimInProgress
+                           ? "Preparing controller"
+                           : g7ReleasedOverlay.claimFailed
+                           ? "Couldn't configure controller"
+                           : "Controller released to games"
+                    Text {
+                        width: parent.width; wrapMode: Text.WordWrap
+                        text: g7ReleasedOverlay.claimInProgress
+                              ? bridge.configStatus
+                              : g7ReleasedOverlay.claimFailed
+                              ? bridge.configStatus + "\n\nDeadband will retry when you choose Configure controller."
+                              : "Configuration needs temporary exclusive access to the controller or dongle. " +
+                                "Deadband restores xpad whenever you release it."
+                        color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
+                    }
+                    PillButton {
+                        visible: !g7ReleasedOverlay.claimInProgress
+                        label: g7ReleasedOverlay.claimFailed ? "Retry" : "Configure controller"
+                        onClicked: bridge.setConfigClaimed(true)
                     }
                 }
             }

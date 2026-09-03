@@ -97,11 +97,38 @@ def find_controllers():
     """Enumerate DISTINCT physical GameSir controllers (not per-interface).
 
     The Cyclone exposes two vendor interfaces (empty + live) on one USB device,
-    so we group hidraw nodes by their owning USB device (topology) and return one
-    entry per controller: {id, pid, nodes, port}. `id`/`port` is the USB bus+path
-    (stable per physical port; serials are empty so this is our unique key), and
-    `nodes` are that controller's /dev/hidraw* paths."""
+    while the G7 Pro configuration identities expose no hidraw node at all. Start from USB
+    sysfs, then attach any hidraw nodes belonging to the same topology.  The
+    returned ``usb`` metadata lets the G7 transport open the exact Linux USB
+    device without confusing two identical receivers."""
     by_dev = {}
+    for devdir in sorted(glob.glob('/sys/bus/usb/devices/*')):
+        if not os.path.isfile(os.path.join(devdir, 'idVendor')):
+            continue
+        try:
+            vid = int(open(os.path.join(devdir, 'idVendor')).read().strip(), 16)
+            pid = int(open(os.path.join(devdir, 'idProduct')).read().strip(), 16)
+            bus = open(os.path.join(devdir, 'busnum')).read().strip()
+            devpath = open(os.path.join(devdir, 'devpath')).read().strip()
+            address = int(open(os.path.join(devdir, 'devnum')).read().strip())
+        except (OSError, ValueError):
+            continue
+        if vid != VENDOR_VID:
+            continue
+        try:
+            product = open(os.path.join(devdir, 'product')).read().strip()
+        except OSError:
+            product = ''
+        try:
+            bcd = int(open(os.path.join(devdir, 'bcdDevice')).read().strip(), 16)
+        except (OSError, ValueError):
+            bcd = None
+        port = f'{bus}-{devpath}'
+        by_dev[port] = {
+            'id': port, 'port': port, 'pid': pid, 'product': product, 'nodes': [],
+            'usb': {'bus': int(bus), 'address': address, 'sysfs': devdir}, 'bcd': bcd,
+        }
+
     for path in sorted(glob.glob('/sys/class/hidraw/hidraw*'),
                        key=lambda p: int(os.path.basename(p)[6:])):
         name = os.path.basename(path)
@@ -137,7 +164,8 @@ def find_controllers():
             product = ''
         port = f'{bus}-{devpath}'
         entry = by_dev.setdefault(port, {'id': port, 'port': port, 'pid': pid,
-                                         'product': product, 'nodes': []})
+                                         'product': product, 'nodes': [],
+                                         'usb': None, 'bcd': None})
         entry['nodes'].append(f'/dev/{name}')
     return list(by_dev.values())
 
@@ -241,7 +269,8 @@ def connected_product_ids():
     """USB product ids (ints) of all connected GameSir vendor interfaces.
 
     Parsed from each hidraw node's HID_ID (`bus:VID:PID`, hex). Lets the app
-    tell a Cyclone (0575/100b) from a G7 (10ba) to pick the right profile.
+    tell a Cyclone (0575/100b) from a G7 Pro 8K (10c5-10c8) to pick the
+    right profile. Raw-USB G7 identities are found by ``find_controllers``.
     Matched by vendor id, so it survives mode/node renumbering like the rest."""
     pids = []
     for path in glob.glob('/sys/class/hidraw/hidraw*'):

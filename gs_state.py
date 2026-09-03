@@ -15,9 +15,11 @@ state = {
     'lb': False, 'rb': False,
     'view': False, 'menu': False,
     'ls': False, 'rs': False,
-    'l4': False, 'r4': False, 'm': False, 'home': False, 'share': False,
+    'l4': False, 'l5': False, 'r4': False, 'r5': False,
+    'm': False, 'home': False, 'share': False,
     'battery': 0, 'charging': False,
     'profile': None,     # current profile 1-4 (from get-profile 0x0B -> 0x10 reply)
+    'edit_profile': None, # profile bank shown by the editor (G7 can differ)
     'led_slot': None,    # active lighting slot (from read-reg 0x20/0x0000 -> 0x10 0x05)
     'connected': None,   # None = connecting, True = open, False = not found/lost
     'mode_ok': False,    # True when we're getting a populated Xbox-mode 0x12 report
@@ -38,6 +40,9 @@ state = {
                          # not applied), 'backend' = hidapi built with the libusb
                          # backend (can't open hidraw paths at all). Drives the
                          # "found your controller but can't open it" banner.
+    'config_wanted': True,   # G7: claim its USB interface while selected
+    'config_claimed': False,
+    'config_status': '',
 }
 
-EXTRA_BTNS = ('l4', 'r4', 'm', 'home', 'share')
+EXTRA_BTNS = ('l4', 'l5', 'r4', 'r5', 'm', 'home', 'share')
