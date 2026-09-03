@@ -5,7 +5,7 @@
 # Install:
 #   sudo cp 70-gamesir.rules /etc/udev/rules.d/
 #   sudo udevadm control --reload-rules && sudo udevadm trigger
-# (no replug needed; the trigger re-applies the ACL.)
+# Unplug and replug after installing so every identity receives its ACL.
 #
 # TAG+="uaccess" hands an ACL to whoever is logged in at the local seat (the
 # modern, group-free way). IMPORTANT: the filename MUST sort before
@@ -23,6 +23,13 @@ SUBSYSTEM=="hidraw", ATTRS{idVendor}=="3537", TAG+="uaccess"
 # (fixes the post-reconnect mouse-mode). The gamepad/joystick node is grabbed
 # only while you enable the toggle; nothing here changes normal input.
 SUBSYSTEM=="input", ATTRS{idVendor}=="3537", TAG+="uaccess"
+
+# G7 Pro configuration uses interface 0 through native libusb rather than
+# hidraw. 109b is wired, 109c is the dongle, and 100a is the short-lived HID
+# identity Deadband transitions before opening a configuration session.
+SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="109b", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="109c", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="100a", TAG+="uaccess"
 
 # Firmware flashing: when the controller is in its JieLi BR23 UBOOT loader it
 # re-enumerates as a USB mass-storage device (4c4a:2342 "BR23UBOOT1.00"). Grant

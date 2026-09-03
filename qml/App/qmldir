@@ -23,6 +23,7 @@ ColorField 1.0 ColorField.qml
 FitScroll 1.0 FitScroll.qml
 LightsPage 1.0 LightsPage.qml
 Lights8kPage 1.0 Lights8kPage.qml
+G7DevicePage 1.0 G7DevicePage.qml
 MotionPage 1.0 MotionPage.qml
 MacroPage 1.0 MacroPage.qml
 TargetPicker 1.0 TargetPicker.qml

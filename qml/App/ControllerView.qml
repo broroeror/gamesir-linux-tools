@@ -32,9 +32,11 @@ Item {
         "Dpad Left": [0.317, 0.500], "Dpad Right": [0.393, 0.500],
         "View": [0.425, 0.265], "Menu": [0.566, 0.265],
         "LT": [0.305, 0.050], "LB": [0.405, 0.050], "RB": [0.595, 0.050], "RT": [0.695, 0.050],
-        "L4": [0.435, 0.660], "R4": [0.565, 0.660]
+        "L4": [0.390, 0.660], "L5": [0.465, 0.700],
+        "R5": [0.535, 0.700], "R4": [0.610, 0.660]
     })
     function hasPos(n) { return n !== undefined && n !== "" && root.ctrlPos[n] !== undefined }
+    function supportsControl(n) { return bridge.remapSources.indexOf(n) !== -1 }
     readonly property point srcPt: hasPos(highlightSource)
         ? Qt.point(ctrlPos[highlightSource][0] * width, ctrlPos[highlightSource][1] * height)
         : Qt.point(0, 0)
@@ -318,8 +320,10 @@ Item {
     EdgeMarker { name: "LB"; nx: 0.405; ny: 0.050; on: root.btn("lb") }
     EdgeMarker { name: "RB"; nx: 0.595; ny: 0.050; on: root.btn("rb") }
     EdgeMarker { name: "RT"; nx: 0.695; ny: 0.050; on: bridge.rightTrigger > 0.06 }
-    EdgeMarker { name: "L4"; nx: 0.435; ny: 0.660; on: root.btn("l4") }
-    EdgeMarker { name: "R4"; nx: 0.565; ny: 0.660; on: root.btn("r4") }
+    EdgeMarker { name: "L4"; nx: 0.390; ny: 0.660; on: root.btn("l4"); visible: root.supportsControl(name) }
+    EdgeMarker { name: "L5"; nx: 0.465; ny: 0.700; on: root.btn("l5"); visible: root.supportsControl(name) }
+    EdgeMarker { name: "R5"; nx: 0.535; ny: 0.700; on: root.btn("r5"); visible: root.supportsControl(name) }
+    EdgeMarker { name: "R4"; nx: 0.610; ny: 0.660; on: root.btn("r4"); visible: root.supportsControl(name) }
 
     // ===================== remap source → target link ====================
     // Dashed connector (drawn under the rings).

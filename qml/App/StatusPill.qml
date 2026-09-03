@@ -74,8 +74,7 @@ Row {
             Text {
                 id: wtip
                 anchors.fill: parent; anchors.margins: 10
-                text: "Not in Xbox mode. Use the controller's Start / pause " +
-                      "buttons to switch to Xbox/XInput mode so the app can read it."
+                text: bridge.modeMessage
                 color: Theme.text; wrapMode: Text.WordWrap
                 font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                 lineHeight: 1.2

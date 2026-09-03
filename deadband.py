@@ -27,7 +27,7 @@ from PySide6.QtCore import QUrl, QSettings
 from PySide6.QtGui import QGuiApplication, QIcon
 from PySide6.QtQml import QQmlApplicationEngine
 
-from reader import read_controller, press_select_loop
+from reader import read_controller, press_select_loop, release_controller
 from bridge import GamesirBridge
 from mouse_bridge import MouseBridge
 import kwin
@@ -75,6 +75,7 @@ def main():
         mousegrab.start()   # EVIOCGRAB fallback (non-KDE); KDE uses the KWin plugin
 
     app = QGuiApplication(sys.argv)
+    app.aboutToQuit.connect(release_controller)
     app.setApplicationName(APP_NAME)
     app.setOrganizationName(ORG_NAME)
     _migrate_settings()                 # must follow the names above

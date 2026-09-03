@@ -5,8 +5,8 @@
 # Deadband — a Linux configuration app for controllers and mice
 
 A Linux GUI for gaming input devices, driven over each device's vendor (hidraw)
-interface, reverse-engineered from scratch. Currently supports the **GameSir
-Cyclone 2** and **G7 Pro 8K PC** controllers and the **Logitech G502 X LIGHTSPEED**
+interface (or vendor-class USB for the G7 Pro). Currently supports the **GameSir
+Cyclone 2**, **G7 Pro**, and **G7 Pro 8K PC** controllers and the **Logitech G502 X LIGHTSPEED**
 mouse (see Tested hardware); the protocol modules are per-vendor
 (`vendors/gamesir`, `vendors/logitech`), so other manufacturers can be added
 alongside. It covers:
@@ -54,8 +54,8 @@ theme; click it (or the caption link) to step through them one at a time:
   <em><a href="docs/screenshots/README.md">Browse the screenshot tour ▶</a></em>
 </p>
 
-**Version:** `0.3.0-dev` — Deadband: multi-device (Cyclone 2 + G7 Pro 8K PC
-controllers, G502 X mouse), the full Qt/QML app (lighting + keyframe editor,
+**Version:** `0.3.0-dev` — Deadband: multi-device (Cyclone 2 + G7 Pro +
+G7 Pro 8K PC controllers, G502 X mouse), the full Qt/QML app (lighting + keyframe editor,
 config editor, remaps, macros, backup/restore), built-in diagnostics,
 one-command install, an [AUR package](https://aur.archlinux.org/packages/deadband-git),
 and a [community NixOS flake](https://codeberg.org/Epaphroditus/gamesir-linux-tools-nix).
@@ -74,10 +74,12 @@ can't positively identify. Fork it and customize it however you like.
 
 > ### ⚠️ Tested hardware
 > Everything here has only been developed and verified on a **GameSir Cyclone 2**,
-> a **GameSir G7 Pro 8K PC**, and a **Logitech G502 X LIGHTSPEED** mouse — **nothing
-> else.** (A regular, non-8K **G7 Pro** was also tested but does **not** work: it's
-> an Xbox-only pad whose config channel Linux doesn't expose — input works, config
-> is blocked. See [RESEARCH.md](RESEARCH.md).)
+> a **GameSir G7 Pro**, a **GameSir G7 Pro 8K PC**, and a **Logitech G502 X LIGHTSPEED** mouse — **nothing
+> else. **G7 Pro** configuration targets `3537:109b` when wired and `3537:109c`
+> through its dongle. Deadband automatically moves the transitional `3537:100a`
+> identity to one of those configuration identities. If it is instead showing
+> `3537:1022`, hold **MENU (START)+SHARE** together first. This new path still
+> needs broader confirmation across firmware revisions.
 > Other GameSir controllers, other Logitech mice, other dongles, and firmware
 > revisions I haven't seen are **unsupported and untested** and may misbehave. The
 > app won't send config writes to a device it can't positively recognize, but
@@ -96,8 +98,10 @@ Macros tabs.
 ## Install
 
 Deadband needs Python 3 with [`PySide6`](https://pypi.org/project/PySide6/) and
-[`hidapi`](https://pypi.org/project/hidapi/) — hidapi built with its **hidraw**
-backend. Each route below takes care of that unless noted.
+[`hidapi`](https://pypi.org/project/hidapi/) — built with its **hidraw** backend.
+G7 Pro configuration uses Deadband's native system `libusb-1.0` transport and
+needs no additional Python package. Each route below takes care of the
+dependencies unless noted.
 
 ### Arch Linux
 
@@ -130,7 +134,8 @@ nix run codeberg:Epaphroditus/gamesir-linux-tools-nix
 ### Any distro (installer script)
 
 1. Install the dependencies. On Arch:
-   `sudo pacman -S --needed python pyside6 python-hidapi`. Elsewhere:
+   `sudo pacman -S --needed python pyside6 python-hidapi libusb`. Elsewhere,
+   install your distribution's `libusb-1.0` runtime, then:
 
    ```sh
    pip install --user PySide6
@@ -160,9 +165,11 @@ it, run `./uninstall.sh`. Upgrading from the old `gamesir-cyclone2` install?
 
 ## Running
 
-Put the controller in **Xbox / XInput mode** (use the Start / pause buttons).
-The vendor protocol is inert in PS4/DS4 and Switch modes — the app's header
-warns you when you're in the wrong one.
+Put the controller in **Xbox / XInput mode**. A G7 Pro at `3537:100a` is switched
+automatically to its wired `3537:109b` or dongle `3537:109c` configuration
+identity. If it is at `3537:1022`, hold **MENU (START)+SHARE** together. Use the
+Start / pause mode control on the other supported GameSir controllers. The app's
+header warns when it detects an unsupported mode.
 
 **Grant device access (recommended, once):**
 
@@ -174,7 +181,7 @@ warns you when you're in the wrong one.
    sudo udevadm control --reload-rules && sudo udevadm trigger
    ```
 
-2. Start the app — no replug needed:
+2. Unplug and replug the controller once, then start the app:
 
    ```sh
    python3 deadband.py
@@ -250,17 +257,22 @@ everything it does is **reversible** and stays **on your machine**. The specific
   online.
 - **Permissions.** Prefer the udev rule (per-user `uaccess`) over running as root —
   see [Running](#running). Under `sudo`, `~` is `/root`, so backups land there.
-- **Tested hardware.** Only the Cyclone 2 and G7 Pro 8K PC (see the note up top). Treat
-  anything else as unproven and use it at your own risk.
+- **Tested hardware.** Cyclone 2 and G7 Pro 8K PC are hardware-verified. G7 Pro
+  support targets wired `3537:109b` and dongle `3537:109c`; `3537:100a` is
+  transitioned automatically. Hold MENU (START)+SHARE together if the controller
+  is showing its `3537:1022` native identity.
 
 ## How it works
 
-The controller exposes a **vendor HID interface** (USB VID `0x3537`) with a 64-byte
-command channel. In **Xbox mode**, with a sustained heartbeat, it streams input
-(enhanced report `0x12` — sticks, triggers, IMU, battery, and the L4/R4/M paddles the
-standard report can't see) and accepts **register read/write** commands for config and
-lighting. The firmware *version* is read from the USB `bcdDevice` descriptor — no
-command, no network.
+Most supported controllers expose a **vendor HID interface** (USB VID `0x3537`)
+with a 64-byte command channel. The G7 Pro's wired and dongle configuration
+identities instead use a vendor-class USB interface that Deadband temporarily
+claims from `xpad`; use **Release to
+games** when configuration is finished. While claimed, its report `0x10` carries
+live sticks, triggers, buttons and battery alongside chunked configuration replies.
+The hidraw controllers use their enhanced report `0x12`. Firmware information is
+read locally from either the USB descriptor or the G7's documented device-info
+query — never from the network.
 
 For what each control reports to Linux as a normal gamepad, see
 **[CONTROLLER_MAP.md](CONTROLLER_MAP.md)**. The full command set, the lighting/keyframe
@@ -286,6 +298,13 @@ custom-curve editor, trigger tuning, vibration, poll rate), **button remap**,
 **backup / restore** — all verified end-to-end on hardware. Restore is
 write-verify-retry; only the active profile + lighting are guaranteed (banks
 `0x02`–`0x04`, the stored profiles, appear read-only on this controller).
+
+**G7 Pro:** wired `3537:109b` and dongle `3537:109c` configuration identities,
+with automatic transition from `3537:100a`; four editable profiles, 21 default-layer
+remap sources, stick/trigger shaping, resolution/inversion/sensitivity, four-motor
+vibration, report rate, D-pad options, dock settings, and semantic backup/restore.
+The shared Shift layer, Continuous Trigger, advanced directional/mouse stick output,
+motion configuration, Bluetooth, and the native `3537:1022` protocol are not yet exposed.
 
 **Mouse (G502 X):** remaps, keyboard bindings, the G-Shift layer + trigger, DPI
 stages, report rate, and the onboard-macro editor are verified on hardware —
@@ -334,6 +353,11 @@ It's a backup/restore tool, **not** a firmware updater, and it needs the externa
 
 Released under the [MIT License](LICENSE) — use, modify, and redistribute
 freely.
+
+The G7 Pro integration was informed by the hardware-tested protocol research in
+[`questionablesyntax/g7ctl`](https://github.com/questionablesyntax/g7ctl), whose
+standalone `pyg7` protocol package is Apache-2.0 licensed. Deadband's Qt/QML UI
+and transport integration are independent; no GPL GUI code is included.
 
 This is an independent, hobby reverse-engineering project. It is **not
 affiliated with, endorsed by, or supported by GameSir**, and "GameSir" and
