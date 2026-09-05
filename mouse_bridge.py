@@ -195,6 +195,12 @@ class MouseBridge(QObject):
         return {'buttons': mk(raw['buttons']), 'gbuttons': mk(raw['gbuttons']),
                 'sensor': raw['sensor']}
 
+    def _set_apply(self, msg):
+        """Set the Apply toast. A message ending in '…' reads as in-progress: the
+        toast renders it neutral and holds it until the result replaces it."""
+        self._apply_status = msg
+        self.applyStatusChanged.emit()
+
     def _set_status(self, msg):
         self._status = msg
         self.statusChanged.emit()
@@ -254,6 +260,7 @@ class MouseBridge(QObject):
             return
         self._selected = sector
         self.profilesChanged.emit()
+        self._set_apply('Reading profile…')   # a read, but not an instant one
         self.refresh()                        # re-read bindings for the new target
 
     @Slot(int)
@@ -264,6 +271,7 @@ class MouseBridge(QObject):
             return
         self._busy = True
         self.busyChanged.emit()
+        self._set_apply('Switching profile…')
         threading.Thread(target=self._profile_worker, args=(int(sector),),
                          daemon=True).start()
 
@@ -311,6 +319,7 @@ class MouseBridge(QObject):
         self._pending_sensor = {}          # contents; a reset makes it meaningless
         self._pending_macros = {}
         self.pendingChanged.emit()
+        self._set_apply('Restoring factory settings…')
         threading.Thread(target=self._reset_worker, args=(target, factory),
                          daemon=True).start()
 
@@ -339,6 +348,7 @@ class MouseBridge(QObject):
             return
         self._busy = True
         self.busyChanged.emit()
+        self._set_apply('Renaming…')
         threading.Thread(target=self._rename_worker,
                          args=(int(sector), str(name)), daemon=True).start()
 
@@ -368,8 +378,7 @@ class MouseBridge(QObject):
     def _on_profile_switch(self, ok, message, active_now):
         self._busy = False
         self.busyChanged.emit()
-        self._apply_status = ('✓ ' if ok else '⚠ ') + message
-        self.applyStatusChanged.emit()
+        self._set_apply(('✓ ' if ok else '⚠ ') + message)
         if ok:
             self._active = active_now
             self.presenceChanged.emit()
@@ -613,6 +622,8 @@ class MouseBridge(QObject):
             self._pending_sensor = {}
             self._pending_macros = {}
             self.pendingChanged.emit()
+        if self._apply_status == 'Reading profile…':
+            self._set_apply('')               # the read finished; nothing to report
         self.presenceChanged.emit()
 
     def _on_remap(self, ok, status, binds):

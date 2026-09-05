@@ -33,7 +33,7 @@ Row {
             readonly property bool act: mouse.activeProfile === modelData.sector
             readonly property bool editing: root.renaming === modelData.sector
 
-            width: root.compact ? 42 : 96
+            width: root.compact ? (pill.modelData.name ? 64 : 42) : 96
             height: 32; radius: 8
             color: sel ? Theme.accent : (hov.hovered ? Theme.cardHover : Theme.card)
             border.color: sel ? Qt.lighter(Theme.accent, 1.2) : Theme.cardBorder
@@ -53,9 +53,14 @@ Row {
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
                     visible: !pill.editing
-                    width: Math.min(implicitWidth, (root.compact ? 28 : 74) - (pill.act ? 11 : 0))
+                    width: Math.min(implicitWidth, (root.compact ? (pill.modelData.name ? 50 : 28) : 74) - (pill.act ? 11 : 0))
                     elide: Text.ElideRight
-                    text: root.compact ? ("P" + pill.modelData.index) : pill.modelData.label
+                    // Compact still shows a NAME when one is set — otherwise
+                    // renaming a profile looks like it did nothing at narrow
+                    // window widths, which is exactly how it was reported.
+                    text: root.compact
+                          ? (pill.modelData.name || ("P" + pill.modelData.index))
+                          : pill.modelData.label
                     color: pill.sel ? "white" : Theme.textDim
                     font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
                     font.weight: pill.sel ? Font.DemiBold : Font.Normal
@@ -64,7 +69,7 @@ Row {
                     id: nameEdit
                     anchors.verticalCenter: parent.verticalCenter
                     visible: pill.editing
-                    width: (root.compact ? 28 : 74) - (pill.act ? 11 : 0)
+                    width: (root.compact ? (pill.modelData.name ? 50 : 28) : 74) - (pill.act ? 11 : 0)
                     maximumLength: 24                 // the mouse stores 24 chars
                     color: pill.sel ? "white" : Theme.text
                     font.family: Theme.fontFamily; font.pixelSize: Theme.fontM

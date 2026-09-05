@@ -1003,7 +1003,7 @@ Window {
     Rectangle {
         id: applyToast
         property bool ok: bridge.applyStatus.indexOf("✓") >= 0
-        property bool busy: bridge.applyStatus === "Applying…"
+        property bool busy: bridge.applyStatus.endsWith("…")   // any in-progress message
         visible: bridge.applyStatus.length > 0
         z: 9999
         anchors.horizontalCenter: parent.horizontalCenter
@@ -1047,7 +1047,7 @@ Window {
     Rectangle {
         id: mouseToast
         property bool ok: mouse.applyStatus.indexOf("✓") >= 0
-        property bool busy: mouse.applyStatus === "Applying…"
+        property bool busy: mouse.applyStatus.endsWith("…")    // any in-progress message
         visible: win.activeDevice === "mouse" && mouse.applyStatus.length > 0
         z: 9999
         anchors.horizontalCenter: parent.horizontalCenter
