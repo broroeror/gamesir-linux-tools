@@ -306,12 +306,19 @@ class Hidpp:
         16-byte reads get it instead of the sixteen a full sector costs. That
         matters because the profile bar names every profile on each refresh.
         Returns '' for a blank/undecodable name rather than raising -- a junk
-        name must not stop the profile list from loading."""
+        name must not stop the profile list from loading.
+
+        Padding is filtered rather than stripped: an unnamed profile reads as
+        0x00 or 0xFF filler, and 0xFF decodes to U+FFFF (a noncharacter), which
+        renders as tofu boxes and -- worse -- makes the name look non-empty, so
+        callers skip their "Profile N" fallback. Dropping everything
+        unprintable means no padding convention can leak into the UI."""
         idx = self.get_feature_index(FEATURE_ONBOARD_PROFILES)
         try:
             raw = b''.join(self._mem_read16(idx, sector, off)
                            for off in (160, 176, 192))
-            return raw.decode('utf-16le').rstrip('\x00').rstrip('\ufffd').strip()
+            text = raw.decode('utf-16le', errors='ignore')
+            return ''.join(c for c in text if c.isprintable()).strip()
         except Exception:
             return ''
 
