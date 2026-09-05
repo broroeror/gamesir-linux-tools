@@ -496,18 +496,42 @@ def apply_bindings(dev, info, headers, sector, button_changes=None,
 
 NAME_OFFSET, NAME_LEN = 160, 48          # UTF-16LE, up to 24 chars
 
+def _plausible_profile(prof):
+    """Structural sanity check for a profile we're about to WRITE.
+
+    Used where the stored CRC can't be the gate (the ROM copies), so something
+    still has to establish that the bytes are a profile and not a truncated read
+    or an unrelated page. Deliberately loose -- it only has to catch garbage."""
+    if len(prof.resolutions) != onboard.N_RESOLUTIONS:
+        return False, 'wrong number of DPI stages'
+    if not all(50 <= int(r) <= 32000 for r in prof.resolutions):
+        return False, f'DPI stages out of range ({prof.resolutions})'
+    if not 100 <= prof.report_rate_hz <= 8000:
+        return False, f'implausible report rate ({prof.report_rate_hz} Hz)'
+    if prof.default_dpi_index >= onboard.N_RESOLUTIONS:
+        return False, 'default DPI index out of range'
+    if prof.shift_dpi_index >= onboard.N_RESOLUTIONS:
+        return False, 'shift DPI index out of range'
+    if len(prof.buttons) != onboard.N_BUTTONS:
+        return False, 'wrong number of buttons'
+    return True, ''
+
+
 def reset_profile_to_oob(dev, info, headers, sector, oob_sector, backup_headers=None):
     """Restore one profile to the mouse's OWN factory copy.
 
-    The device keeps its out-of-box profiles in ROM, so this is a real factory
-    restore rather than a plausible-looking default layout invented here. The
-    ROM profile is validated (decodes, CRC good) BEFORE anything is written, so
-    a device without usable OOB data fails without touching the live profile.
+    The device keeps out-of-box profiles in ROM (`oob_count` of them, listed in
+    the ROM directory), so this restores what the mouse actually shipped with
+    rather than a default layout invented here.
 
-    Unlike the other write paths there's no byte-diff gate: a reset legitimately
-    changes every byte, name included. The safety comes from the source being a
-    valid factory profile, a snapshot taken first, and a read-back that reverts
-    on mismatch."""
+    The ROM copies do NOT carry a CRC that matches the live formula -- verified
+    on a G502 X, where all five RAM profiles verify and both ROM profiles don't,
+    through the identical read path. So the stored CRC can't be the gate here:
+    instead the content is sanity-checked, and the CRC is recomputed for what
+    actually gets written, which is what has to be valid.
+
+    Everything is validated BEFORE any write, so a device with unusable factory
+    data fails having touched nothing."""
     size = info['sector_size']
     if sector not in [h[0] for h in headers]:
         return False, f'sector 0x{sector:04x} is not a profile'
@@ -515,14 +539,20 @@ def reset_profile_to_oob(dev, info, headers, sector, oob_sector, backup_headers=
         src = dev.read_sector(oob_sector, size)
     except Exception as e:
         return False, f'could not read the factory profile ({e}) - nothing was changed'
-    if len(src) != size:
-        return False, 'the factory profile is the wrong size - nothing was changed'
+    if len(src) != size or set(src) in ({0x00}, {0xFF}):
+        return False, 'the factory profile is empty or the wrong size - nothing was changed'
+
     factory = onboard.OnboardProfile.decode(src, sector=sector)
-    if not factory.crc_ok:
-        return False, 'the factory profile did not verify - nothing was changed'
+    ok, why = _plausible_profile(factory)
+    if not ok:
+        return False, f'the factory profile does not look valid ({why}) - nothing was changed'
+    # read-modify-write from raw: identical content, correct CRC for this sector
+    payload = factory.to_bytes()
+    if not onboard.OnboardProfile.decode(payload).crc_ok:
+        return False, 'could not build a valid profile from the factory copy'
 
     raw = dev.read_sector(sector, size)
-    if raw == src:
+    if raw == payload:
         return True, 'already at factory defaults'
     try:
         remap.backup_all(dev, info,
@@ -530,8 +560,8 @@ def reset_profile_to_oob(dev, info, headers, sector, oob_sector, backup_headers=
     except OSError as e:
         return False, f'could not save the safety backup ({e}) - nothing was changed'
     try:
-        dev.write_sector(sector, src)
-        if dev.read_sector(sector, size) != src:
+        dev.write_sector(sector, payload)
+        if dev.read_sector(sector, size) != payload:
             dev.write_sector(sector, raw)                  # revert
             return False, 'read-back mismatch - reverted to your settings'
     except Exception as e:

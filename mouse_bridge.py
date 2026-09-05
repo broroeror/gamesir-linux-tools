@@ -171,11 +171,13 @@ class MouseBridge(QObject):
                 name = dev.profile_name(sector)
             except Exception:
                 name = ''
-            # pair profile N with factory profile N; a device shipping a single
-            # OOB profile uses it for every slot
-            if len(oob) >= i:
+            # Pair profile N with factory profile N where one exists. The G502 X
+            # has 5 profile slots but only 2 OOB profiles, so the rest fall back
+            # to the first -- which is what the untouched slots on this device
+            # actually match (same 1000Hz, same PROFILE_NAME_DEFAULT name).
+            if i <= len(oob):
                 factory = oob[i - 1]
-            elif len(oob) == 1:
+            elif oob:
                 factory = oob[0]
             else:
                 factory = 0
@@ -256,7 +258,7 @@ class MouseBridge(QObject):
         if sector == self._selected or sector not in [p['sector'] for p in self._profiles]:
             return
         if self._pending or self._pending_sensor or self._pending_macros:
-            self._set_status('apply or discard your staged changes before switching profile')
+            self._set_apply('⚠ apply or discard your staged changes first')
             return
         self._selected = sector
         self.profilesChanged.emit()
