@@ -1,23 +1,75 @@
 # Changelog
 
-Notable changes to the GameSir Cyclone 2 Linux app, newest first. This is the
+Notable changes to Deadband — the Linux configuration app for GameSir controllers
+and Logitech mice — newest first. This is the
 curated, user-facing summary; the complete history is in git. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com).
 
 ## [Unreleased]
 
 ### Added
+- **GameSir G7 Pro configuration** — contributed by
+  [@brcly](https://github.com/brcly) and verified on their hardware. Config rides a
+  vendor-class USB interface that exposes no hidraw node, reached through a native
+  `libusb` transport (no extra Python package; the system `libusb-1.0` runtime is
+  now a dependency). The mode switch this project had written off as untriggerable
+  from Linux turns out to be a physical **MENU (START) + SHARE** combo. Targets the
+  **Shadow Ember** edition (`3537:109b` wired, `3537:109c` dongle), transitioning
+  `3537:100a` automatically.
+- **Other G7 Pro editions are recognised and named** — White Trimode, Zenless Zone
+  Zero, and an Amazon edition — so their owners get "config isn't supported for this
+  edition yet" instead of a bare USB id. They deliberately have no write path: the
+  register map looks common to all editions, but nobody has confirmed that on
+  hardware, and a guess isn't worth someone's stored config.
+- **Mouse profiles (G502 X)** — all five onboard profiles. Pick which one you're
+  editing without switching to it, rename them (stored on the mouse), double-click to
+  make one active, and restore any of them to the copy the mouse itself shipped with
+  in ROM. Verified on hardware.
+- **Per-macro playback speed** for mouse macros, which offsets the mouse's own
+  per-step overhead — a recorded macro otherwise plays back slightly slower than it
+  was typed.
+- **App version and git commit in the diagnostics report**, so a bug report
+  identifies which build is running (the AUR package tracks `main`).
+- **Issue templates** that ask for the diagnostics report.
+- **Offline checks** (`vendors/logitech/offline_checks.py`) — 20 hardware-free
+  regressions over the mouse write paths that can damage stored settings.
+
+### Fixed
+- **Editing a mouse macro no longer burns a flash slot.** Flash can't be rewritten in
+  place, so replacing a macro stranded its old sector; an apply now sweeps
+  unreferenced sectors automatically.
+- **A crash no longer leaves a controller inert.** Claiming a USB interface displaces
+  the kernel driver, and the kernel does not rebind it when the holder dies — measured
+  as `usbhid` → `usbfs` → nothing. An atexit hook and a chained SIGTERM handler now
+  release it on the exits Python can observe.
+- **The live stick on the Rebinds page** read as a low frame rate: it tweened its
+  position over 40ms while input arrives every 16ms, so every sample restarted an
+  animation that never finished and the dot permanently chased the thumb.
+- **Poll rate did nothing** — a `@Slot(str, int)` declaration on a one-argument
+  method, now guarded by an AST check in the smoke test.
+- **Unnamed mouse profiles showed boxes** instead of falling back to "Profile N":
+  `0xFF` name padding decodes to U+FFFF, which is unprintable but not empty.
+- **"Free unused slots" was hiding itself** exactly when it was needed — it only
+  appeared once slots were nearly exhausted.
+- Mouse **backups now precede the first flash write** and work on an installed app.
+
+### Changed
+- **Documentation brought back in line with the app.** The manual had no mouse
+  section at all; RESEARCH.md had no G502 X section and contradicted its own summary
+  table; both still described a Cyclone-only project.
+
+## [0.2.0] — 2026-09-02
+
+### Added
 - **Multi-controller support** — a top-bar picker to choose which connected
   controller the app drives, plus press-to-select (press a button on a pad to switch
   to it). Identical units are told apart by USB port.
-- **GameSir G7 Pro** recognised, with live input over evdev. *(Its config editor is
-  blocked on Linux — see [RESEARCH.md](RESEARCH.md) for the full reason.)*
+- **GameSir G7 Pro** recognised, with live input over evdev. *(Config editing was
+  still blocked on Linux at this point — see the Unreleased section above.)*
 - Per-controller **profile abstraction**, so the whole config / lighting / backup
   stack follows the active controller instead of hard-coded Cyclone constants.
 - **Startup smoke test** (`smoke_test.py`) that fails if a background thread crashes
   on launch or the QML doesn't load.
-
-### Added
 - **Name your controllers** (Settings → Controllers) — call them "Black" and "White"
   instead of "Cyclone 2 #1/#2"; the top-bar picker shows your name. Each entry shows a
   wired (plug) or wireless (bands) icon and whether a controller is actually connected.
@@ -30,6 +82,9 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
 - **"Restore default lighting" moved to the Lights page** (it was buried in Settings)
   — and it now actually works on the **G7 Pro 8K**, which previously had no factory
   baseline to restore, so the button silently did nothing there.
+- **Documentation restructured** into a lean [README](README.md) (overview), a
+  [Manual](MANUAL.md) (how to use each feature, troubleshooting, FAQ), and
+  [RESEARCH.md](RESEARCH.md) (protocol, architecture, and per-controller findings).
 
 ### Fixed
 - **Empty dongles no longer masquerade as controllers.** A dongle with nothing paired
@@ -57,11 +112,6 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
 - **UI fit** — the top bar is responsive (the settings gear always stays reachable),
   and the Sticks / Triggers / Lights pages no longer clip at the default or minimum
   window size.
-
-### Changed
-- **Documentation restructured** into a lean [README](README.md) (overview), a
-  [Manual](MANUAL.md) (how to use each feature, troubleshooting, FAQ), and
-  [RESEARCH.md](RESEARCH.md) (protocol, architecture, and per-controller findings).
 
 ### Firmware Backup & Restore (advanced, optional)
 - Back up the Cyclone 2's firmware and restore your own backup — wired only, brick-

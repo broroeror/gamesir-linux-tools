@@ -1,4 +1,4 @@
-# GameSir Cyclone 2 (Linux) — TODO / Roadmap
+# Deadband — TODO / Roadmap
 
 Open bugs, proposed changes, and reverse-engineering questions. **Completed work
 moves to the [CHANGELOG](CHANGELOG.md)** (and the full history is in git), so this
@@ -20,12 +20,12 @@ them into the CHANGELOG so this file doesn't grow stale.
 ## ✨ Enhancements / proposed changes
 
 - [ ] **Bind the mouse-mode toggle to a controller button** via the controller's
-      macro/keybind system (the original stretch goal). Needs a USB capture of the
-      official app's macro/keybind screen to learn the command format.
-- [ ] *(blocked, external)* **Publish the package to the AUR.** Waiting on AUR account
-      creation, which is disabled upstream for the maintainer right now. Not on the
-      critical path — both install routes work without it. Revisit when registration
-      reopens.
+      macro/keybind system (the original stretch goal). No longer blocked on a
+      capture — per-paddle gamepad macros ship, so the command format is known.
+      What's left is deciding what the pad should send and having the app watch
+      for it. *(unblocked 2026-09-06)*
+- [x] **Publish the package to the AUR** *(DONE — `deadband-git`, live and updated
+      since)*. There is also a community NixOS flake, linked from the README.
 - [ ] **Collapse overlapping helper modules** (`gs_common` / `gs_state` vs the
       `gamesir_*` modules) for a leaner runtime surface. *(The RE-script reorg into
       `research/` is already done — see the CHANGELOG.)*
@@ -58,8 +58,10 @@ them into the CHANGELOG so this file doesn't grow stale.
 
 ## 🚀 Long-term / big bets
 
-The project's north-star goals — larger efforts. Hardware on hand: **two Cyclone 2s**
-and a **GameSir G7 Pro**. *(Full per-controller findings in **[RESEARCH.md](RESEARCH.md)**.)*
+The project's north-star goals — larger efforts. Hardware on hand: **two Cyclone 2s**,
+a **G7 Pro 8K PC**, and a **Logitech G502 X LIGHTSPEED**. The plain **G7 Pro** was
+passed on to family before it ever worked, so that support is contributed rather
+than mine. *(Full per-device findings in **[RESEARCH.md](RESEARCH.md)**.)*
 
 - [ ] **Audio responsiveness via the headset jack.** Investigate forcing system audio
       out through the controller's 3.5 mm jack, and driving the audio-reactive LEDs from
@@ -81,10 +83,15 @@ and a **GameSir G7 Pro**. *(Full per-controller findings in **[RESEARCH.md](RESE
       clears). Remaining: capture the **Cyclone** applying an L4/R4 + View/Menu remap
       to confirm those *source*-slot addresses on the Cyclone specifically (the G7 slot
       bases may differ) and that it accepts the writes.
+- [ ] **Confirm the G7 Pro register map on a second edition.** The editions differ
+      only by USB product id, and everything points at one shared map — but it's
+      unconfirmed, so White Trimode (`1003`/`1004`), Zenless (`105d`) and the Amazon
+      edition (`10ba`) are recognised without a write path. One owner of any of them
+      could settle it. *(2026-09-06)*
 - [ ] **PS4 / Switch-mode input parsing** — the vendor channel is Xbox-only; other
       modes need their own report parser.
 
 ---
 
-*Hardware: GameSir Cyclone 2 in Xbox / XInput mode (use the Start / pause buttons). See
-[README.md](README.md) for setup and the [CHANGELOG](CHANGELOG.md) for what's shipped.*
+*GameSir controllers need Xbox / XInput mode; see [README.md](README.md) for setup
+and the [CHANGELOG](CHANGELOG.md) for what's shipped.*

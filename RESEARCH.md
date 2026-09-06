@@ -1,22 +1,25 @@
-# Reverse-engineering findings — per controller
+# Reverse-engineering findings — per device
 
-Results from reverse-engineering GameSir controllers on Linux for this project.
-Each controller gets a section with its USB identities, config/input protocols, and
-an honest Linux support verdict — including the walls we hit, so nobody has to
+Results from reverse-engineering gaming input devices on Linux for this project:
+the GameSir controller family, and the Logitech G502 X mouse (a different vendor
+and an entirely different protocol). Each device gets a section with its USB
+identities, config/input protocols, and an honest Linux support verdict — including the walls we hit, so nobody has to
 re-tread them. This is a hobby RE effort; corrections and additions welcome.
 
 > Everything here was found from the Linux side (hidraw/evdev/`usbmon`/libusb) plus
 > USB captures of the official Windows apps (**GameSir Connect** for the Cyclone,
-> **GameSir Nexus** for the G7 Pro). See [Methodology & tools](#methodology--tools).
+> **GameSir Nexus** for the G7 Pro). The G502 X work needed no captures — HID++ 2.0
+> is documented enough to probe directly, with Solaar and libratbag as references. See [Methodology & tools](#methodology--tools).
 
 ## Summary
 
-| Controller | USB IDs (VID 0x3537) | Input on Linux | Config editor on Linux | Firmware flash | Verdict |
+| Device | USB IDs | Input on Linux | Config editor on Linux | Firmware flash | Verdict |
 |---|---|---|---|---|---|
-| **Cyclone 2** | `0575` / `100b` / `1053` | ✅ vendor `0x12` | ✅ full | ✅ (JieLi BR23) | **Fully supported** |
-| **G7 Pro** | `109b` (wired config) · `109c` (dongle config) · `100a` (transition) · `1022` (native/GIP) | ✅ evdev or claimed USB telemetry | ✅ four profiles + core/extras | — (different chip) | **Supported on 109b/109c** |
+| **Cyclone 2** *(GameSir, VID 0x3537)* | `0575` / `100b` / `1053` | ✅ vendor `0x12` | ✅ full | ✅ (JieLi BR23) | **Fully supported** |
+| **G7 Pro** *(Shadow Ember)* | `109b` (wired config) · `109c` (dongle config) · `100a` (transition) · `1022` (native/GIP) | ✅ evdev or claimed USB telemetry | ✅ four profiles + core/extras | — (different chip) | **Supported on 109b/109c** — contributed and verified by [@brcly](https://github.com/brcly), not on my hardware |
 | G7 SE *(not owned)* | `1010` | ✅ mainline `xpad` | n/a | — | Reference only |
 | **G7 Pro 8K PC** | `10c5`–`10c8` edition pairs | ✅ vendor `0x12` | ✅ full incl. motion/macros/lights | ❌ | **Fully supported** |
+| **G502 X LIGHTSPEED** *(Logitech, VID 0x046d)* | `c098` (wired) · `409f` / `c547` (receiver) | ✅ standard HID | ✅ full — profiles, G-Shift, DPI, macros | — | **Fully supported** |
 | 8BitDo *(future)* | — | — | — | — | Not started |
 
 The shared thread: **GameSir's config protocol is a register read/write protocol on
@@ -130,13 +133,86 @@ own one; this section is reference, not a tested finding. Source:
 
 ---
 
+## Logitech G502 X LIGHTSPEED — fully supported
+
+A different vendor and a completely different protocol from the GameSir family:
+**HID++ 2.0** over hidraw, rather than a register read/write channel on report
+`0x0F`. Settings live in the mouse's own flash, so they persist with the device and
+nothing needs to run in the background.
+
+**USB identities:** `046d:c098` (wired) and `046d:409f` (LIGHTSPEED receiver). The
+receiver also enumerates as `046d:c547`, its generic-receiver identity.
+
+**Features used:** `0x8100` onboard profiles (the whole config surface), `0x1004`
+unified battery, `0x2201` adjustable DPI (for the sensor's real range — this mouse
+reports up to 25600, so the range shown isn't a hardcoded guess).
+
+### Memory model
+
+16 sectors of 255 bytes. Sector `0x0000` is the live profile directory; **`0x0100`
+is the ROM directory**, listing the out-of-box profiles the mouse shipped with
+(`oob_count` says how many — two on this unit, at `0x0101`/`0x0102`). Profiles
+occupy sectors 1–5; everything above `profile_count` is the macro region, so this
+mouse has **10 macro slots**. All of it is device-reported, not assumed.
+
+Within a profile sector: report rate at byte 0, the active/shift DPI indices at 1–2,
+five DPI stages at 3–12, RGB at 13–15, the write counter at 18–19, the primary
+button bank at 32, the **G-Shift bank at 96**, the name at **160–207** (UTF-16LE, 24
+characters), and a CRC-16/CCITT-FALSE over everything but the trailing two bytes.
+
+Encoding is read-modify-write from the original sector rather than rebuilt from
+scratch, so unmodelled regions (power modes, angle snapping, timeouts) survive an
+edit. Blanking the whole sector is what wipes G-Shift on other tools.
+
+### Three findings that cost real time
+
+**`memoryWriteEnd` returns error `0x04`, and the write commits anyway.** The
+firmware's CRC check is *soft*: it rejects the sector and stores the bytes. Treating
+that error as failure is what made macros look impossible for a long time — the fix
+is to swallow the `0x04` and prove the write by reading the sector back. Confirmed
+independently by `cvuchener/hidpp` and libratbag PR #1850.
+
+**ROM profiles don't carry a CRC that verifies.** Every one of the five RAM profiles
+verifies through the same read path; both ROM copies fail. So a factory restore
+can't gate on the stored CRC — it validates the *content* (DPI stages in range,
+plausible report rate, indices in bounds) and recomputes the CRC for the copy it
+writes, which is the one that has to be valid.
+
+**An unnamed profile's name field is `0xFF` filler**, which decodes from UTF-16LE to
+U+FFFF — unprintable, but *not empty*. Anything that tests a name for emptiness has
+to filter unprintable characters, or the padding survives as tofu boxes and defeats
+the caller's fallback label.
+
+### Macros
+
+A small bytecode: `DELAY 0x40`, `KEY_PRESS 0x43` / `KEY_RELEASE 0x44`, `MOUSE_PRESS
+0x41` / `MOUSE_RELEASE 0x42`, `MOUSE_WHEEL 0x20`, `CONSUMER 0x45`/`0x46`, `JUMP
+0x60`, `END 0xFF`; operand length comes from the opcode's top three bits. A macro
+longer than a sector is split at opcode boundaries and JUMP-chained across up to
+four sectors.
+
+Flash can't be rewritten in place, so replacing a button's macro writes a new sector
+and strands the old one. Reclaiming those is safe only behind a **complete**
+reference walk: the scan raises on anything it can't fully decode — an unknown
+opcode, a stream running past the sector end — because a silently truncated walk
+would classify a live chain's tail as an orphan and blank it. Foreign macros (G HUB's)
+can use opcodes this project doesn't model, and a blank sector is a legal instant-END
+macro, so an erased sector that something still points at must not be reallocated.
+
+Playback runs slightly slower than recorded. The captured timings are exact; the
+mouse's macro engine simply spends a little time per step, and there are roughly four
+steps per typed character.
+
+---
+
 ## To be tested
 
-- **GameSir G7 Pro 8K (PC edition).** Uses **GameSir Connect**, not Nexus — the same
-  app that drives the Cyclone with the register protocol we already own. As a
-  PC-specific (non-Xbox-licensed) variant it likely skips the Xbox-mode enumeration
-  switch entirely, so its vendor channel may be **live on Linux out of the box**. The
-  most promising untested target. *(Ordered — findings to be added here.)*
+- **Other G7 Pro editions.** The editions differ only by USB product id — White
+  Trimode (`1003`/`1004`), Zenless Zone Zero (`105d`), and an Amazon edition
+  reporting `10ba`. The register map looks common to all of them (upstream `g7ctl`
+  keeps its variant table to names and PIDs, branches on the variant nowhere, and
+  drives PIDs it has never seen), but nobody here owns one to confirm it, so they're
+  recognised and named without a write path. Confirming one would unblock the rest.
 - **8BitDo controllers.** Planned; not started.
 
 ---
