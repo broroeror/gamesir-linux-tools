@@ -54,7 +54,7 @@ theme; click it (or the caption link) to step through them one at a time:
   <em><a href="docs/screenshots/README.md">Browse the screenshot tour ▶</a></em>
 </p>
 
-**Version:** `0.3.0` — Deadband: multi-device (Cyclone 2 + G7 Pro +
+**Version:** `0.4.0-dev` — Deadband: multi-device (Cyclone 2 + G7 Pro +
 G7 Pro 8K PC controllers, G502 X mouse), the full Qt/QML app (lighting + keyframe editor,
 config editor, remaps, macros, backup/restore), built-in diagnostics,
 one-command install, an [AUR package](https://aur.archlinux.org/packages/deadband-git),
