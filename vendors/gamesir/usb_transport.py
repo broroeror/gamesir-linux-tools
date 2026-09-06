@@ -11,10 +11,12 @@ The binding calls the system libusb-1.0 runtime through Python's standard
 
 from __future__ import annotations
 
+import atexit
 import ctypes
 import ctypes.util
 import errno
 import os
+import signal
 import threading
 
 
@@ -23,6 +25,66 @@ BACKEND = 'native libusb-1.0 (no Python USB package)'
 
 class UsbTransportError(OSError):
     """A libusb load, discovery, claim, or transfer failure."""
+
+
+# --- releasing the interface when the process goes away ----------------------
+# Claiming an interface displaces the kernel driver that had it (usbhid, for a
+# gamepad). When the holding process dies, the kernel reclaims the usbfs handle
+# but does NOT rebind the driver it displaced -- measured on a Cyclone 2:
+# usbhid -> usbfs -> nothing, still nothing 10s later. So a crash leaves the
+# controller inert until it is unplugged and replugged.
+#
+# close() already re-attaches; the gap is only whether it gets called. These
+# hooks make sure it does for the exits Python can observe: a normal quit, an
+# unhandled exception, Ctrl-C, and SIGTERM. SIGKILL and a segfault run no code
+# at all, so a replug remains the only cure for those -- this narrows the
+# window, it does not close it.
+_open_handles = set()
+_handles_lock = threading.Lock()
+_hooks_installed = False
+
+
+def _close_all_handles():
+    with _handles_lock:
+        handles = list(_open_handles)
+    for handle in handles:
+        try:
+            handle.close()
+        except Exception:
+            pass            # shutting down; a failure here has nowhere to go
+
+
+def _install_exit_hooks():
+    """atexit always; SIGTERM only when we're on the main thread (handles are
+    usually opened from a worker, where signal.signal refuses). Any existing
+    handler is chained rather than replaced."""
+    global _hooks_installed
+    if _hooks_installed:
+        return
+    _hooks_installed = True
+    atexit.register(_close_all_handles)
+    try:
+        previous = signal.getsignal(signal.SIGTERM)
+
+        def _on_sigterm(signum, frame, _previous=previous):
+            _close_all_handles()
+            if callable(_previous):
+                _previous(signum, frame)
+            else:
+                signal.signal(signum, signal.SIG_DFL)
+                os.kill(os.getpid(), signum)
+
+        signal.signal(signal.SIGTERM, _on_sigterm)
+    except (ValueError, OSError, AttributeError):
+        pass                # not the main thread, or no signals here
+
+
+# Installed at import as well as on claim: signal.signal only works on the main
+# thread, and the app opens its handles from a reader thread, where the SIGTERM
+# hook would otherwise never be installed. Import happens on the main thread, so
+# this is the one reliable moment to register it. The previous handler is
+# chained, so nothing that was already installed is lost.
+_install_exit_hooks()
 
 
 class _DeviceDescriptor(ctypes.Structure):
@@ -231,6 +293,9 @@ class InterruptHandle:
         _check(self._lib, self._lib.libusb_claim_interface(
             self._handle, self._interface), 'claim USB interface')
         self._claimed = True
+        _install_exit_hooks()
+        with _handles_lock:
+            _open_handles.add(self)
 
     def write(self, data):
         payload = bytes(data)
@@ -265,6 +330,8 @@ class InterruptHandle:
             return bytes(buffer[:transferred.value])
 
     def close(self):
+        with _handles_lock:
+            _open_handles.discard(self)
         with self._io_lock:
             if self._closed:
                 return
