@@ -296,9 +296,16 @@ CYCLONE = ControllerProfile(
 # product string). 109b/109c are the SHADOW EMBER edition, contributed and
 # hardware-verified by @brcly. Per upstream g7ctl, White Trimode is 1003/1004
 # and Zenless Zone Zero is 105d; an Amazon edition reports 10ba. None of those
-# are covered here, and they are deliberately absent rather than forgotten:
-# writing a register map to an edition it wasn't captured from is exactly how
-# you brick someone's config.
+# are covered here yet -- not because the protocol is expected to differ, but
+# because nobody involved owns one to confirm against.
+#
+# The register map looks UNIVERSAL across editions: upstream keeps its variant
+# table (name + PIDs, no addresses) entirely separate from its protocol, uses
+# one address map and command set with no variant branching anywhere, and treats
+# an unrecognised PID as "don't know the edition name yet" rather than a
+# different device. Consistent with one board in several shells, where the PID
+# exists so the vendor app can show the right picture. Adding the other editions
+# is therefore likely safe -- it just hasn't been tested by anyone here.
 #
 # CAVEAT: 100a and 1022 are NOT unique to one edition (upstream confirms 100a on
 # both Shadow Ember and White Trimode, 1022 on both Shadow Ember and Zenless).
