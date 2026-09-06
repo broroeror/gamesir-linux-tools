@@ -21,6 +21,27 @@ PID_DONGLE = 0x109C
 PID_HID = 0x100A
 PID_NATIVE = 0x1022
 CONFIG_PIDS = (PID_WIRED, PID_DONGLE)
+
+# Editions we can NAME but haven't confirmed against real hardware. The protocol
+# looks common to all of them (upstream g7ctl keeps its variant table to names +
+# PIDs, branches on the variant nowhere, and happily drives a PID it has never
+# seen), so these are absent from CONFIG_PIDS only because nobody here owns one
+# to check. Recognising them buys a device an honest "not supported yet" instead
+# of a bare hex id -- see UNCONFIRMED_PIDS.
+UNCONFIRMED_EDITIONS = {
+    0x1003: 'White Trimode',
+    0x1004: 'White Trimode (dongle)',
+    0x105D: 'Zenless Zone Zero',
+    0x10BA: 'Amazon edition',
+}
+UNCONFIRMED_PIDS = tuple(UNCONFIRMED_EDITIONS)
+
+
+def edition_name(pid):
+    """A human name for a G7 Pro USB id, or None if we've never seen it."""
+    if pid in CONFIG_PIDS:
+        return 'Shadow Ember'
+    return UNCONFIRMED_EDITIONS.get(pid)
 TRANSITION_PIDS = (PID_HID,)
 ALL_PIDS = CONFIG_PIDS + TRANSITION_PIDS + (PID_NATIVE,)
 # Compatibility names used by early versions of this integration.

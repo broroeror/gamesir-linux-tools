@@ -353,6 +353,21 @@ G7_NATIVE = ControllerProfile(
     profile_banks=(),
 )
 
+# Editions we can name but have never driven. Detection only -- no write style,
+# no banks -- so the app can say "this is a G7 Pro, just not one I can configure
+# yet" instead of leaving the device unrecognised or printing a bare hex id.
+# Deliberately NOT given the Shadow Ember register map: the map looks universal
+# (see the note above), but "looks universal" and "confirmed on that hardware"
+# are different things, and only the second one earns a write path.
+G7_PRO_OTHER = ControllerProfile(
+    name='GameSir G7 Pro',
+    short='G7 Pro',
+    usb_products=_g7.UNCONFIRMED_PIDS,
+    write_style='none',
+    input_style='evdev',
+    profile_banks=(),
+)
+
 # Compatibility name for code/tests that referred to the old misidentified G7.
 G7 = G7_PRO
 
@@ -490,7 +505,7 @@ G7_8K = ControllerProfile(
 
 
 # --- registry + detection ----------------------------------------------------
-ALL = (CYCLONE, G7_PRO, G7_NATIVE, G7_8K)
+ALL = (CYCLONE, G7_PRO, G7_NATIVE, G7_PRO_OTHER, G7_8K)
 DEFAULT = CYCLONE
 
 

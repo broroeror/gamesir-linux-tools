@@ -316,6 +316,22 @@ def read_controller():
             time.sleep(0.3)
             continue
 
+        # A G7 Pro edition we can name but have never driven. Input still works;
+        # only configuration is off the table. Says which edition and asks for a
+        # report, rather than showing a bare USB id or nothing at all.
+        if prof is profiles.G7_PRO_OTHER:
+            edition = g7pro.edition_name(sel['pid']) or 'unrecognised edition'
+            state['connected'] = True
+            state['mode_ok'] = False
+            state['config_status'] = (
+                f'G7 Pro ({edition}) — config isn\'t supported for this edition '
+                f'yet; input works. An issue naming {g7pro.VID:04x}:'
+                f'{sel["pid"]:04x} would help get it added.')
+            read_session_evdev(sel['id'], force_wrong_mode=True)
+            state['connected'] = False
+            time.sleep(0.3)
+            continue
+
         # G7-family: input arrives over evdev (standard gamepad), not a vendor
         # hidraw stream, so read that instead of the Cyclone 0x12 path.
         if prof is not None and prof.input_style == 'evdev':
