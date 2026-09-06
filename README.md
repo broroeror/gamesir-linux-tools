@@ -84,10 +84,13 @@ can't positively identify. Fork it and customize it however you like.
 > showing `3537:1022` instead, hold **MENU (START)+SHARE** together first.
 >
 > The G7 Pro ships in editions that differ only by USB product ID, so **other
-> editions are not covered** and won't be recognised — White Trimode
-> (`1003`/`1004`), Zenless Zone Zero (`105d`), and at least one Amazon edition
-> reporting `10ba`. This path also still needs confirmation across firmware
-> revisions.
+> editions can't be configured** — White Trimode (`1003`/`1004`), Zenless Zone
+> Zero (`105d`), and at least one Amazon edition reporting `10ba`. Deadband does
+> recognise those and names them, so input works and the app tells you
+> configuration isn't supported for that edition yet, rather than failing
+> silently. The register map looks common to all of them, but no one here owns
+> one to confirm that, and a guess isn't worth someone's stored config. This
+> path also still needs confirmation across firmware revisions.
 > Other GameSir controllers, other Logitech mice, other dongles, and firmware
 > revisions I haven't seen are **unsupported and untested** and may misbehave. The
 > app won't send config writes to a device it can't positively recognize, but
@@ -309,7 +312,9 @@ custom-curve editor, trigger tuning, vibration, poll rate), **button remap**,
 write-verify-retry; only the active profile + lighting are guaranteed (banks
 `0x02`–`0x04`, the stored profiles, appear read-only on this controller).
 
-**G7 Pro:** wired `3537:109b` and dongle `3537:109c` configuration identities,
+**G7 Pro:** contributed by [@brcly](https://github.com/brcly) and verified on
+their hardware, not mine (see Tested hardware). Wired `3537:109b` and dongle
+`3537:109c` configuration identities,
 with automatic transition from `3537:100a`; four editable profiles, 21 default-layer
 remap sources, stick/trigger shaping, resolution/inversion/sensitivity, four-motor
 vibration, report rate, D-pad options, dock settings, and semantic backup/restore.
@@ -326,13 +331,12 @@ button's macro costs no net slots (there's a manual sweep on the Macros tab
 too). Macro playback runs slightly slower than recorded — the mouse's macro
 engine spends a little time per step, which the per-macro speed control offsets.
 
-**Newer, not yet confirmed on hardware:** the profile bar (selecting, renaming,
-switching the running profile) and restoring a profile to the mouse's factory
-copy. These are built on the same gated, backed-up, read-back-verified write
-path as everything above and are tested against a simulated device, but they
-haven't been exercised on a real mouse yet. Switching the running profile is
-the least certain piece — the spec is ambiguous about how that call is
-addressed, and the app reports it if the mouse doesn't move.
+**Mouse profiles:** all five onboard profiles are verified on hardware — picking
+which one you're editing (which costs no device write, so you can edit a profile
+you aren't currently using), renaming, switching the profile the mouse runs, and
+restoring one to the mouse's own factory copy in ROM. A restore is around a
+hundred device reads and writes, so it takes a few seconds with the controls
+disabled while it runs; the toast says what it's doing.
 
 **Mouse-mode gotcha (KDE Plasma 6.7):** after a dongle replug, the sticks may start
 driving the desktop cursor — that's **KWin's Game Controller plugin** reading the
