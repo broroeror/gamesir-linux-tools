@@ -217,8 +217,14 @@ Item {
             x: parent.width / 2 - width / 2 + parent.ax * parent.width * 0.20
             y: parent.height / 2 - height / 2 + parent.ay * parent.width * 0.20
             Behavior on color { ColorAnimation { duration: 80 } }
-            Behavior on x { NumberAnimation { duration: 40 } }
-            Behavior on y { NumberAnimation { duration: 40 } }
+            // NO Behavior on x/y. Stick position updates every 16ms (the input
+            // timer runs at ~60Hz), so a 40ms tween never finished -- each new
+            // sample restarted it, leaving the dot permanently chasing a target
+            // it never reached, ~40ms behind the thumb, with its velocity reset
+            // every frame. It read as a low frame rate. The data is already at
+            // display rate; tweening it can only add lag. (The D-pad below DOES
+            // animate, and should: `dir` is a discrete nine-position state that
+            // changes rarely, so there the tween is a glide, not a chase.)
         }
     }
 
