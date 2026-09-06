@@ -1,7 +1,8 @@
 # Deadband — Linux device configuration manual
 
-The user guide for the **[GameSir Cyclone 2 Linux app](README.md)**: how to use each
-feature, how to get out of trouble, and the questions that tend to come up. For
+The user guide for **[Deadband](README.md)**: how to use each feature, how to get
+out of trouble, and the questions that tend to come up. It covers the supported
+GameSir controllers and the Logitech G502 X mouse. For
 install and a quick overview start with the [README](README.md); for the protocol,
 the app's architecture, and reverse-engineering findings, see
 [RESEARCH.md](RESEARCH.md).
@@ -9,6 +10,7 @@ the app's architecture, and reverse-engineering findings, see
 ## Contents
 
 - [Using the app](#using-the-app) — every feature, what it does and how to use it
+- [The mouse (G502 X)](#the-mouse-g502-x) — profiles, buttons, DPI, and macros
 - [Troubleshooting & recovery](#troubleshooting--recovery) — when something isn't working
 - [FAQ](#faq) — the questions that come up
 
@@ -80,10 +82,80 @@ restore to return.
 
 ### Mouse-mode toggle
 
-On KDE Plasma the sticks can end up driving the desktop cursor — that's a KWin
-feature, not the controller. The app's **Stop mouse mode** toggle suppresses it on
+This is about your *controller* driving the desktop cursor; it has nothing to do
+with the G502 X mouse below. On KDE Plasma the sticks can end up moving the
+pointer — that's a KWin feature, not the controller. The app's **Stop mouse mode** toggle suppresses it on
 demand; the cleaner permanent fix is a KDE setting. Both are in
 [Troubleshooting](#troubleshooting--recovery).
+
+## The mouse (G502 X)
+
+Pick the **G502 X** from the device selector in the header and the app switches to
+its three pages: **Buttons**, **DPI** and **Macros**. Everything on them edits the
+mouse's own onboard memory, so settings live on the mouse and follow it to another
+machine — nothing runs in the background to maintain them.
+
+Edits stage into a pending bar rather than applying as you click. Nothing reaches
+the mouse until you press **Apply**, which writes once and reads the result back to
+confirm it. A backup of the profile being written is saved first, every time.
+
+### Mouse profiles
+
+The mouse stores **five profiles**, shown as pills in the header. Two different
+things are marked, because they're often not the same profile:
+
+- **Filled pill** — the profile you're editing.
+- **Dot** — the profile the mouse is actually running.
+
+**Single-click** a pill to edit that profile. This costs no device write, so you can
+edit a profile you aren't currently using; the app just reads it, which takes a
+moment and shows a "Reading profile…" toast. **Double-click** to switch the mouse to
+it. Switching is refused while you have unsaved edits staged, since those were built
+against a different profile.
+
+**✎ Rename** renames the selected profile in place — up to 24 characters, stored on
+the mouse. **↺ Reset profile** restores it to the copy the mouse shipped with, kept
+in the mouse's own ROM. That's a real factory restore rather than defaults invented
+by the app. It's around a hundred reads and writes, so it takes a few seconds with
+the controls disabled while it runs.
+
+### Buttons
+
+Pick a button on the left, assign it on the right. Targets are the mouse buttons
+(M1–M5), a keyboard key or combination, the DPI controls (up, down, cycle, and
+**Sniper**, the hold-to-drop-DPI button), or **Disabled**.
+
+**G-Shift** is a second layer: hold a button assigned as the G-Shift trigger and
+every other button uses its G-Shift binding instead. Switch between **Default** and
+**G-Shift** above the mouse diagram to edit each layer, and assign the trigger
+itself like any other target.
+
+### DPI
+
+Five DPI stages, each adjustable with **−** / **+**. Two of them are special:
+
+- **Active** — the stage the mouse boots into.
+- **Sniper** — the stage the Sniper button drops to while held.
+
+**Report rate** sets the polling rate in Hz. The page's own note explains how the
+DPI buttons behave.
+
+### Macros
+
+Assign a multi-step macro to any button. Build one with **+ Add event**, or press
+**⏺ Record** and type — the recorder captures your real keystrokes and their timing.
+
+Each step is a key, a mouse click, a scroll, a media key, or a block of text, with
+its own **hold** and **delay** timings. **Speed** scales every timing on playback,
+which is useful because the mouse's macro engine spends a little time per step, so a
+recorded macro plays back slightly slower than you typed it. **Repeat while held**
+loops the macro until you release the button.
+
+Macros live in the mouse's flash, which has room for **10** of them. Flash can't be
+rewritten in place, so changing a button's macro writes a new slot and strands the
+old one — an Apply sweeps those automatically, so editing costs no net slots.
+**♻ Free unused slots** does the same sweep by hand, and only ever blanks slots that
+nothing points at, so it can't remove a macro a button still uses.
 
 ## Troubleshooting & recovery
 
@@ -160,9 +232,11 @@ your home directory.
 - **Restore a backup.** If you exported one before experimenting (the app makes it
   one click), **Backup / Restore → Restore** writes it back and verifies it. This
   is the fastest undo.
-- **Factory defaults.** The Buttons page offers a **Default profile** reset for a
-  recognized controller with a captured factory image, and the controller has its
-  own hardware reset. Config and lighting are ordinary settings — nothing the app
+- **Factory defaults.** The **↺ Reset profile** button in the header (beside the
+  profile pills) restores the selected profile for a recognized controller with a
+  captured factory image, and the controller has its own hardware reset. The
+  mouse has the same button, restoring from the copy the mouse itself shipped
+  with. Config and lighting are ordinary settings — nothing the app
   changes is permanent.
 - **Restart the app.** State is re-read live on connect, so a confused UI usually
   clears on relaunch or a controller replug.

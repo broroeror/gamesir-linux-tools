@@ -2,9 +2,10 @@ import QtQuick
 import QtQuick.Controls as QQC
 import QtQuick.Layouts
 
-// Front page: live controller render, per-profile button remap (master-detail:
-// pick a source on the left, assign a target on the right), and the factory
-// default-profile reset. Remap edits stage through the config pending/save queue.
+// Front page: live controller render and per-profile button remap (master-detail:
+// pick a source on the left, assign a target on the right). Remap edits stage
+// through the config pending/save queue. The factory default-profile reset used
+// to live here; it's in the header beside the profile pills now.
 Item {
     id: page
     property string sel: "A"
@@ -52,7 +53,7 @@ Item {
             Layout.fillWidth: true; Layout.fillHeight: true
             spacing: 16
 
-            // -------- LEFT: source list + reset --------
+            // -------- LEFT: source list --------
             ColumnLayout {
                 visible: bridge.profile > 0
                 Layout.fillWidth: true
@@ -148,7 +149,7 @@ Item {
                 }
             }
 
-            // -------- RIGHT: assign target (+ reset when compact) --------
+            // -------- RIGHT: assign target --------
             ColumnLayout {
                 visible: bridge.profile > 0
                 Layout.fillWidth: true
