@@ -64,7 +64,7 @@ snapshot is `v0.3.0`.
 **Going deeper?** The **[Manual](MANUAL.md)** is the user guide — how to use each
 feature, troubleshooting & recovery, and an FAQ. **[RESEARCH.md](RESEARCH.md)** is the
 developer side — protocol, architecture, the diagnostic tools, and per-controller
-findings. See also **[CONTROLLER_MAP.md](CONTROLLER_MAP.md)** (what each control
+findings. **[RELEASING.md](RELEASING.md)** is the release checklist. See also **[CONTROLLER_MAP.md](CONTROLLER_MAP.md)** (what each control
 reports to Linux) and **[TODO.md](TODO.md)** (roadmap + open questions).
 
 This is a spare-time project. I am one person, so fixes land when they land.
