@@ -6,11 +6,19 @@ import QtQuick
 //   * ACTIVE (dot) — the one the mouse is actually running right now.
 // They're usually the same profile, but they don't have to be: picking a pill
 // costs no device write, so you can edit a profile you aren't currently using.
-// Double-click a pill to rename it in place.
+// Single-click selects, double-click makes it the profile the mouse runs, and
+// renaming is the pencil button (file-manager conventions: click to pick, double
+// -click to use, explicit action to rename).
 Row {
     id: root
     property bool compact: false
     property int renaming: -1                 // sector being renamed, -1 = none
+
+    // Called by the toolbar's pencil: rename whichever profile is selected.
+    function startRename() {
+        if (mouse.selectedProfile > 0)
+            root.renaming = mouse.selectedProfile
+    }
 
     spacing: compact ? 5 : 8
     visible: mouse.present && mouse.profiles.length > 0
@@ -76,17 +84,21 @@ Row {
                     selectByMouse: true
                     onEditingFinished: if (pill.editing) root.commitRename(pill.modelData.sector, text)
                     Keys.onEscapePressed: root.renaming = -1
+                    // works however the rename started -- pencil or keyboard
+                    onVisibleChanged: if (visible) {
+                        text = pill.modelData.name
+                        forceActiveFocus()
+                        selectAll()
+                    }
                 }
             }
 
             HoverHandler { id: hov }
             TapHandler {
                 onTapped: if (!pill.editing) mouse.selectProfile(pill.modelData.sector)
-                onDoubleTapped: {
+                onDoubleTapped: if (!pill.editing) {
                     mouse.selectProfile(pill.modelData.sector)
-                    root.renaming = pill.modelData.sector
-                    nameEdit.text = pill.modelData.name
-                    nameEdit.forceActiveFocus(); nameEdit.selectAll()
+                    mouse.makeActive(pill.modelData.sector)   // switch the mouse to it
                 }
             }
         }

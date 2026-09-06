@@ -302,27 +302,24 @@ Window {
                              && mouse.profiles.length > 0
                 }
 
-                // Only meaningful when you're editing a profile the mouse isn't
-                // running — otherwise it's a no-op button, so it stays hidden.
+                // Renames the selected profile in place. Making a profile active
+                // is the double-click on its pill, so this is the button: renaming
+                // is the rarer action and the one that needs an obvious affordance.
                 PillButton {
-                    id: makeActiveBtn
+                    id: renameBtn
                     Layout.alignment: Qt.AlignVCenter
                     visible: win.activeDevice === "mouse" && mouse.present
                              && mouse.selectedProfile > 0
-                             && mouse.selectedProfile !== mouse.activeProfile
                     enabled: !mouse.busy
-                    // Higher text threshold than the profile bar on purpose: the
-                    // NAMES are what deserve the width, so these two collapse to
-                    // icons first rather than pushing the status pill off the bar.
-                    label: win.width < 1450 ? "▶" : "▶ Make active"
-                    onClicked: mouse.makeActive(mouse.selectedProfile)
-                    HoverHandler { id: makeActiveHover }
+                    label: win.width < 1450 ? "✎" : "✎ Rename"
+                    onClicked: mouseProfiles.startRename()
+                    HoverHandler { id: renameHover }
                     QQC.ToolTip {
-                        parent: makeActiveBtn
-                        visible: makeActiveHover.hovered
+                        parent: renameBtn
+                        visible: renameHover.hovered
                         delay: 400
-                        text: "Switch the mouse to the profile you're editing.\n" +
-                              "You can also cycle profiles with the button on the mouse."
+                        text: "Rename " + win.selectedProfileLabel + ".\n" +
+                              "Double-click a profile to switch the mouse to it."
                     }
                 }
 
