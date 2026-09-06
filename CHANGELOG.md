@@ -5,7 +5,7 @@ and Logitech mice — newest first. This is the
 curated, user-facing summary; the complete history is in git. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com).
 
-## [Unreleased]
+## [0.3.0] — 2026-09-06
 
 ### Added
 - **GameSir G7 Pro configuration** — contributed by
