@@ -290,6 +290,21 @@ CYCLONE = ControllerProfile(
 # 100a is a transitional HID identity changed automatically before configuration.
 # 1022 is detected separately so the UI can give the physical Menu+Share mode
 # instruction, but is never written.
+#
+# EDITION SCOPE: the G7 Pro ships in editions that differ ONLY by USB product id
+# (the same trap as the 8K's Nioh/Aimlabs pair — they all report a generic
+# product string). 109b/109c are the SHADOW EMBER edition, contributed and
+# hardware-verified by @brcly. Per upstream g7ctl, White Trimode is 1003/1004
+# and Zenless Zone Zero is 105d; an Amazon edition reports 10ba. None of those
+# are covered here, and they are deliberately absent rather than forgotten:
+# writing a register map to an edition it wasn't captured from is exactly how
+# you brick someone's config.
+#
+# CAVEAT: 100a and 1022 are NOT unique to one edition (upstream confirms 100a on
+# both Shadow Ember and White Trimode, 1022 on both Shadow Ember and Zenless).
+# So a pad matched on 100a alone is not provably Shadow Ember, and the transition
+# aims it at 109b regardless. Untested against another edition; if that turns out
+# to misbehave, gate the transition on something narrower than the id alone.
 G7_PRO = ControllerProfile(
     name='GameSir G7 Pro',
     short='G7 Pro',

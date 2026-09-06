@@ -74,12 +74,20 @@ can't positively identify. Fork it and customize it however you like.
 
 > ### ⚠️ Tested hardware
 > Everything here has only been developed and verified on a **GameSir Cyclone 2**,
-> a **GameSir G7 Pro**, a **GameSir G7 Pro 8K PC**, and a **Logitech G502 X LIGHTSPEED** mouse — **nothing
-> else. **G7 Pro** configuration targets `3537:109b` when wired and `3537:109c`
-> through its dongle. Deadband automatically moves the transitional `3537:100a`
-> identity to one of those configuration identities. If it is instead showing
-> `3537:1022`, hold **MENU (START)+SHARE** together first. This new path still
-> needs broader confirmation across firmware revisions.
+> a **GameSir G7 Pro 8K PC**, and a **Logitech G502 X LIGHTSPEED** mouse — **nothing
+> else.**
+>
+> **G7 Pro** support was contributed by [@brcly](https://github.com/brcly) and
+> verified on their hardware rather than mine. It targets the **Shadow Ember**
+> edition: `3537:109b` wired, `3537:109c` through the dongle. Deadband moves the
+> transitional `3537:100a` identity to one of those automatically; if the pad is
+> showing `3537:1022` instead, hold **MENU (START)+SHARE** together first.
+>
+> The G7 Pro ships in editions that differ only by USB product ID, so **other
+> editions are not covered** and won't be recognised — White Trimode
+> (`1003`/`1004`), Zenless Zone Zero (`105d`), and at least one Amazon edition
+> reporting `10ba`. This path also still needs confirmation across firmware
+> revisions.
 > Other GameSir controllers, other Logitech mice, other dongles, and firmware
 > revisions I haven't seen are **unsupported and untested** and may misbehave. The
 > app won't send config writes to a device it can't positively recognize, but
@@ -257,10 +265,12 @@ everything it does is **reversible** and stays **on your machine**. The specific
   online.
 - **Permissions.** Prefer the udev rule (per-user `uaccess`) over running as root —
   see [Running](#running). Under `sudo`, `~` is `/root`, so backups land there.
-- **Tested hardware.** Cyclone 2 and G7 Pro 8K PC are hardware-verified. G7 Pro
-  support targets wired `3537:109b` and dongle `3537:109c`; `3537:100a` is
-  transitioned automatically. Hold MENU (START)+SHARE together if the controller
-  is showing its `3537:1022` native identity.
+- **Tested hardware.** Cyclone 2, G7 Pro 8K PC and the G502 X are verified here.
+  G7 Pro support was contributed and verified by [@brcly](https://github.com/brcly)
+  on the Shadow Ember edition (wired `3537:109b`, dongle `3537:109c`; `3537:100a`
+  is transitioned automatically — hold MENU (START)+SHARE if the pad is showing
+  `3537:1022`). Other G7 Pro editions aren't covered. Treat anything not listed
+  as unproven and use it at your own risk.
 
 ## How it works
 
