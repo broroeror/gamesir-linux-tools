@@ -30,12 +30,27 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # vendors we care about: GameSir controllers + the Logitech mouse work
 VENDOR_NAMES = {0x3537: 'GameSir', 0x046D: 'Logitech'}
 
-G7_IDENTITIES = {
-    0x109B: 'wired configuration',
-    0x109C: 'dongle configuration',
-    0x100A: 'HID transition',
-    0x1022: 'native/GIP',
-}
+# Sourced from the protocol module rather than copied, because the copy already
+# drifted: the app learned to name other G7 Pro editions and this table didn't,
+# so a pad on one of them was skipped entirely and never appeared in a report --
+# hiding the single most likely explanation for "it's found but I see no config".
+try:
+    from vendors.gamesir.models.g7pro import protocol as _g7
+    G7_IDENTITIES = {
+        _g7.PID_WIRED: 'wired configuration',
+        _g7.PID_DONGLE: 'dongle configuration',
+        _g7.PID_HID: 'HID transition',
+        _g7.PID_NATIVE: 'native/GIP',
+    }
+    G7_UNCONFIRMED = dict(_g7.UNCONFIRMED_EDITIONS)
+except Exception:                      # partial install -- report what we can
+    G7_IDENTITIES = {
+        0x109B: 'wired configuration', 0x109C: 'dongle configuration',
+        0x100A: 'HID transition', 0x1022: 'native/GIP',
+    }
+    G7_UNCONFIRMED = {}
+G7_IDENTITIES.update({pid: f'{name} (not configurable)'
+                      for pid, name in G7_UNCONFIRMED.items()})
 
 UDEV_RULES = {
     'GameSir': ('/etc/udev/rules.d/70-gamesir.rules',
@@ -324,6 +339,16 @@ def collect():
         ready = [n for n in rep['usb_devices'] if n['pid'] in (0x109B, 0x109C)]
         transition = [n for n in rep['usb_devices'] if n['pid'] == 0x100A]
         native = [n for n in rep['usb_devices'] if n['pid'] == 0x1022]
+        other_ed = [n for n in rep['usb_devices'] if n['pid'] in G7_UNCONFIRMED]
+        if other_ed:
+            names = ', '.join(sorted({G7_UNCONFIRMED[n['pid']] for n in other_ed}))
+            pids = ', '.join(sorted({f'3537:{n["pid"]:04x}' for n in other_ed}))
+            rep['verdict'].append(
+                f'G7 Pro {names} found ({pids}). Input works, but '
+                'configuration is only supported on the Shadow Ember edition so '
+                'far — the editions differ only by USB id and nobody has been '
+                'able to confirm the register map on another one. Please say so '
+                'on an issue; that is exactly what would unblock it.')
         if ready:
             if any(n['access'] for n in ready):
                 kinds = ', '.join(sorted({n['identity'].split()[0] for n in ready}))
