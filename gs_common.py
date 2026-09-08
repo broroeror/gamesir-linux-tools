@@ -226,11 +226,8 @@ def device_bcd(devnode):
     """USB bcdDevice (firmware version) for a /dev/hidrawN node as an int
     (e.g. 0x0326 for fw 3.26), or None if unreadable.
 
-    Mainly a display/labelling helper now (firmware_version builds on it to pin a
-    version string to one physical unit). NOTE: the firmware flasher no longer uses
-    the bcd major to detect the 2.4GHz dongle — that gated on the *version*, which
-    would eventually lock a legit controller out of updates; the dongle guard is now
-    identity-based (USB product id + the chip's in-loader flash-header signature)."""
+    A display/labelling helper: firmware_version builds on it to pin a version
+    string to one physical unit."""
     name = os.path.basename(devnode)
     devdir = _usb_device_dir(os.path.join('/sys/class/hidraw', name))
     if devdir is None:

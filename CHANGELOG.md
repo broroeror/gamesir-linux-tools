@@ -53,6 +53,13 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
   appeared once slots were nearly exhausted.
 - Mouse **backups now precede the first flash write** and work on an installed app.
 
+### Removed
+- **Firmware backup & restore.** It needed an external tool that was never
+  bundled, so in practice it did nothing for anyone who installed the app, and
+  it widened the project's scope well past configuring a controller. Suggested
+  by a GameSir community moderator, and I agreed. Reading the firmware *version*
+  is unaffected — that's just a USB descriptor and it still shows in the header.
+
 ### Changed
 - **Documentation brought back in line with the app.** The manual had no mouse
   section at all; RESEARCH.md had no G502 X section and contradicted its own summary
@@ -115,8 +122,8 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
 
 ### Firmware Backup & Restore (advanced, optional)
 - Back up the Cyclone 2's firmware and restore your own backup — wired only, brick-
-  safe, and gated by an on-chip identity check. Needs the external jl-uboot-tool
-  (not bundled). See [FIRMWARE.md](FIRMWARE.md).
+  safe, and gated by an on-chip identity check. Needed the external jl-uboot-tool
+  (never bundled). *Removed in a later release — see Unreleased.*
 
 ## [0.1.0-alpha.2]
 

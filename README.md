@@ -355,14 +355,6 @@ and the **open items** — verifying the RT block, some remap target codes,
 profile-switch sync, PS4/Switch input parsing — live in
 **[RESEARCH.md](RESEARCH.md)** and **[TODO.md](TODO.md)**.
 
-## Firmware
-
-The Cyclone 2's firmware can be **backed up and restored** from Linux — an advanced,
-opt-in, Cyclone-2-only feature (wired connection only, never over the 2.4 GHz dongle).
-It's a backup/restore tool, **not** a firmware updater, and it needs the external
-[jl-uboot-tool](https://github.com/kagaimiq/jl-uboot-tool) (not bundled). See
-**[FIRMWARE.md](FIRMWARE.md)**.
-
 ## License & disclaimer
 
 Released under the [MIT License](LICENSE) — use, modify, and redistribute

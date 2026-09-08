@@ -1019,11 +1019,6 @@ Window {
                         SectionHeader { text: "Backup & Restore" }
                         BackupPanel { width: parent.width }
 
-                        // Firmware backup/restore is Cyclone/BR23-only; hide the
-                        // whole section for controllers that don't support it.
-                        Divider { visible: bridge.fwSupported }
-                        SectionHeader { text: "Firmware Backup & Restore"; visible: bridge.fwSupported }
-                        FirmwarePanel { width: parent.width; visible: bridge.fwSupported }
 
                         Divider {}
 

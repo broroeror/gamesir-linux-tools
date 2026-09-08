@@ -32,7 +32,6 @@ import kf_cache
 import kwin
 import vendors.gamesir.models.cyclone2.factory as factory
 import backup
-import vendors.gamesir.flash as flash
 from vendors.gamesir.models.cyclone2.led import LIGHTS
 
 from PySide6.QtCore import QUrl
@@ -148,9 +147,7 @@ class GamesirBridge(QObject):
     backupBusyChanged = Signal()
     backupProgress = Signal(int, int)   # done, total
     backupStatus = Signal(bool, str)    # ok, message
-    fwBusyChanged = Signal()
     fwProgress = Signal(str)            # phase text (Entering loader / Writing / …)
-    fwStatus = Signal(bool, str)        # ok, message
     fwVersionsChanged = Signal()        # library changed (e.g. after a backup)
     diagChanged = Signal()              # diagnostics report text / busy changed
     _diagDone = Signal(str)             # worker thread -> GUI (queued delivery)
@@ -191,7 +188,6 @@ class GamesirBridge(QObject):
         self._diag_busy = False
         self._diagDone.connect(self._on_diag_done)
         self._backup_busy = False
-        self._fw_busy = False
 
         # 8K simple lighting (bank 0x20). Loaded once per connection; writes apply
         # immediately (like the Cyclone LED), so we don't re-read/clobber after.
@@ -273,7 +269,7 @@ class GamesirBridge(QObject):
     def _poll_status(self):
         # Model changed (Cyclone <-> G7 <-> none): rebuild the register-address
         # map and refresh the model-level properties bound to controllerChanged
-        # (fwSupported, poll rates, remap sources).
+        # (poll rates, remap sources).
         if state['controller'] != self._controller:
             self._controller = state['controller']
             self._apply_profile(profiles.active())
@@ -796,8 +792,7 @@ class GamesirBridge(QObject):
     def connectionKind(self):
         """'Wired' / 'Wireless' hint for the current controller ('' if unknown/demo).
         Derived from the USB identity we're talking to (8K wired PID, Cyclone fw
-        namespace) — a display hint, NOT a flash gate. The authoritative dongle guard
-        is the in-loader flash-header identity (GS_C2_Dongle) used by gamesir_flash."""
+        namespace). A display hint only."""
         if state.get('demo'):
             return ''
         w = state.get('wired')
@@ -805,8 +800,7 @@ class GamesirBridge(QObject):
 
     @Property(bool, notify=statusChanged)
     def onDongle(self):
-        """True when we're connected through the wireless dongle (for UI warnings —
-        e.g. the firmware panel: flashing over the dongle writes to the dongle)."""
+        """True when we're connected through the wireless dongle (for UI warnings)."""
         return state.get('wired') is False
 
     @Property(str, notify=statusChanged)
@@ -1684,150 +1678,6 @@ class GamesirBridge(QObject):
             self._backup_busy = False
             self.backupBusyChanged.emit()
             self.backupStatus.emit(False, f'Backup is not restorable: {e}')
-
-    # ------------------------------------------------------------- firmware flash
-    # Mirrors the backup pattern: a worker thread drives gamesir_flash (enter
-    # loader -> jl-uboot-tool write/read -> reset), reporting phase text. Loader
-    # entry reuses the app's own command channel (control.send_cmd) so we don't
-    # open a second hidraw handle alongside the reader thread.
-    @Property(bool, notify=fwBusyChanged)
-    def fwBusy(self):
-        return self._fw_busy
-
-    @Property(bool, notify=controllerChanged)
-    def fwSupported(self):
-        """Whether to offer firmware flashing. True unless we've POSITIVELY
-        identified a connected controller that can't be flashed (a recognized
-        G7/G7 Pro -- the Linux flasher is Cyclone/BR23-only). It deliberately
-        stays True when nothing is recognized, which covers two cases the old
-        `is_recognized() and can_flash` form wrongly hid:
-          * mid-flash -- the controller is in the BR23 loader (a /dev/sg device,
-            not a GameSir HID), so it reads as 'nothing connected'; the panel must
-            stay up to show progress and the 'don't unplug' warning.
-          * recovery -- a controller left stuck in the loader by an interrupted
-            flash must still be flashable from the GUI (enter_loader finds the
-            existing loader).
-        Sending the Cyclone loader command to an unrecognized device is prevented
-        independently by the recognized-model guard in control.send_cmd, so
-        widening visibility here doesn't widen what can actually be written."""
-        return not profiles.is_recognized() or self._prof.can_flash
-
-    @Property(bool, notify=controllerChanged)
-    def factoryResetSupported(self):
-        """True only for a recognized model with a captured factory-default image
-        (Cyclone). The Buttons page binds the 'Default profile' reset card to this
-        so a G7/G7 Pro isn't offered a reset that would write Cyclone bytes."""
-        return profiles.is_recognized() and self._prof.factory_reset
-
-    @Property(bool, notify=controllerChanged)
-    def profileResetSupported(self):
-        """Any recognized, vendor-writable model can reset its profile: the ones
-        with a captured factory image (Cyclone) restore the exact out-of-box bytes;
-        the rest (8K) get a field-by-field write of documented default values."""
-        return profiles.is_recognized() and self._prof.input_style == 'cyclone_0x12'
-
-    @Property(int, notify=controllerChanged)
-    def profileCount(self):
-        """Number of editable profiles on the active controller (4 on both)."""
-        return len(self._prof.profile_banks)
-
-    @Property('QVariantList', notify=fwVersionsChanged)
-    def fwVersions(self):
-        return [f['version'] for f in flash.list_firmware()
-                if f['kind'] == 'fw' and f['product'] == flash.PRODUCT]
-
-    @Property(bool, constant=True)
-    def firmwareToolingAvailable(self):
-        """Whether jl-uboot-tool (an external, user-installed dependency) is
-        present. Firmware backup/restore needs it; the panel shows an install
-        note instead of the actions when it's missing."""
-        return flash.tooling_available()
-
-    def _fw_done(self, ok, msg):
-        self._fw_busy = False
-        self.fwBusyChanged.emit()
-        self.fwStatus.emit(ok, msg)
-        self.fwVersionsChanged.emit()      # a backup may have added a version
-        self._loaded_profile = None        # device changed underneath us
-        self._loaded_led_slot = None
-
-    def _fw_run(self, work, done_msg):
-        if self._fw_busy:
-            return
-        self._fw_busy = True
-        self.fwBusyChanged.emit()
-
-        def run():
-            try:
-                work()
-                ok, msg = True, done_msg()
-            except Exception as e:
-                ok, msg = False, str(e)
-            self._fw_done(ok, msg)
-        threading.Thread(target=run, daemon=True).start()
-
-    def _enter_loader_cmd(self, gen=None):
-        """Send the BR23 enter-loader command over the app's own control channel.
-        `gen` pins it to the device session captured when the flash/backup began,
-        so a controller switch between the click and the send refuses the command
-        instead of delivering it to a different (possibly dongle-attached) unit."""
-        control.send_cmd(0x0F, 0x17, 0x55, 0x88, gen=gen)
-
-    def _selected_node(self):
-        """A /dev/hidraw node of the currently-selected controller — the device
-        `_enter_loader_cmd` (via control) actually sends the loader command to.
-        Passing it to the flasher lets the dongle guard validate that exact unit
-        instead of whichever vendor interface happens to be streaming live."""
-        from gs_common import find_controllers
-        sel = state['selected']
-        for c in find_controllers():
-            if c['id'] == sel and c['nodes']:
-                return c['nodes'][0]
-        return None
-
-    def _fw_precheck(self, verb):
-        """Shared gate for firmware backup/restore: model must be flashable AND the
-        external jl-uboot-tool present. Emits the reason and returns False if not."""
-        if not self.fwSupported:
-            self.fwStatus.emit(False, "Firmware backup/restore is only supported on "
-                                      "the Cyclone 2.")
-            return False
-        if not flash.tooling_available():
-            self.fwStatus.emit(False, "Firmware %s needs jl-uboot-tool installed "
-                                      "(see FIRMWARE.md)." % verb)
-            return False
-        return True
-
-    @Slot(str)
-    def restoreFirmware(self, version):
-        """Write a firmware image FROM YOUR LIBRARY back to the controller — a
-        restore, not a flasher. The in-loader identity guard refuses anything but
-        the matching wired controller."""
-        if not self._fw_precheck("restore"):
-            return
-        prog = lambda p: self.fwProgress.emit(p)
-        gen = control.generation()          # capture before resolving the node so
-        node = self._selected_node()        # a rebind in between fails the send, not
-        send = lambda: self._enter_loader_cmd(gen)   # a send to an unvalidated unit
-        self._fw_run(
-            lambda: flash.flash_version(version=version, on_progress=prog,
-                                        send=send, guard_node=node),
-            lambda: f"Restored firmware {version}.")
-
-    @Slot(str)
-    def backupFirmware(self, label):
-        if not self._fw_precheck("backup"):
-            return
-        prog = lambda p: self.fwProgress.emit(p)
-        gen = control.generation()
-        node = self._selected_node()
-        send = lambda: self._enter_loader_cmd(gen)
-        out = {}
-        def work():
-            path, ver = flash.backup_current(label=label or None, on_progress=prog,
-                                             send=send, guard_node=node)
-            out['ver'] = ver
-        self._fw_run(work, lambda: f"Backed up firmware {out.get('ver', '')}.")
 
     # ------------------------------------------------------------- config editor
     @Property('QVariantMap', notify=configLoaded)

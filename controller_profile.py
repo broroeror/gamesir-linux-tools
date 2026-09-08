@@ -74,18 +74,8 @@ class ControllerProfile:
                                            # (8K sticks use 5, everything else 3)
     trigger_curve_npts: int = 3             # trigger response-curve control points
     profile_banks: tuple = (1, 2, 3, 4)    # banks that hold editable profiles
-    can_flash: bool = False                # firmware flasher supports this model
-                                           # (gamesir_flash is Cyclone/BR23-only)
     factory_reset: bool = False            # a captured factory-default image exists
                                            # (gamesir_factory bytes are Cyclone-only)
-    flash_identity: Optional[str] = None   # product-id string in the chip's own
-                                           # flash header (raw offset 0x1010). The
-                                           # flasher reads it IN the loader and
-                                           # refuses to write unless it matches --
-                                           # a version-independent, brick-proof
-                                           # check that the target really is this
-                                           # controller and not a 2.4GHz dongle
-                                           # (which reads 'GS_C2_Dongle' there).
 
     # capability hints for the editor UI (which pages/logic a model supports).
     # The whole `gamesir_led` module assumes the Cyclone keyframe/palette RGB, so
@@ -243,11 +233,7 @@ CYCLONE = ControllerProfile(
     write_style='cyclone',
     input_style='cyclone_0x12',
     profile_banks=(1, 2, 3, 4),
-    can_flash=True,                         # the Linux flasher targets the Cyclone
     factory_reset=True,                     # captured Cyclone factory-default image
-    # Flash-header identity confirmed against real dumps of fw 3.26 AND 3.52 (the
-    # dongle reads 'GS_C2_Dongle' at the same offset). Version-independent.
-    flash_identity='GS_C2_ADC_DEVICE',
     lighting_style='cyclone_keyframe',      # the app's LED module IS the Cyclone's
     # Macros use the Cyclone's own RE'd paddle blocks (L4/R4) -> safe + verified.
     has_motion=True,
@@ -390,7 +376,6 @@ G7 = G7_PRO
 #   * LIGHTING is a single power/home RGB indicator (a 4-quadrant ring) + global
 #     device settings, NOT the Cyclone's per-key keyframe RGB. All of it lives in
 #     bank 0x20 (see extras) and is GLOBAL, not per-profile.
-# Flash is OFF: geometry/loader identity unknown -> can_flash=False, no identity.
 G7_8K = ControllerProfile(
     # Officially "G7 Pro 8K PC" — the PC (non-Xbox-licensed) line; reviewers and
     # GameSir's own shorthand often drop the "PC", and there is no Xbox 8K.
@@ -407,9 +392,7 @@ G7_8K = ControllerProfile(
     write_style='cyclone',                  # bare 0f03 writes (NOT the g7 envelope)
     input_style='cyclone_0x12',             # live 0x12 on the vendor hidraw
     profile_banks=(1, 2, 3, 4),             # 4 profiles, confirmed via the app
-    can_flash=False,                        # loader identity + flash geometry unknown
     factory_reset=False,
-    flash_identity=None,
     lighting_style='simple_8k',             # mode/brightness/home-ring/dock (bank 0x20);
                                             # NOT the Cyclone keyframe model
     has_motion=True,                        # Aim/Tilt gyro block (bank 0x01)

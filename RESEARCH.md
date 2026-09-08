@@ -13,14 +13,14 @@ re-tread them. This is a hobby RE effort; corrections and additions welcome.
 
 ## Summary
 
-| Device | USB IDs | Input on Linux | Config editor on Linux | Firmware flash | Verdict |
-|---|---|---|---|---|---|
-| **Cyclone 2** *(GameSir, VID 0x3537)* | `0575` / `100b` / `1053` | ✅ vendor `0x12` | ✅ full | ✅ (JieLi BR23) | **Fully supported** |
-| **G7 Pro** *(Shadow Ember)* | `109b` (wired config) · `109c` (dongle config) · `100a` (transition) · `1022` (native/GIP) | ✅ evdev or claimed USB telemetry | ✅ four profiles + core/extras | — (different chip) | **Supported on 109b/109c** — contributed and verified by [@brcly](https://github.com/brcly), not on my hardware |
-| G7 SE *(not owned)* | `1010` | ✅ mainline `xpad` | n/a | — | Reference only |
-| **G7 Pro 8K PC** | `10c5`–`10c8` edition pairs | ✅ vendor `0x12` | ✅ full incl. motion/macros/lights | ❌ | **Fully supported** |
-| **G502 X LIGHTSPEED** *(Logitech, VID 0x046d)* | `c098` (wired) · `409f` / `c547` (receiver) | ✅ standard HID | ✅ full — profiles, G-Shift, DPI, macros | — | **Fully supported** |
-| 8BitDo *(future)* | — | — | — | — | Not started |
+| Device | USB IDs | Input on Linux | Config editor on Linux | Verdict |
+|---|---|---|---|---|
+| **Cyclone 2** *(GameSir, VID 0x3537)* | `0575` / `100b` / `1053` | ✅ vendor `0x12` | ✅ full | **Fully supported** |
+| **G7 Pro** *(Shadow Ember)* | `109b` (wired config) · `109c` (dongle config) · `100a` (transition) · `1022` (native/GIP) | ✅ evdev or claimed USB telemetry | ✅ four profiles + core/extras | **Supported on 109b/109c** — contributed and verified by [@brcly](https://github.com/brcly), not on my hardware |
+| G7 SE *(not owned)* | `1010` | ✅ mainline `xpad` | n/a | Reference only |
+| **G7 Pro 8K PC** | `10c5`–`10c8` edition pairs | ✅ vendor `0x12` | ✅ full incl. motion/macros/lights | **Fully supported** |
+| **G502 X LIGHTSPEED** *(Logitech, VID 0x046d)* | `c098` (wired) · `409f` / `c547` (receiver) | ✅ standard HID | ✅ full — profiles, G-Shift, DPI, macros | **Fully supported** |
+| 8BitDo *(future)* | — | — | — | Not started |
 
 The shared thread: **GameSir's config protocol is a register read/write protocol on
 HID report `0x0F`**, the same across the family — only the framing and the transport
