@@ -203,6 +203,41 @@ def classify_open_failure(node):
 
 
 # --------------------------------------------------------------------- report
+PLATFORM_VENDORS = {0x057E: 'Nintendo', 0x054C: 'Sony', 0x045E: 'Microsoft'}
+
+
+def _platform_mode_devices():
+    """USB devices presenting as another platform's controller.
+
+    A GameSir pad's platform-mode combo changes its USB VENDOR id, not just its
+    product id -- in Switch mode it enumerates as Nintendo. Everything else here
+    scans vendor 0x3537 only, so a pad that got mode-switched vanishes from the
+    report entirely and the verdict blames the kernel. This finds it. Best
+    effort: a failure here must never cost someone their report."""
+    out = []
+    try:
+        for d in glob.glob('/sys/bus/usb/devices/*/'):
+            try:
+                vid = int(open(d + 'idVendor').read().strip(), 16)
+            except (OSError, ValueError):
+                continue
+            if vid in PLATFORM_VENDORS:
+                try:
+                    pid = int(open(d + 'idProduct').read().strip(), 16)
+                except (OSError, ValueError):
+                    continue
+                name = ''
+                try:
+                    name = open(d + 'product').read().strip()
+                except OSError:
+                    pass
+                out.append({'vendor': PLATFORM_VENDORS[vid], 'vid': vid,
+                            'pid': pid, 'product': name})
+    except Exception:
+        pass
+    return out
+
+
 def _version():
     """App version (plus the git commit when running from a checkout). Never
     raises -- a missing version must not cost someone their whole report."""
@@ -280,9 +315,24 @@ def collect():
     # ---- overall verdicts, most-specific first ----
     gsnodes = [n for n in rep['nodes'] if n['vid'] == 0x3537]
     if not gsnodes and not rep['usb_devices']:
-        rep['verdict'].append(
-            'No GameSir device is enumerated. If one is plugged in, that is a '
-            'kernel/USB-level problem (check `dmesg`), not an app problem.')
+        others = _platform_mode_devices()
+        if others:
+            found = ', '.join(f'{o["vendor"]} {o["vid"]:04x}:{o["pid"]:04x}'
+                              + (f' "{o["product"]}"' if o['product'] else '')
+                              for o in others)
+            rep['verdict'].append(
+                'No GameSir device is enumerated, but a controller from another '
+                f'platform is: {found}. A GameSir pad changes its USB VENDOR id '
+                'when you switch platform mode, so if you just used a button '
+                'combo it may have moved to Switch/PS mode rather than into '
+                'configuration mode. Put it back in Xbox/XInput mode and re-check.')
+        else:
+            rep['verdict'].append(
+                'No GameSir device is enumerated. If one is plugged in, check '
+                '`lsusb` — a platform-mode combo changes the USB vendor id, so a '
+                'mode-switched pad will appear under another vendor entirely. If '
+                'it is absent from `lsusb` too, that is a kernel/USB-level '
+                'problem (check `dmesg`), not an app problem.')
     elif gsnodes and all(n['verdict'] == 'no-access' for n in gsnodes):
         rule = rep['rules'].get('GameSir', {})
         if rep.get('nixos'):
