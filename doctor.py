@@ -254,6 +254,37 @@ def _platform_mode_devices():
     return out
 
 
+def _interfaces(sysfs):
+    """Interface class/subclass/protocol + bound driver for a USB device.
+
+    Distinguishes a vendor CONFIG interface from an Xbox INPUT one. Both are
+    vendor-class with no hidraw node, so from the device line alone they look
+    identical -- which is exactly the ambiguity that makes it hard to say whether
+    a new edition's identity is configurable or just XInput. xpad-bound `ff/5d/01`
+    (XInput) or `ff/47/d0` (GIP) is input; an interface with no driver, or a
+    driver that isn't xpad, is the interesting one."""
+    out = []
+    if not sysfs:
+        return out
+    try:
+        for iface in sorted(glob.glob(os.path.join(sysfs, '*:*'))):
+            def rd(name, default='?'):
+                try:
+                    return open(os.path.join(iface, name)).read().strip()
+                except OSError:
+                    return default
+            link = os.path.join(iface, 'driver')
+            drv = os.path.basename(os.path.realpath(link)) if os.path.islink(link) else '-'
+            out.append({
+                'name': os.path.basename(iface),
+                'cls': rd('bInterfaceClass'), 'sub': rd('bInterfaceSubClass'),
+                'proto': rd('bInterfaceProtocol'), 'driver': drv,
+            })
+    except Exception:
+        pass
+    return out
+
+
 def _version():
     """App version (plus the git commit when running from a checkout). Never
     raises -- a missing version must not cost someone their whole report."""
@@ -329,6 +360,7 @@ def collect():
                 'pid': dev['pid'], 'identity': G7_IDENTITIES[dev['pid']],
                 'product': dev.get('product', ''), 'port': dev['port'],
                 'node': node, 'access': os.access(node, os.R_OK | os.W_OK),
+                'interfaces': _interfaces(meta.get('sysfs') or dev.get('sysfs')),
             })
     except Exception:
         pass
@@ -493,6 +525,14 @@ def format_report(rep):
         L.append(f'- {n["node"]}  GameSir {n["pid"]:04x} '
                  f'({n.get("identity", "unknown")})  "{n["product"]}" port {n["port"]}')
         L.append('    raw USB access: ' + ('OK' if n['access'] else 'PERMISSION DENIED'))
+        for i in n.get('interfaces', []):
+            kind = ''
+            if i['driver'] == 'xpad':
+                kind = '   <- Xbox INPUT, not config'
+            elif i['cls'] == 'ff' and i['driver'] == '-':
+                kind = '   <- vendor, unclaimed (config candidate)'
+            L.append(f"    iface {i['name']}: class {i['cls']}/{i['sub']}/{i['proto']}"
+                     f"  driver {i['driver']}{kind}")
     L.append('')
     L.append('### Verdict')
     for v in rep['verdict'] or ['Nothing conclusive — attach this report to the issue.']:
