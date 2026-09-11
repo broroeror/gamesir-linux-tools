@@ -61,6 +61,29 @@ def _slot_signature_mismatches():
     return out
 
 
+def _udev_pid_gaps():
+    """Config identities with no udev rule granting raw USB access.
+
+    The G7 Pro's config interfaces are reached through libusb, so each one needs
+    its own rule on the USB device. An id present in CONFIG_PIDS but missing from
+    the rules file fails as "raw USB access: PERMISSION DENIED" in the
+    diagnostics while everything else looks correct -- a confusing failure, and
+    an easy one to create, since adding an edition means editing two files. This
+    is the second table in this project that drifted from its source of truth, so
+    it gets checked rather than remembered."""
+    try:
+        from vendors.gamesir.models.g7pro import protocol as g7
+    except Exception:
+        return []
+    try:
+        rules = open(os.path.join(HERE, '70-gamesir.rules')).read().lower()
+    except OSError:
+        return ['70-gamesir.rules is missing']
+    return [f'3537:{pid:04x} ({g7.edition_name(pid) or "transition"}) has no udev rule'
+            for pid in g7.CONFIG_PIDS + g7.TRANSITION_PIDS
+            if f'"{pid:04x}"' not in rules]
+
+
 def main():
     from PySide6.QtCore import QUrl
     from PySide6.QtGui import QGuiApplication
@@ -99,12 +122,17 @@ def main():
 
     # --- report ---------------------------------------------------------------
     slot_bad = _slot_signature_mismatches()
-    ok = qml_ok and not slot_bad
+    udev_bad = _udev_pid_gaps()
+    ok = qml_ok and not slot_bad and not udev_bad
     print("=== startup smoke test ===")
     print(f"  QML (Main.qml) loaded : {'OK' if qml_ok else 'FAIL — did not load'}")
     print(f"  @Slot signatures      : "
           + ('OK' if not slot_bad else f'FAIL — {len(slot_bad)} mismatch(es)'))
     for m in slot_bad:
+        print(f"      {m}")
+    print(f"  udev vs CONFIG_PIDS   : "
+          + ('OK' if not udev_bad else f'FAIL — {len(udev_bad)} gap(s)'))
+    for m in udev_bad:
         print(f"      {m}")
     for name, t in threads.items():
         alive = t.is_alive()

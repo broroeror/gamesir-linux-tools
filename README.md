@@ -78,14 +78,16 @@ can't positively identify. Fork it and customize it however you like.
 > else.**
 >
 > **G7 Pro** support was contributed by [@brcly](https://github.com/brcly) and
-> verified on their hardware rather than mine. It targets the **Shadow Ember**
-> edition: `3537:109b` wired, `3537:109c` through the dongle. Deadband moves the
-> transitional `3537:100a` identity to one of those automatically; if the pad is
-> showing `3537:1022` instead, hold **MENU (START)+SHARE** together first.
+> verified on their hardware rather than mine. It covers the **Shadow Ember**
+> edition (`3537:109b` wired, `3537:109c` dongle) and the **Zenless Zone Zero**
+> edition (`3537:105d` / `3537:105e`, added from a user report and not yet
+> round-tripped on hardware). Deadband moves the transitional `3537:100a`
+> identity to a configuration one automatically; if the pad is showing
+> `3537:1022` instead, hold **MENU (START)+SHARE** together first.
 >
 > The G7 Pro ships in editions that differ only by USB product ID, so **other
-> editions can't be configured** — White Trimode (`1003`/`1004`), Zenless Zone
-> Zero (`105d`), and at least one Amazon edition reporting `10ba`. Deadband does
+> editions can't be configured** — White Trimode (`1003`/`1004`) and at least one
+> Amazon edition reporting `10ba`. Deadband does
 > recognise those and names them, so input works and the app tells you
 > configuration isn't supported for that edition yet, rather than failing
 > silently. The register map looks common to all of them, but no one here owns

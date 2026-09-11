@@ -16,11 +16,30 @@ import time
 from vendors.gamesir.usb_transport import InterruptHandle
 
 VID = 0x3537
+# Shadow Ember -- the edition this integration was built and verified against.
 PID_WIRED = 0x109B
 PID_DONGLE = 0x109C
+# Zenless Zone Zero. 105d was confirmed on real hardware upstream (g7ctl) with its
+# partner never found; 105e came from a user on issue #9 whose pad moved between
+# 105e and 1022 on the MENU+SHARE combo. Consecutive pair, same as every other
+# edition, so 105d/105e is wired/dongle.
+PID_ZZZ_WIRED = 0x105D
+PID_ZZZ_DONGLE = 0x105E
 PID_HID = 0x100A
 PID_NATIVE = 0x1022
-CONFIG_PIDS = (PID_WIRED, PID_DONGLE)
+CONFIG_PIDS = (PID_WIRED, PID_DONGLE, PID_ZZZ_WIRED, PID_ZZZ_DONGLE)
+
+# Editions reachable for configuration. The register map is NOT branched per
+# edition -- upstream uses one map everywhere and drives ids it has never seen,
+# which is consistent with one board in several shells. Zenless is included on
+# that reasoning plus a real pad reporting 105e; it has not been round-tripped on
+# hardware here, so treat a first report from one as verification, not routine.
+EDITIONS = {
+    PID_WIRED: 'Shadow Ember',
+    PID_DONGLE: 'Shadow Ember (dongle)',
+    PID_ZZZ_WIRED: 'Zenless Zone Zero',
+    PID_ZZZ_DONGLE: 'Zenless Zone Zero (dongle)',
+}
 
 # Editions we can NAME but haven't confirmed against real hardware. The protocol
 # looks common to all of them (upstream g7ctl keeps its variant table to names +
@@ -31,7 +50,6 @@ CONFIG_PIDS = (PID_WIRED, PID_DONGLE)
 UNCONFIRMED_EDITIONS = {
     0x1003: 'White Trimode',
     0x1004: 'White Trimode (dongle)',
-    0x105D: 'Zenless Zone Zero',
     0x10BA: 'Amazon edition',
 }
 UNCONFIRMED_PIDS = tuple(UNCONFIRMED_EDITIONS)
@@ -39,8 +57,8 @@ UNCONFIRMED_PIDS = tuple(UNCONFIRMED_EDITIONS)
 
 def edition_name(pid):
     """A human name for a G7 Pro USB id, or None if we've never seen it."""
-    if pid in CONFIG_PIDS:
-        return 'Shadow Ember'
+    if pid in EDITIONS:
+        return EDITIONS[pid]
     return UNCONFIRMED_EDITIONS.get(pid)
 TRANSITION_PIDS = (PID_HID,)
 ALL_PIDS = CONFIG_PIDS + TRANSITION_PIDS + (PID_NATIVE,)
