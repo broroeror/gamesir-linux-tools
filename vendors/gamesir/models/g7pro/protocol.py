@@ -25,9 +25,16 @@ PID_DONGLE = 0x109C
 # edition, so 105d/105e is wired/dongle.
 PID_ZZZ_WIRED = 0x105D
 PID_ZZZ_DONGLE = 0x105E
+# Amazon edition. Reported on issue #10 wired as 10ba with NO hidraw node at all,
+# which is the vendor-class signature every other configuration identity has --
+# 1022 by contrast comes up with two hidraw interfaces. This project's own G7 Pro
+# also reported 10ba, and the original Windows USB capture of the config protocol
+# was taken on that identity.
+PID_AMZ_WIRED = 0x10BA
 PID_HID = 0x100A
 PID_NATIVE = 0x1022
-CONFIG_PIDS = (PID_WIRED, PID_DONGLE, PID_ZZZ_WIRED, PID_ZZZ_DONGLE)
+CONFIG_PIDS = (PID_WIRED, PID_DONGLE, PID_ZZZ_WIRED, PID_ZZZ_DONGLE,
+               PID_AMZ_WIRED)
 
 # Editions reachable for configuration. The register map is NOT branched per
 # edition -- upstream uses one map everywhere and drives ids it has never seen,
@@ -39,6 +46,7 @@ EDITIONS = {
     PID_DONGLE: 'Shadow Ember (dongle)',
     PID_ZZZ_WIRED: 'Zenless Zone Zero',
     PID_ZZZ_DONGLE: 'Zenless Zone Zero (dongle)',
+    PID_AMZ_WIRED: 'Amazon edition',
 }
 
 # Editions we can NAME but haven't confirmed against real hardware. The protocol
@@ -50,7 +58,6 @@ EDITIONS = {
 UNCONFIRMED_EDITIONS = {
     0x1003: 'White Trimode',
     0x1004: 'White Trimode (dongle)',
-    0x10BA: 'Amazon edition',
 }
 UNCONFIRMED_PIDS = tuple(UNCONFIRMED_EDITIONS)
 

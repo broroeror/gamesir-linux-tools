@@ -396,6 +396,15 @@ def _eviocgabs(code):
     return (2 << 30) | (24 << 16) | (ord('E') << 8) | (0x40 + code)
 
 
+# ⚠ 0x133/0x134 are the well-known Linux gamepad trap. The kernel defines
+# 0x133 = BTN_NORTH (aliased BTN_X) and 0x134 = BTN_WEST (aliased BTN_Y) -- and
+# those aliases are historically WRONG for an Xbox layout, where X is the west
+# button and Y is the north one. So the mapping below is positional (north = Y),
+# which is right for a driver reporting compass semantics and backwards for one
+# that emits BTN_X/BTN_Y literally, as `xpad` does. Reported swapped on issue
+# #10; UNVERIFIED either way, because this path only ever runs for a G7 Pro in a
+# mode it can't be configured in -- the Cyclone and 8K read input over the vendor
+# hidraw channel and never reach here. Get `evtest` output before flipping it.
 _KEY_TO_STATE = {           # Linux gamepad button codes -> state keys
     0x130: 'a', 0x131: 'b', 0x133: 'y', 0x134: 'x',
     0x136: 'lb', 0x137: 'rb', 0x13a: 'view', 0x13b: 'menu',

@@ -52,13 +52,29 @@ except Exception:                      # partial install -- report what we can
 G7_IDENTITIES.update({pid: f'{name} (not configurable)'
                       for pid, name in G7_UNCONFIRMED.items()})
 
+# A rule can legitimately live in EITHER directory: /etc is for rules an admin
+# installed by hand, /usr/lib is where a package puts its own. Checking only /etc
+# told every AUR user their rule was "NOT INSTALLED" and sent them off to copy a
+# file they already had, out of a source tree the package manager had cleaned up
+# (issue #10). Check both, and report which one answered.
 UDEV_RULES = {
-    'GameSir': ('/etc/udev/rules.d/70-gamesir.rules',
+    'GameSir': (('/etc/udev/rules.d/70-gamesir.rules',
+                 '/usr/lib/udev/rules.d/70-gamesir.rules'),
                 os.path.join(HERE, '70-gamesir.rules')),
-    'Logitech (G502 X)': ('/etc/udev/rules.d/70-deadband-g502x.rules',
+    'Logitech (G502 X)': (('/etc/udev/rules.d/70-deadband-g502x.rules',
+                           '/usr/lib/udev/rules.d/70-deadband-g502x.rules'),
                           os.path.join(HERE, 'packaging', 'udev',
                                        '70-deadband-g502x.rules')),
 }
+
+
+def _find_rule(paths):
+    """The first of `paths` that exists, or None. /etc wins so a hand-installed
+    override is what gets reported when both are present."""
+    for path in paths:
+        if os.path.exists(path):
+            return path
+    return None
 
 
 # --------------------------------------------------------------------- helpers
@@ -285,11 +301,16 @@ def collect():
     except Exception:
         rep['raw_usb_backend'] = 'native libusb-1.0 — unavailable'
 
-    for label, (installed, source) in UDEV_RULES.items():
+    for label, (paths, source) in UDEV_RULES.items():
+        found = _find_rule(paths)
         rep['rules'][label] = {
-            'installed': os.path.exists(installed),
+            'installed': found is not None,
+            'path': found,
+            'packaged': bool(found and found.startswith('/usr/lib/')),
             'source_present': os.path.exists(source),
-            'current': _same_file(installed, source),
+            # with no source tree (an installed app) we can't compare, so don't
+            # claim the rule is stale -- that reads as a problem when it isn't
+            'current': _same_file(found, source) if (found and os.path.exists(source)) else None,
         }
 
     for n in _sysfs_nodes():
@@ -346,13 +367,19 @@ def collect():
                 f'"{UDEV_RULES["GameSir"][1]}";\n'
                 'then `sudo nixos-rebuild switch` and UNPLUG AND REPLUG the '
                 'controller.')
-        elif not rule.get('installed') or not rule.get('current'):
+        elif not rule.get('installed') or rule.get('current') is False:
+            if rule.get('source_present'):
+                fix = (f'    sudo cp "{UDEV_RULES["GameSir"][1]}" /etc/udev/rules.d/\n'
+                       '    sudo udevadm control --reload-rules && sudo udevadm trigger')
+            else:
+                # installed app, no source tree: reinstalling the package is the
+                # route, not copying a file they don't have
+                fix = ('    reinstall/update the package (it ships the rule), then\n'
+                       '    sudo udevadm control --reload-rules && sudo udevadm trigger')
             rep['verdict'].append(
                 'GameSir device found but NOT openable (permission denied), and '
                 'the current udev rule is NOT installed. Fix:\n'
-                f'    sudo cp "{UDEV_RULES["GameSir"][1]}" /etc/udev/rules.d/\n'
-                '    sudo udevadm control --reload-rules && sudo udevadm trigger\n'
-                'then UNPLUG AND REPLUG the controller.')
+                + fix + '\nthen UNPLUG AND REPLUG the controller.')
         else:
             rep['verdict'].append(
                 'GameSir device found but NOT openable (permission denied) even '
@@ -442,8 +469,14 @@ def format_report(rep):
              f'— backend: {rep["hidapi_backend"]}')
     L.append(f'- Raw USB: {rep.get("raw_usb_backend", "?")}')
     for label, r in rep['rules'].items():
-        status = ('NOT INSTALLED' if not r['installed'] else
-                  'installed' if r.get('current') else 'installed, OUTDATED')
+        if not r['installed']:
+            status = 'NOT INSTALLED'
+        elif r.get('current') is False:
+            status = 'installed, OUTDATED'
+        else:
+            # current is None when there's no source tree to compare against (an
+            # installed app). Installed is all we can honestly claim.
+            status = 'installed' + (' (packaged)' if r.get('packaged') else '')
         L.append(f'- udev rule ({label}): {status}')
     L.append('')
     L.append('### Devices')

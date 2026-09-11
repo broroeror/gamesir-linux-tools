@@ -27,7 +27,7 @@ SUBSYSTEM=="input", ATTRS{idVendor}=="3537", TAG+="uaccess"
 # G7 Pro configuration uses interface 0 through native libusb rather than
 # hidraw, so it needs a rule on the USB device itself. Each edition has its own
 # pair of configuration ids -- Shadow Ember 109b (wired) / 109c (dongle),
-# Zenless Zone Zero 105d / 105e -- plus 100a, the short-lived HID identity
+# Zenless Zone Zero 105d / 105e, Amazon edition 10ba -- plus 100a, the HID
 # Deadband transitions before opening a configuration session.
 #
 # An edition missing from this list fails as "raw USB access: PERMISSION DENIED"
@@ -37,4 +37,5 @@ SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="109b", TAG+="uaccess
 SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="109c", TAG+="uaccess"
 SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="105d", TAG+="uaccess"
 SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="105e", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="10ba", TAG+="uaccess"
 SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="100a", TAG+="uaccess"
