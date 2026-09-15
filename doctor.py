@@ -488,9 +488,9 @@ def collect():
         elif native:
             rep['verdict'].append(
                 'G7 Pro 1022 native/GIP identity found. Input is available, but '
-                'configuration requires holding VIEW (⧉) + MENU (☰) for 2 '
-                'seconds. Do NOT use Share+Menu: that is a recovery reset and '
-                'it erases the active profile\'s remaps.')
+                'configuration requires holding SHARE + MENU together. Be aware '
+                'that combo also resets the active profile\'s remaps and the '
+                'Shift layer, so back them up first if you care about them.')
 
     monodes = [n for n in rep['nodes'] if n['vid'] == 0x046D]
     if monodes and all(n['verdict'] == 'no-access' for n in monodes):

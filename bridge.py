@@ -776,8 +776,8 @@ class GamesirBridge(QObject):
     @Property(str, notify=statusChanged)
     def modeMessage(self):
         if profiles.active() is profiles.G7_NATIVE:
-            return ('Hold VIEW (⧉) + MENU (☰) for 2 seconds to switch the '
-                    'controller to XInput mode.')
+            return ('Hold SHARE + MENU (☰) to switch the controller to XInput '
+                    'mode. Note this also resets the active profile\'s remaps.')
         return ('Not in Xbox mode. Use the controller\'s Start / pause buttons '
                 'to switch to Xbox/XInput mode so the app can read it.')
 
@@ -835,6 +835,21 @@ class GamesirBridge(QObject):
         import doctor
         rule = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                             '70-gamesir.rules')
+        if not os.path.exists(rule):
+            # A packaged install ships the rule to /usr/lib/udev/rules.d and does
+            # NOT drop a copy beside the app, so the cp below pointed at a file
+            # that was never installed ("cannot stat"). If the packaged rule is
+            # already there, copying it achieves nothing anyway -- udev reads both
+            # directories -- so the real fix is a newer package, then a replug.
+            packaged = '/usr/lib/udev/rules.d/70-gamesir.rules'
+            if os.path.exists(packaged):
+                return ('The udev rule is installed but does not cover this '
+                        'device yet.\n'
+                        'Update Deadband (the rule ships with it), then:\n'
+                        '  sudo udevadm control --reload-rules && sudo udevadm trigger\n'
+                        'then UNPLUG AND REPLUG the controller.')
+            return ('The udev rule is missing. Reinstall/update Deadband, then '
+                    'unplug and replug the controller.')
         if doctor.is_nixos():
             return (f'services.udev.extraRules = builtins.readFile "{rule}";\n'
                     f'# or use the community flake: {doctor.NIX_FLAKE_URL}\n'

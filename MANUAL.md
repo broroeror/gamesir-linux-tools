@@ -19,9 +19,8 @@ the app's architecture, and reverse-engineering findings, see
 Launch it from your app menu as **Deadband**, or run `deadband` from a terminal.
 Everything below assumes the controller is connected and in **Xbox / XInput
 mode**. A G7 Pro at `3537:100a` is transitioned automatically to wired `3537:109b`
-or dongle `3537:109c`. If it shows `3537:1022`, hold **VIEW (⧉) + MENU (☰) for 2
-seconds** (do not use Share+Menu — that is a recovery reset that erases the active
-profile's remaps); use the Start / pause mode control on the other supported GameSir
+or dongle `3537:109c`. If it shows `3537:1022`, hold **SHARE + MENU (☰)** together (note this
+also resets the active profile's remaps and the Shift layer); use the Start / pause mode control on the other supported GameSir
 controllers. The header shows a warning until the expected identity is available.
 
 ### Live input view
@@ -166,7 +165,7 @@ udev rule isn't applying, or the compositor grabbed the sticks. Start here.
 ### The app can't see the controller ("not connected" / empty input)
 
 - **Is it in Xbox / XInput mode?** A G7 Pro at `3537:100a` transitions
-  automatically. For `3537:1022`, hold **VIEW (⧉) + MENU (☰) for 2 seconds**. Do **not** use Share+Menu: that is a recovery reset and it erases the active profile's remaps, to expose
+  automatically. For `3537:1022`, hold **SHARE + MENU (☰)** together — note this also resets the active profile's remaps and the Shift layer, to expose
   wired `3537:109b` or dongle `3537:109c`. Use the Start / pause mode control for
   the other supported GameSir controllers. The header shows the appropriate warning.
 - **Is the udev rule installed and applied?** From the repo directory:
@@ -190,7 +189,7 @@ udev rule isn't applying, or the compositor grabbed the sticks. Start here.
 
 The controller is using an identity where its supported configuration protocol is
 unavailable. On a G7 Pro, Deadband automatically handles `3537:100a`; for
-`3537:1022`, hold **VIEW (⧉) + MENU (☰) for 2 seconds**. Do **not** use Share+Menu: that is a recovery reset and it erases the active profile's remaps, to reach wired `3537:109b` or
+`3537:1022`, hold **SHARE + MENU (☰)** together — note this also resets the active profile's remaps and the Shift layer, to reach wired `3537:109b` or
 dongle `3537:109c`. On the other controllers, use the Start / pause mode control.
 
 ### Settings don't stick, or a restore reports unconfirmed blocks

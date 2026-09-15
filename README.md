@@ -83,7 +83,7 @@ can't positively identify. Fork it and customize it however you like.
 > edition (`3537:105d` / `3537:105e`, added from a user report and not yet
 > round-tripped on hardware). Deadband moves the transitional `3537:100a`
 > identity to a configuration one automatically; if the pad is showing
-> `3537:1022` instead, hold **VIEW (⧉) + MENU (☰) for 2 seconds**. Do **not** use Share+Menu: that is a recovery reset and it erases the active profile's remaps.
+> `3537:1022` instead, hold **SHARE + MENU (☰)** together — note this also resets the active profile's remaps and the Shift layer.
 >
 > The G7 Pro ships in editions that differ only by USB product ID, so **other
 > editions can't be configured** — White Trimode (`1003`/`1004`) and at least one
@@ -180,7 +180,7 @@ it, run `./uninstall.sh`. Upgrading from the old `gamesir-cyclone2` install?
 
 Put the controller in **Xbox / XInput mode**. A G7 Pro at `3537:100a` is switched
 automatically to its wired `3537:109b` or dongle `3537:109c` configuration
-identity. If it is at `3537:1022`, hold **VIEW (⧉) + MENU (☰) for 2 seconds**. Do **not** use Share+Menu: that is a recovery reset and it erases the active profile's remaps. Use the
+identity. If it is at `3537:1022`, hold **SHARE + MENU (☰)** together — note this also resets the active profile's remaps and the Shift layer. Use the
 Start / pause mode control on the other supported GameSir controllers. The app's
 header warns when it detects an unsupported mode.
 
@@ -273,7 +273,7 @@ everything it does is **reversible** and stays **on your machine**. The specific
 - **Tested hardware.** Cyclone 2, G7 Pro 8K PC and the G502 X are verified here.
   G7 Pro support was contributed and verified by [@brcly](https://github.com/brcly)
   on the Shadow Ember edition (wired `3537:109b`, dongle `3537:109c`; `3537:100a`
-  is transitioned automatically — hold VIEW + MENU for 2s if the pad is showing
+  is transitioned automatically — hold SHARE + MENU if the pad is showing
   `3537:1022`). Other G7 Pro editions aren't covered. Treat anything not listed
   as unproven and use it at your own risk.
 
