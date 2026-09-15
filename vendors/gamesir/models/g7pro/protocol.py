@@ -31,10 +31,16 @@ PID_ZZZ_DONGLE = 0x105E
 # also reported 10ba, and the original Windows USB capture of the config protocol
 # was taken on that identity.
 PID_AMZ_WIRED = 0x10BA
+# White Trimode. Upstream confirmed 1003/1004 on real hardware as this edition's
+# xid/dongle pair -- the same role 109b/109c play on Shadow Ember. A user on
+# issue #9 reports 1003 as their pad's default identity, with a vendor-class
+# interface present, and 1022 in its other mode.
+PID_WT_WIRED = 0x1003
+PID_WT_DONGLE = 0x1004
 PID_HID = 0x100A
 PID_NATIVE = 0x1022
 CONFIG_PIDS = (PID_WIRED, PID_DONGLE, PID_ZZZ_WIRED, PID_ZZZ_DONGLE,
-               PID_AMZ_WIRED)
+               PID_AMZ_WIRED, PID_WT_WIRED, PID_WT_DONGLE)
 
 # Editions reachable for configuration. The register map is NOT branched per
 # edition -- upstream uses one map everywhere and drives ids it has never seen,
@@ -47,6 +53,8 @@ EDITIONS = {
     PID_ZZZ_WIRED: 'Zenless Zone Zero',
     PID_ZZZ_DONGLE: 'Zenless Zone Zero (dongle)',
     PID_AMZ_WIRED: 'Amazon edition',
+    PID_WT_WIRED: 'White Trimode',
+    PID_WT_DONGLE: 'White Trimode (dongle)',
 }
 
 # Editions we can NAME but haven't confirmed against real hardware. The protocol
@@ -55,10 +63,10 @@ EDITIONS = {
 # seen), so these are absent from CONFIG_PIDS only because nobody here owns one
 # to check. Recognising them buys a device an honest "not supported yet" instead
 # of a bare hex id -- see UNCONFIRMED_PIDS.
-UNCONFIRMED_EDITIONS = {
-    0x1003: 'White Trimode',
-    0x1004: 'White Trimode (dongle)',
-}
+# Every edition we know of is now reachable for configuration. Kept as the hook
+# for the next one someone turns up with -- a named "not supported yet" beats a
+# bare hex id, and this is how the last three arrived.
+UNCONFIRMED_EDITIONS = {}
 UNCONFIRMED_PIDS = tuple(UNCONFIRMED_EDITIONS)
 
 

@@ -275,10 +275,18 @@ def _interfaces(sysfs):
                     return default
             link = os.path.join(iface, 'driver')
             drv = os.path.basename(os.path.realpath(link)) if os.path.islink(link) else '-'
+            eps = []
+            for ep in sorted(glob.glob(os.path.join(iface, 'ep_*'))):
+                try:
+                    addr = open(os.path.join(ep, 'bEndpointAddress')).read().strip()
+                    kind = open(os.path.join(ep, 'type')).read().strip()
+                    eps.append(f'0x{int(addr, 16):02x} {kind.lower()}')
+                except (OSError, ValueError):
+                    continue
             out.append({
                 'name': os.path.basename(iface),
                 'cls': rd('bInterfaceClass'), 'sub': rd('bInterfaceSubClass'),
-                'proto': rd('bInterfaceProtocol'), 'driver': drv,
+                'proto': rd('bInterfaceProtocol'), 'driver': drv, 'eps': eps,
             })
     except Exception:
         pass
@@ -526,13 +534,26 @@ def format_report(rep):
                  f'({n.get("identity", "unknown")})  "{n["product"]}" port {n["port"]}')
         L.append('    raw USB access: ' + ('OK' if n['access'] else 'PERMISSION DENIED'))
         for i in n.get('interfaces', []):
-            kind = ''
-            if i['driver'] == 'xpad':
-                kind = '   <- Xbox INPUT, not config'
-            elif i['cls'] == 'ff' and i['driver'] == '-':
+            cls, sub, proto = i['cls'], i['sub'], i['proto']
+            # ff/47/d0 = Xbox GIP, ff/5d/01 = Xbox 360 XInput. On BOTH, interface 0
+            # carries input; a higher unclaimed one is usually audio, not a config
+            # channel. Only a vendor interface that is NEITHER of those is worth
+            # calling a config candidate -- an earlier version of this line labelled
+            # a GIP audio interface as one, which is exactly the wrong hint.
+            if (cls, sub, proto) == ('ff', '47', 'd0'):
+                kind = '   <- Xbox GIP (iface 0 = input; higher usually audio)'
+            elif (cls, sub, proto) == ('ff', '5d', '01'):
+                kind = '   <- Xbox 360 XInput (input)'
+            elif cls == 'ff' and i['driver'] == '-':
                 kind = '   <- vendor, unclaimed (config candidate)'
-            L.append(f"    iface {i['name']}: class {i['cls']}/{i['sub']}/{i['proto']}"
+            else:
+                kind = ''
+            L.append(f"    iface {i['name']}: class {cls}/{sub}/{proto}"
                      f"  driver {i['driver']}{kind}")
+            if i.get('eps'):
+                # our transport hardcodes EP_OUT 0x02 / EP_IN 0x82; a mismatch
+                # means the claim succeeds and every transfer then times out
+                L.append(f"      endpoints: {', '.join(i['eps'])}")
     L.append('')
     L.append('### Verdict')
     for v in rep['verdict'] or ['Nothing conclusive — attach this report to the issue.']:
