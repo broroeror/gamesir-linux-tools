@@ -776,7 +776,8 @@ class GamesirBridge(QObject):
     @Property(str, notify=statusChanged)
     def modeMessage(self):
         if profiles.active() is profiles.G7_NATIVE:
-            return 'Hold MENU (START) + SHARE to switch the controller to XInput mode.'
+            return ('Hold VIEW (⧉) + MENU (☰) for 2 seconds to switch the '
+                    'controller to XInput mode.')
         return ('Not in Xbox mode. Use the controller\'s Start / pause buttons '
                 'to switch to Xbox/XInput mode so the app can read it.')
 

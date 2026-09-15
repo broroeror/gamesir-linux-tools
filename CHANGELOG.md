@@ -13,7 +13,7 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
   vendor-class USB interface that exposes no hidraw node, reached through a native
   `libusb` transport (no extra Python package; the system `libusb-1.0` runtime is
   now a dependency). The mode switch this project had written off as untriggerable
-  from Linux turns out to be a physical **MENU (START) + SHARE** combo. Targets the
+  from Linux turns out to be a physical button combo. Targets the
   **Shadow Ember** edition (`3537:109b` wired, `3537:109c` dongle), transitioning
   `3537:100a` automatically.
 - **Other G7 Pro editions are recognised and named** — White Trimode, Zenless Zone

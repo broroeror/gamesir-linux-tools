@@ -86,7 +86,7 @@ editor, backup/restore, and reversible firmware up/downgrade.
 ## GameSir G7 Pro — configuration over `3537:109b` / `3537:109c`
 
 The earlier “input only” conclusion was based on the controller's `3537:1022`
-native/GIP identity. Holding **MENU (START)+SHARE** together leaves that mode. The
+native/GIP identity. Holding **VIEW (⧉) + MENU (☰) for 2 seconds** cycles XInput/Switch mode (GameSir's documented combo; wired or receiver only). **Share+Menu is NOT a mode switch** — upstream g7ctl documents it as the only recovery for a wedged read path, and it erases every non-native binding on the active profile and the Shift layer. The
 controller may first enumerate as transitional HID identity `3537:100a`; Deadband
 then sends the official-app `gamesirapp` handshake as five two-character chunks,
 with a flush between chunks, and waits on the same physical USB port for it to
@@ -299,7 +299,7 @@ lighting and captured factory images; addresses and capabilities are profile dat
 Xbox-mode envelope, decode register writes out of the captures, and distinguish the
 `1022`, `100a`, `109b`, and `109c` identities. Comparing official-app traffic
 identified the replayable `gamesirapp` transition handshake used at `100a`; the
-physical MENU (START)+SHARE combination is still required to leave `1022`.
+physical VIEW + MENU combination is still required to leave `1022`.
 
 **Decoders & probes (this repo).** All under `research/`, run from the repo root,
 non-destructive unless noted:

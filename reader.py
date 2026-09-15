@@ -29,6 +29,13 @@ from vendors.gamesir.models.g7pro import protocol as g7pro
 
 _active_g7_handle = None
 _g7_transition_last = {}
+# ⚠ DO NOT REDUCE. Upstream g7ctl calls this HANDSHAKE_MIN_INTERVAL and documents
+# what it prevents: "Rapid re-enumeration is what wedges this firmware's read
+# path: reads stop answering entirely while heartbeats and writes carry on, and
+# nothing in software clears it -- not a host reboot, not dev.reset(), not a
+# cable replug, not even the manual's own pinhole reset." The only cure is a
+# physical Share+Menu, which erases every non-native binding on the active
+# profile and the Shift layer. Five seconds of waiting is cheap next to that.
 _G7_TRANSITION_INTERVAL = 5.0
 _G7_TRANSITION_TIMEOUT = 10.0
 
@@ -310,7 +317,8 @@ def read_controller():
         if prof is profiles.G7_NATIVE:
             state['connected'] = True
             state['mode_ok'] = False
-            state['config_status'] = 'Hold MENU (START) + SHARE to switch to XInput mode'
+            state['config_status'] = ('Hold VIEW (⧉) + MENU (☰) for 2s to switch '
+                                      'to XInput mode')
             read_session_evdev(sel['id'], force_wrong_mode=True)
             state['connected'] = False
             time.sleep(0.3)
@@ -621,7 +629,7 @@ def transition_g7_identity(ctrl):
                 return True
             if current['pid'] == g7pro.PID_NATIVE:
                 state['config_status'] = (
-                    'Hold MENU (START) + SHARE to switch to XInput mode')
+                    'Hold VIEW (⧉) + MENU (☰) for 2s to switch to XInput mode')
                 state['config_wanted'] = False
                 return False
             if current['pid'] not in g7pro.TRANSITION_PIDS:
