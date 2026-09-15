@@ -765,6 +765,18 @@ class GamesirBridge(QObject):
     def activeProfile(self):
         return int(state['profile']) if state.get('profile') else 0
 
+    @Property(int, notify=controllerChanged)
+    def profileCount(self):
+        """How many editable profile banks the active controller has.
+
+        ProfileBar uses this as its Repeater model, so a missing value renders
+        ZERO pills and the profile selector silently disappears -- which is what
+        happened between this being referenced in QML and existing here. Falls
+        back to the default profile's bank count rather than 0 so an unrecognised
+        controller still shows a usable bar."""
+        prof = self._prof or profiles.DEFAULT
+        return len(prof.profile_banks)
+
     @Property(bool, notify=statusChanged)
     def configClaimed(self):
         return bool(state.get('config_claimed'))
