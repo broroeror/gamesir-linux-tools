@@ -236,7 +236,14 @@ def parse_input(report, state):
     # depicts the physical controls being pressed, so use the raw/pre-binding
     # group at 55/56 instead.  Its first byte is a hat nibble plus XYAB and its
     # second byte contains shoulders, View/Menu and stick clicks.
-    face, meta, extras = report[55], report[56], report[60]
+    # Paddles live in bytes 57/58, NOT 60. Byte 60 is an ANALOG value -- measured
+    # on a fw 2.36 Amazon-edition pad it runs 0 -> 80 -> 186 -> 255 as RT is
+    # pulled, so reading it as a bitfield lit L4/R4/L5/R5 together on any firm
+    # trigger pull, while the real paddles lit nothing. Byte 9 is the POST-remap
+    # button state (a paddle bound to A shows up there as A); 55/56 stay the
+    # pre-remap group so the diagram keeps showing physical controls.
+    face, meta = report[55], report[56]
+    pad_a, pad_b = report[57], report[58]
     state['dpad'] = DPAD_HAT.get(face & 0x0F, 'unknown')
     state.update({
         'x': bool(face & 0x10), 'a': bool(face & 0x20),
@@ -244,10 +251,8 @@ def parse_input(report, state):
         'lb': bool(meta & 0x01), 'rb': bool(meta & 0x02),
         'view': bool(meta & 0x10), 'menu': bool(meta & 0x20),
         'ls': bool(meta & 0x40), 'rs': bool(meta & 0x80),
-        'home': bool(extras & 0x01), 'share': bool(extras & 0x02),
-        'l4': bool(extras & 0x08), 'r4': bool(extras & 0x10),
-        'm': bool(extras & 0x20),
-        'l5': bool(extras & 0x40), 'r5': bool(extras & 0x80),
+        'l4': bool(pad_a & 0x08), 'r4': bool(pad_a & 0x10),
+        'l5': bool(pad_b & 0x01), 'r5': bool(pad_b & 0x02),
         'lt': report[12], 'rt': report[13],
         'charging': report[32] == 1, 'battery': min(report[33], 100),
         'mode_ok': True,
