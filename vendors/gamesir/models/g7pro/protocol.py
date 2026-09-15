@@ -236,7 +236,14 @@ def parse_input(report, state):
     # depicts the physical controls being pressed, so use the raw/pre-binding
     # group at 55/56 instead.  Its first byte is a hat nibble plus XYAB and its
     # second byte contains shoulders, View/Menu and stick clicks.
-    # Paddles live in bytes 57/58, NOT 60. Byte 60 is an ANALOG value -- measured
+    # The extras byte is 57, NOT 60 -- an off-by-three on the index, not a
+    # different report format: byte 57's bit layout (home 0x01, share 0x02,
+    # l4 0x08, r4 0x10, m 0x20) matches what the old code expected at byte 60
+    # exactly. L5/R5 are the exception, sitting in byte 58 at 0x01/0x02 rather
+    # than 57's high bits. All measured on a fw 2.36 Amazon-edition pad; byte 56
+    # (lb/rb/view/menu/ls/rs) was already correct, confirmed via LB.
+    #
+    # Byte 60 is ANALOG. Byte 60 is an ANALOG value -- measured
     # on a fw 2.36 Amazon-edition pad it runs 0 -> 80 -> 186 -> 255 as RT is
     # pulled, so reading it as a bitfield lit L4/R4/L5/R5 together on any firm
     # trigger pull, while the real paddles lit nothing. Byte 9 is the POST-remap
@@ -251,7 +258,9 @@ def parse_input(report, state):
         'lb': bool(meta & 0x01), 'rb': bool(meta & 0x02),
         'view': bool(meta & 0x10), 'menu': bool(meta & 0x20),
         'ls': bool(meta & 0x40), 'rs': bool(meta & 0x80),
+        'home': bool(pad_a & 0x01), 'share': bool(pad_a & 0x02),
         'l4': bool(pad_a & 0x08), 'r4': bool(pad_a & 0x10),
+        'm': bool(pad_a & 0x20),
         'l5': bool(pad_b & 0x01), 'r5': bool(pad_b & 0x02),
         'lt': report[12], 'rt': report[13],
         'charging': report[32] == 1, 'battery': min(report[33], 100),
