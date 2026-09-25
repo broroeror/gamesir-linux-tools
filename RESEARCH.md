@@ -16,7 +16,7 @@ re-tread them. This is a hobby RE effort; corrections and additions welcome.
 | Device | USB IDs | Input on Linux | Config editor on Linux | Verdict |
 |---|---|---|---|---|
 | **Cyclone 2** *(GameSir, VID 0x3537)* | `0575` / `100b` / `1053` | ✅ vendor `0x12` | ✅ full | **Fully supported** |
-| **G7 Pro** *(Shadow Ember)* | `109b` (wired config) · `109c` (dongle config) · `100a` (transition) · `1022` (native/GIP) | ✅ evdev or claimed USB telemetry | ✅ four profiles + core/extras | **Supported on 109b/109c** — contributed and verified by [@brcly](https://github.com/brcly), not on my hardware |
+| **G7 Pro** *(Shadow Ember, Amazon)* | `109b` (wired config) · `109c` (dongle config) · `10ba` (Amazon config) · `100a` (transition) · `1022` (native/GIP) · `1003`/`105e` (recognised, detect-only) | ✅ evdev or claimed USB telemetry | ✅ four profiles + core/extras | **Writes on 109b/109c/10ba** — 109b/109c contributed and verified by [@brcly](https://github.com/brcly); 10ba is my own pad's identity and the one the register map was captured from |
 | G7 SE *(not owned)* | `1010` | ✅ mainline `xpad` | n/a | Reference only |
 | **G7 Pro 8K PC** | `10c5`–`10c8` edition pairs | ✅ vendor `0x12` | ✅ full incl. motion/macros/lights | **Fully supported** |
 | **G502 X LIGHTSPEED** *(Logitech, VID 0x046d)* | `c098` (wired) · `409f` / `c547` (receiver) | ✅ standard HID | ✅ full — profiles, G-Shift, DPI, macros | **Fully supported** |
@@ -207,12 +207,21 @@ steps per typed character.
 
 ## To be tested
 
-- **Other G7 Pro editions.** The editions differ only by USB product id — White
-  Trimode (`1003`), Zenless Zone Zero (`105e`), and an Amazon edition
-  reporting `10ba`. The register map looks common to all of them (upstream `g7ctl`
-  keeps its variant table to names and PIDs, branches on the variant nowhere, and
-  drives PIDs it has never seen), but nobody here owns one to confirm it, so they're
-  recognised and named without a write path. Confirming one would unblock the rest.
+- **Other G7 Pro editions.** The editions differ only by USB product id. White
+  Trimode (`1003`) and Zenless Zone Zero (`105e`) are recognised and named but
+  have **no write path**: neither has ever accepted a config write, and for
+  `1003` the one report we have showed both interfaces as `ff/47/d0` (Xbox GIP),
+  where the unclaimed interface is usually audio rather than a config channel.
+  The register map looks common to every edition — upstream `g7ctl` keeps its
+  variant table to names and PIDs, branches on the variant nowhere, and drives
+  PIDs it has never seen — but that argument is what carried `1004` in, and
+  `1004` is the T4 Kaleid (issue #14). **A confirmed write round-trip, not a
+  resemblance, is what promotes an edition into `CONFIG_PIDS`.** Confirming one
+  would unblock the rest.
+- **A write round-trip on `10ba`.** It is in `CONFIG_PIDS` because it is the
+  identity this project's own pad presents and the one the Windows capture was
+  taken on — the config channel there is read, not inferred. What is missing is
+  a write back to a pad with someone watching the result.
 - **8BitDo controllers.** Planned; not started.
 
 ---

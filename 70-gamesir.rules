@@ -25,18 +25,21 @@ SUBSYSTEM=="hidraw", ATTRS{idVendor}=="3537", TAG+="uaccess"
 SUBSYSTEM=="input", ATTRS{idVendor}=="3537", TAG+="uaccess"
 
 # G7 Pro configuration uses interface 0 through native libusb rather than
-# hidraw, so it needs a rule on the USB device itself. Each edition has its own
-# pair of configuration ids -- Shadow Ember 109b (wired) / 109c (dongle),
-# Zenless Zone Zero 105e, Amazon edition 10ba, White Trimode 1003
-# -- plus 100a, the HID
-# Deadband transitions before opening a configuration session.
+# hidraw, so it needs a rule on the USB device itself. One rule per WRITABLE
+# identity -- Shadow Ember 109b (wired) / 109c (dongle) and the Amazon edition
+# 10ba -- plus 100a, the HID identity Deadband transitions through before
+# opening a configuration session.
 #
-# An edition missing from this list fails as "raw USB access: PERMISSION DENIED"
-# in the diagnostics even though everything else is correct, so this list must
-# grow whenever protocol.CONFIG_PIDS does.
+# This list mirrors protocol.CONFIG_PIDS and smoke_test.py fails if it drifts.
+# An edition missing from it reads as "raw USB access: PERMISSION DENIED" in the
+# diagnostics even though everything else is correct.
+#
+# Editions Deadband recognises but does NOT write to (White Trimode 1003,
+# Zenless Zone Zero 105e) are deliberately absent: they have never accepted a
+# config write, so granting access we never use buys nothing. If someone
+# confirms a write round-trip on one, it moves into CONFIG_PIDS and gains a line
+# here at the same time.
 SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="109b", TAG+="uaccess"
 SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="109c", TAG+="uaccess"
-SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="105e", TAG+="uaccess"
 SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="10ba", TAG+="uaccess"
-SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="1003", TAG+="uaccess"
 SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="100a", TAG+="uaccess"

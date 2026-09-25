@@ -79,20 +79,22 @@ can't positively identify. Fork it and customize it however you like.
 >
 > **G7 Pro** support was contributed by [@brcly](https://github.com/brcly) and
 > verified on their hardware rather than mine. It covers the **Shadow Ember**
-> edition (`3537:109b` wired, `3537:109c` dongle) and the **Zenless Zone Zero**
-> edition (`3537:105e`, added from a user report and not yet
-> round-tripped on hardware). Deadband moves the transitional `3537:100a`
+> edition (`3537:109b` wired, `3537:109c` dongle) and the **Amazon** edition
+> (`3537:10ba` — the identity my own pad presents, and the one the register map
+> was captured from). Deadband moves the transitional `3537:100a`
 > identity to a configuration one automatically; if the pad is showing
 > `3537:1022` instead, hold **SHARE + MENU (☰)** together — note this also resets the active profile's remaps and the Shift layer.
 >
 > The G7 Pro ships in editions that differ only by USB product ID, so **other
-> editions can't be configured** — and note `3537:1004` is the **T4 Kaleid**, a
-> different controller, not a G7 Pro identity. At least one
-> Amazon edition reporting `10ba`. Deadband does
-> recognise those and names them, so input works and the app tells you
-> configuration isn't supported for that edition yet, rather than failing
-> silently. The register map looks common to all of them, but no one here owns
-> one to confirm that, and a guess isn't worth someone's stored config. This
+> editions can't be configured yet** — currently the **White Trimode**
+> (`3537:1003`) and **Zenless Zone Zero** (`3537:105e`). Deadband recognises and
+> names both, so input works and the app says configuration isn't supported for
+> that edition rather than failing silently. The register map looks common to
+> every edition, but "looks common" isn't a result: reasoning from the pattern is
+> how `3537:1004` — which is actually the **T4 Kaleid**, a different controller —
+> briefly became a writable identity here and renamed someone's pad
+> ([#14](https://github.com/broroeror/gamesir-linux-tools/issues/14)). So an
+> edition earns a write path by round-tripping one, not by resembling one. This
 > path also still needs confirmation across firmware revisions.
 > Other GameSir controllers, other Logitech mice, other dongles, and firmware
 > revisions I haven't seen are **unsupported and untested** and may misbehave. The
@@ -275,8 +277,9 @@ everything it does is **reversible** and stays **on your machine**. The specific
   G7 Pro support was contributed and verified by [@brcly](https://github.com/brcly)
   on the Shadow Ember edition (wired `3537:109b`, dongle `3537:109c`; `3537:100a`
   is transitioned automatically — hold SHARE + MENU if the pad is showing
-  `3537:1022`). Other G7 Pro editions aren't covered. Treat anything not listed
-  as unproven and use it at your own risk.
+  `3537:1022`), plus the Amazon edition `3537:10ba`. Other G7 Pro editions are
+  recognised but not configured. Treat anything not listed as unproven and use it
+  at your own risk.
 
 ## How it works
 

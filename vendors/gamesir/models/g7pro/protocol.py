@@ -26,25 +26,29 @@ PID_DONGLE = 0x109C
 # mainline xpad), became a writable config identity here and got a user's
 # controller renamed out from under them (issue #14).
 #
-# Zenless Zone Zero. 105e came from a user on issue #9 whose pad moved between
-# 105e and 1022. Its wired partner 105d appears in upstream g7ctl but has never
-# been observed here, so it is NOT in CONFIG_PIDS.
-PID_ZZZ_DONGLE = 0x105E
+# 105e (Zenless) and 1003 (White Trimode) live in UNCONFIRMED_EDITIONS below.
+# Both were OBSERVED on a real G7 Pro, which is why they are named -- but neither
+# has ever accepted a config write, and for 1003 the evidence points the other
+# way: the reporter's interfaces were both ff/47/d0 (Xbox GIP), where an
+# unclaimed interface is usually AUDIO rather than a config channel.
 # Amazon edition. Reported on issue #10 wired as 10ba with NO hidraw node at all,
 # which is the vendor-class signature every other configuration identity has --
 # 1022 by contrast comes up with two hidraw interfaces. This project's own G7 Pro
 # also reported 10ba, and the original Windows USB capture of the config protocol
 # was taken on that identity.
 PID_AMZ_WIRED = 0x10BA
-# White Trimode. A user on issue #9 reported 1003 as their pad's default
-# identity with a vendor-class interface present. Upstream pairs it with 1004,
-# but 1004 is the T4 Kaleid's product id -- a DIFFERENT CONTROLLER -- so it is
-# deliberately absent. Do not add it back from a pattern.
-PID_WT_WIRED = 0x1003
 PID_HID = 0x100A
 PID_NATIVE = 0x1022
-CONFIG_PIDS = (PID_WIRED, PID_DONGLE, PID_ZZZ_DONGLE, PID_AMZ_WIRED,
-               PID_WT_WIRED)
+# THE BAR FOR THIS TUPLE IS NOT "seen on a G7 Pro" -- it is "this identity has
+# ACCEPTED A CONFIG WRITE". 0x1004 got in on a pattern and turned out to be
+# another controller (issue #14); 1003 and 105e got in on a sighting and have
+# never taken a write. 109b/109c were round-tripped on @brcly's hardware. 10ba
+# is here on the strongest evidence short of that: it is the identity this
+# project's own G7 Pro presents, and the Windows capture the whole register map
+# was derived from was taken ON 10ba -- so the config channel is not inferred
+# there, it is the channel we read. What is still missing is a write back to a
+# pad while someone watches the result, which is why it is called out here.
+CONFIG_PIDS = (PID_WIRED, PID_DONGLE, PID_AMZ_WIRED)
 
 # Product ids belonging to OTHER GameSir devices, from mainline xpad. Listed so
 # nothing here can claim one by accident; smoke_test asserts no overlap.
@@ -54,29 +58,33 @@ OTHER_PRODUCT_PIDS = {
     0x1010: 'G7 SE',
 }
 
-# Editions reachable for configuration. The register map is NOT branched per
-# edition -- upstream uses one map everywhere and drives ids it has never seen,
-# which is consistent with one board in several shells. Zenless is included on
-# that reasoning plus a real pad reporting 105e; it has not been round-tripped on
-# hardware here, so treat a first report from one as verification, not routine.
+# Display names for the editions Deadband will configure. The register map is
+# NOT branched per edition -- upstream uses one map everywhere and drives ids it
+# has never seen, which is consistent with one board in several shells. That
+# reasoning is why a new edition is PLAUSIBLE, but on its own it is not enough to
+# put one here: it was exactly this argument that carried 1004 in.
 EDITIONS = {
     PID_WIRED: 'Shadow Ember',
     PID_DONGLE: 'Shadow Ember (dongle)',
-    PID_ZZZ_DONGLE: 'Zenless Zone Zero (dongle)',
     PID_AMZ_WIRED: 'Amazon edition',
-    PID_WT_WIRED: 'White Trimode',
 }
 
-# Editions we can NAME but haven't confirmed against real hardware. The protocol
-# looks common to all of them (upstream g7ctl keeps its variant table to names +
-# PIDs, branches on the variant nowhere, and happily drives a PID it has never
-# seen), so these are absent from CONFIG_PIDS only because nobody here owns one
-# to check. Recognising them buys a device an honest "not supported yet" instead
-# of a bare hex id -- see UNCONFIRMED_PIDS.
-# Every edition we know of is now reachable for configuration. Kept as the hook
-# for the next one someone turns up with -- a named "not supported yet" beats a
-# bare hex id, and this is how the last three arrived.
-UNCONFIRMED_EDITIONS = {}
+# Editions seen on a real G7 Pro but never written to. The protocol LOOKS common
+# to all of them (upstream g7ctl keeps its variant table to names + PIDs,
+# branches on the variant nowhere, and happily drives a PID it has never seen) --
+# but "looks common" is an argument, not a result, and these stay here until one
+# of them takes a write. For 1003 the little evidence there is points away: the
+# reporter's interfaces were both ff/47/d0, Xbox GIP, where the unclaimed
+# interface is usually audio rather than a config channel.
+#
+# Being named still earns its keep: these pads get input plus an honest "not
+# supported yet" instead of a bare hex id, and they get no udev grant, since
+# Deadband never opens them. Promoting one means a confirmed write round-trip,
+# a CONFIG_PIDS entry and a 70-gamesir.rules line in the same commit.
+UNCONFIRMED_EDITIONS = {
+    0x1003: 'White Trimode',
+    0x105E: 'Zenless Zone Zero (dongle)',
+}
 UNCONFIRMED_PIDS = tuple(UNCONFIRMED_EDITIONS)
 
 

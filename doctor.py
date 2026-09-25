@@ -43,12 +43,14 @@ try:
         _g7.PID_NATIVE: 'native/GIP',
     }
     G7_UNCONFIRMED = dict(_g7.UNCONFIRMED_EDITIONS)
+    G7_WRITABLE = tuple(_g7.CONFIG_PIDS)
 except Exception:                      # partial install -- report what we can
     G7_IDENTITIES = {
         0x109B: 'wired configuration', 0x109C: 'dongle configuration',
         0x100A: 'HID transition', 0x1022: 'native/GIP',
     }
     G7_UNCONFIRMED = {}
+    G7_WRITABLE = (0x109B, 0x109C)
 G7_IDENTITIES.update({pid: f'{name} (not configurable)'
                       for pid, name in G7_UNCONFIRMED.items()})
 
@@ -453,7 +455,10 @@ def collect():
     elif any(n['verdict'] == 'ok' for n in gsnodes):
         rep['verdict'].append('GameSir device access: OK.')
     if rep['usb_devices']:
-        ready = [n for n in rep['usb_devices'] if n['pid'] in (0x109B, 0x109C)]
+        # Sourced from protocol.CONFIG_PIDS, never hand-listed: this line used to
+        # read (0x109B, 0x109C) and so told Amazon-edition owners their working
+        # configuration identity was unrecognised.
+        ready = [n for n in rep['usb_devices'] if n['pid'] in G7_WRITABLE]
         transition = [n for n in rep['usb_devices'] if n['pid'] == 0x100A]
         native = [n for n in rep['usb_devices'] if n['pid'] == 0x1022]
         other_ed = [n for n in rep['usb_devices'] if n['pid'] in G7_UNCONFIRMED]
@@ -461,11 +466,14 @@ def collect():
             names = ', '.join(sorted({G7_UNCONFIRMED[n['pid']] for n in other_ed}))
             pids = ', '.join(sorted({f'3537:{n["pid"]:04x}' for n in other_ed}))
             rep['verdict'].append(
-                f'G7 Pro {names} found ({pids}). Input works, but '
-                'configuration is only supported on the Shadow Ember edition so '
-                'far — the editions differ only by USB id and nobody has been '
-                'able to confirm the register map on another one. Please say so '
-                'on an issue; that is exactly what would unblock it.')
+                f'G7 Pro {names} found ({pids}). Input works. Deadband '
+                'recognises this edition but does not configure it: no config '
+                'write has ever been confirmed on this USB id. The editions '
+                'differ only by that id, so it may well work — it has just never '
+                'been proven, and guessing is how a different controller '
+                'entirely ended up on this list once (issue #14). If you are '
+                'willing to try it, say so on an issue; that is exactly what '
+                'would unblock it.')
         if ready:
             if any(n['access'] for n in ready):
                 kinds = ', '.join(sorted({n['identity'].split()[0] for n in ready}))
@@ -534,7 +542,13 @@ def format_report(rep):
     for n in rep.get('usb_devices', []):
         L.append(f'- {n["node"]}  GameSir {n["pid"]:04x} '
                  f'({n.get("identity", "unknown")})  "{n["product"]}" port {n["port"]}')
-        L.append('    raw USB access: ' + ('OK' if n['access'] else 'PERMISSION DENIED'))
+        if n['pid'] in G7_UNCONFIRMED:
+            # Detect-only editions get no udev grant, so a denial here is the
+            # intended state, not a fault. Saying PERMISSION DENIED would send
+            # these users chasing a rule that is absent on purpose.
+            L.append('    raw USB access: not required (recognised, not configured)')
+        else:
+            L.append('    raw USB access: ' + ('OK' if n['access'] else 'PERMISSION DENIED'))
         for i in n.get('interfaces', []):
             cls, sub, proto = i['cls'], i['sub'], i['proto']
             # ff/47/d0 = Xbox GIP, ff/5d/01 = Xbox 360 XInput. On BOTH, interface 0
