@@ -19,11 +19,16 @@ VID = 0x3537
 # Shadow Ember -- the edition this integration was built and verified against.
 PID_WIRED = 0x109B
 PID_DONGLE = 0x109C
-# Zenless Zone Zero. 105d was confirmed on real hardware upstream (g7ctl) with its
-# partner never found; 105e came from a user on issue #9 whose pad moved between
-# 105e and 1022 on the MENU+SHARE combo. Consecutive pair, same as every other
-# edition, so 105d/105e is wired/dongle.
-PID_ZZZ_WIRED = 0x105D
+# RULE FOR THIS TABLE: a PID earns a place in CONFIG_PIDS only when someone has
+# OBSERVED IT ON A G7 PRO -- ours, a contributor's, or a user's report. Inferring
+# one from a consecutive-pair pattern or from an upstream table is how 0x1004,
+# which is a different product entirely (the T4 Kaleid, see RESEARCH.md and
+# mainline xpad), became a writable config identity here and got a user's
+# controller renamed out from under them (issue #14).
+#
+# Zenless Zone Zero. 105e came from a user on issue #9 whose pad moved between
+# 105e and 1022. Its wired partner 105d appears in upstream g7ctl but has never
+# been observed here, so it is NOT in CONFIG_PIDS.
 PID_ZZZ_DONGLE = 0x105E
 # Amazon edition. Reported on issue #10 wired as 10ba with NO hidraw node at all,
 # which is the vendor-class signature every other configuration identity has --
@@ -31,16 +36,23 @@ PID_ZZZ_DONGLE = 0x105E
 # also reported 10ba, and the original Windows USB capture of the config protocol
 # was taken on that identity.
 PID_AMZ_WIRED = 0x10BA
-# White Trimode. Upstream confirmed 1003/1004 on real hardware as this edition's
-# xid/dongle pair -- the same role 109b/109c play on Shadow Ember. A user on
-# issue #9 reports 1003 as their pad's default identity, with a vendor-class
-# interface present, and 1022 in its other mode.
+# White Trimode. A user on issue #9 reported 1003 as their pad's default
+# identity with a vendor-class interface present. Upstream pairs it with 1004,
+# but 1004 is the T4 Kaleid's product id -- a DIFFERENT CONTROLLER -- so it is
+# deliberately absent. Do not add it back from a pattern.
 PID_WT_WIRED = 0x1003
-PID_WT_DONGLE = 0x1004
 PID_HID = 0x100A
 PID_NATIVE = 0x1022
-CONFIG_PIDS = (PID_WIRED, PID_DONGLE, PID_ZZZ_WIRED, PID_ZZZ_DONGLE,
-               PID_AMZ_WIRED, PID_WT_WIRED, PID_WT_DONGLE)
+CONFIG_PIDS = (PID_WIRED, PID_DONGLE, PID_ZZZ_DONGLE, PID_AMZ_WIRED,
+               PID_WT_WIRED)
+
+# Product ids belonging to OTHER GameSir devices, from mainline xpad. Listed so
+# nothing here can claim one by accident; smoke_test asserts no overlap.
+OTHER_PRODUCT_PIDS = {
+    0x1004: 'T4 Kaleid',
+    0x100F: 'Nova 2 Lite',
+    0x1010: 'G7 SE',
+}
 
 # Editions reachable for configuration. The register map is NOT branched per
 # edition -- upstream uses one map everywhere and drives ids it has never seen,
@@ -50,11 +62,9 @@ CONFIG_PIDS = (PID_WIRED, PID_DONGLE, PID_ZZZ_WIRED, PID_ZZZ_DONGLE,
 EDITIONS = {
     PID_WIRED: 'Shadow Ember',
     PID_DONGLE: 'Shadow Ember (dongle)',
-    PID_ZZZ_WIRED: 'Zenless Zone Zero',
     PID_ZZZ_DONGLE: 'Zenless Zone Zero (dongle)',
     PID_AMZ_WIRED: 'Amazon edition',
     PID_WT_WIRED: 'White Trimode',
-    PID_WT_DONGLE: 'White Trimode (dongle)',
 }
 
 # Editions we can NAME but haven't confirmed against real hardware. The protocol
