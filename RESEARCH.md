@@ -208,7 +208,7 @@ steps per typed character.
 ## To be tested
 
 - **Other G7 Pro editions.** The editions differ only by USB product id — White
-  Trimode (`1003`/`1004`), Zenless Zone Zero (`105d`), and an Amazon edition
+  Trimode (`1003`), Zenless Zone Zero (`105e`), and an Amazon edition
   reporting `10ba`. The register map looks common to all of them (upstream `g7ctl`
   keeps its variant table to names and PIDs, branches on the variant nowhere, and
   drives PIDs it has never seen), but nobody here owns one to confirm it, so they're

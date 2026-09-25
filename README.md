@@ -80,13 +80,14 @@ can't positively identify. Fork it and customize it however you like.
 > **G7 Pro** support was contributed by [@brcly](https://github.com/brcly) and
 > verified on their hardware rather than mine. It covers the **Shadow Ember**
 > edition (`3537:109b` wired, `3537:109c` dongle) and the **Zenless Zone Zero**
-> edition (`3537:105d` / `3537:105e`, added from a user report and not yet
+> edition (`3537:105e`, added from a user report and not yet
 > round-tripped on hardware). Deadband moves the transitional `3537:100a`
 > identity to a configuration one automatically; if the pad is showing
 > `3537:1022` instead, hold **SHARE + MENU (☰)** together — note this also resets the active profile's remaps and the Shift layer.
 >
 > The G7 Pro ships in editions that differ only by USB product ID, so **other
-> editions can't be configured** — White Trimode (`1003`/`1004`) and at least one
+> editions can't be configured** — and note `3537:1004` is the **T4 Kaleid**, a
+> different controller, not a G7 Pro identity. At least one
 > Amazon edition reporting `10ba`. Deadband does
 > recognise those and names them, so input works and the app tells you
 > configuration isn't supported for that edition yet, rather than failing
