@@ -939,6 +939,13 @@ class GamesirBridge(QObject):
     def hasMotion(self):
         return profiles.is_recognized() and profiles.active().has_motion
 
+    @Property(str, notify=controllerChanged)
+    def diagram(self):
+        """Which controller drawing the Buttons page shows ('cyclone' -- also used
+        for the 8K and G7 Pro -- or 'tarantula'). The default drawing when nothing
+        is recognised, so the empty state looks as it always has."""
+        return profiles.active().diagram if profiles.is_recognized() else 'cyclone'
+
     @Property(bool, notify=controllerChanged)
     def hasVibration(self):
         """False for controllers with no rumble motors (e.g. the Tarantula Pro 8K),
@@ -1002,7 +1009,7 @@ class GamesirBridge(QObject):
     # The raw-USB G7 Pro is excluded from demo for now because its editor reads
     # whole 480-byte semantic blobs; the older synthetic-register demo backend
     # only emulates individual hidraw register reads.
-    _DEMO_MODELS = (profiles.CYCLONE, profiles.G7_8K)
+    _DEMO_MODELS = (profiles.CYCLONE, profiles.G7_8K, profiles.TARANTULA_PRO_8K)
 
     @staticmethod
     def _demo_id(prof):

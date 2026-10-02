@@ -81,6 +81,8 @@ class ControllerProfile:
     # The whole `gamesir_led` module assumes the Cyclone keyframe/palette RGB, so
     # only 'cyclone_keyframe' models may be driven through it; others must not.
     lighting_style: str = 'none'    # 'cyclone_keyframe' / 'simple_8k' / 'none'
+    diagram: str = 'cyclone'        # which controller drawing the Buttons page uses:
+                                    # 'cyclone' (also the 8K/G7 Pro) or 'tarantula'
     has_motion: bool = False        # gyro Aim/Tilt config (8K)
     has_macros: bool = False        # per-paddle macro editor
     supports_hair_thresholds: bool = True
@@ -547,6 +549,7 @@ TARANTULA_PRO_8K = ControllerProfile(
                                             # pad also has a bank 5 (role unknown --
                                             # possibly the Shift layer), left alone
     factory_reset=False,
+    diagram='tarantula',                    # its own drawing, traced from GameSir's render
     lighting_style='none',                  # top-button + logo lighting only partly
                                             # mapped (bank 0x20); no Lights tab yet
     has_motion=True,                        # Aim/Tilt gyro, the 8K's block shifted
