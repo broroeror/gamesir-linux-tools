@@ -22,7 +22,9 @@ alongside. It covers:
   (hair-trigger + response curve), vibration, poll rate, and button remap.
 - **Gamepad macros** — a per-paddle (L4/R4, plus L5/R5 on the 8K) sequence
   editor with per-step hold/delay timing.
-- **Motion / gyro** (G7 Pro 8K PC) — aim/tilt activation, axis setup, and curves.
+- **Motion / gyro** (G7 Pro, G7 Pro 8K PC, Cyclone 2, Tarantula Pro 8K) —
+  activation, axis setup, deadzones, output routing and response curves;
+  controls adapt to each model's register layout.
 - **Backup / Restore** — snapshot all 4 profiles + lighting to a JSON file and
   write it back later.
 - **Mouse-mode toggle** — turn KDE/KWin's gamepad-drives-the-cursor behaviour
@@ -89,6 +91,12 @@ can't positively identify. Fork it and customize it however you like.
 > (`3537:10ba` wired, `3537:10bb` dongle — my own pad, write-tested on both) and
 > the **White Trimode** (`3537:1003` wired, `3537:1004` on its charging dock —
 > confirmed by an owner whose settings read back exactly as set on Windows).
+> The **Wuchang Edition** (`3537:10a7` wired, firmware **5.41**) is hardware-tested
+> by its owner: configuration reads, saved paddle remaps, Aim/Tilt register
+> round-trips, live gyro/accel readings, gyro aiming through the right stick,
+> input-range sensitivity, and independent tests of all four vibration motors.
+> The separate `3537:10a8` identity remains input-only: no configuration response
+> was confirmed. Wireless configuration is not enabled for this edition.
 > Deadband moves the transitional `3537:100a`
 > identity to a configuration one automatically; if the pad is showing
 > `3537:1022` instead, hold **SHARE + MENU (☰)** together — note this also resets the active profile's remaps and the Shift layer.
@@ -343,8 +351,35 @@ their hardware, not mine (see Tested hardware). Wired `3537:109b` and dongle
 with automatic transition from `3537:100a`; four editable profiles, 21 default-layer
 remap sources, stick/trigger shaping, resolution/inversion/sensitivity, four-motor
 vibration, report rate, D-pad options, dock settings, and semantic backup/restore.
+The Vibration tab can test the big left grip motor, small right grip motor,
+left trigger and right trigger individually at their slider strengths. Tests
+run for 400 ms, stop explicitly and never save profile settings. The G7 Pro's
+[standard GIP motor packet](https://github.com/medusalix/xone/blob/master/driver/gamepad.c)
+addresses all four channels; trigger tests require configuration access.
+Aim/Tilt gyro configuration includes hold/press/always-on activation, rotation
+axes, inversion, stick/mouse/button output, X/Y balance, deadzones, button
+bindings and overlap area.
+For stick output, **Sensitivity (input range)** compresses the input span by
+lowering the upper deadzone endpoint: higher values give stronger response and
+reach maximum stick output sooner. The displayed multiplier is relative to
+the full input span with the same lower deadzone, not a separate sensor gain.
+It preserves the lower deadzone, curve, anti-deadzone and X/Y balance, and stays
+in sync with the Deadzone range control. Edits wait for **Save to Profile**;
+**Discard** restores the previous range. No independent overall gyro-gain
+register has been confirmed for this model. Endpoint geometry follows the
+[captured Nexus protocol](https://github.com/questionablesyntax/g7ctl/blob/main/PROTOCOL.md#the-two-scales-are-different-coordinate-systems-not-two-units);
+the exact motion-to-aim response still depends on the firmware and game.
+The Motion tab also displays live gyroscope and accelerometer X/Y/Z readings
+as signed raw counts while the controller is claimed for configuration. The
+display clears when reports stop or the controller is released to games.
+Gyro writes were read-back verified locally on wired `3537:10a7` (firmware 5.41),
+using an inactive profile and then restoring every
+profile and dock byte. Named curves use G7 Pro's captured presets; Custom selects
+the shape already stored in the controller. Custom gyro point editing is not
+implemented. Backups include gyro settings; restoring a Custom gyro curve with
+different stored points is refused before any settings are written.
 The shared Shift layer, Continuous Trigger, advanced directional/mouse stick output,
-motion configuration, Bluetooth, and the native `3537:1022` protocol are not yet exposed.
+Bluetooth, and the native `3537:1022` protocol are not yet exposed.
 
 **Mouse (G502 X):** remaps, keyboard bindings, the G-Shift layer + trigger, DPI
 stages, report rate, and the onboard-macro editor are verified on hardware —

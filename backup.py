@@ -398,6 +398,32 @@ def _g7_writes_from(data):
             if isinstance(code, bool) or not isinstance(code, int) or not -1 <= code <= 255:
                 raise ValueError(f'invalid remap for {name}')
             writes.append((bank, addr, [0, 0] if code < 0 else [1, code]))
+        if 'motion' in obj:
+            settings = obj['motion']
+            if not isinstance(settings, dict):
+                raise ValueError('invalid G7 Pro motion backup')
+            for section, fields, curve_addr in g7pro.motion_fields():
+                sec = settings.get(section)
+                if not isinstance(sec, dict):
+                    raise ValueError(f'missing G7 Pro motion section {section}')
+                for key, addr in fields.items():
+                    hi = 1 if key.startswith('invert_') else 100
+                    if key == 'act_method': hi = 3
+                    if key == 'output': hi = 4
+                    if key == 'xaxis': hi = 3
+                    if key == 'act_button' or key.startswith('direction_'): hi = 255
+                    value = byte(sec, key, 0, hi)
+                    # Untouched fw 5.41 profiles store 0/2 here too. Retain those
+                    # bytes on restore; the editor only offers captured 1/3.
+                    writes.append((bank, addr, [value]))
+                curve = sec.get('curve')
+                if (not isinstance(curve, list) or len(curve) != 10
+                        or any(type(v) is not int or not 0 <= v <= 255 for v in curve)
+                        or curve[0] > 3 or curve[1] not in (0, 100)):
+                    raise ValueError('invalid G7 Pro motion curve')
+                # Captured Custom only selects the existing points. The restore
+                # worker checks those points before writing any settings.
+                writes.append((bank, curve_addr, curve[:1] if curve[0] == 3 else curve))
     dock = data.get('device_settings')
     if not isinstance(dock, dict) or not isinstance(dock.get('dock_auto'), bool):
         raise ValueError('G7 Pro backup is missing dock settings')
@@ -559,6 +585,17 @@ def _apply_g7_backup(data, writes, on_progress=None, on_done=None):
 
     def run():
         gen = control.generation()
+        for bank in ctrl.G7_PRO.profile_banks:
+            motion_data = data['profiles'][str(bank)].get('motion', {})
+            for section, _fields, addr in g7pro.motion_fields():
+                curve = motion_data.get(section, {}).get('curve')
+                if curve and curve[0] == 3:
+                    live = control.read_reg_sync(bank, addr + 1, 9, gen=gen)
+                    if live is None or list(live) != curve[1:]:
+                        if on_done:
+                            on_done(False, 'Custom gyro points differ from the backup; '
+                                    'restoring their shape is not supported. No settings written.')
+                        return
         for index, (bank, addr, byts) in enumerate(writes):
             if not control.write_reg(bank, addr, byts, write_style='g7', gen=gen):
                 if on_done: on_done(False, f'G7 Pro restore stopped at {index}/{total}.')
@@ -579,7 +616,11 @@ def _apply_g7_backup(data, writes, on_progress=None, on_done=None):
         mismatches = []
         for bank in ctrl.G7_PRO.profile_banks:
             blob = g7pro.stitch_blob(bank, g7pro.PROFILE_BLOB_SIZE, control.reg_result)
-            if blob is None or g7pro.decode_profile(blob) != data['profiles'][str(bank)]:
+            expected = data['profiles'][str(bank)]
+            actual = g7pro.decode_profile(blob) if blob is not None else {}
+            if 'motion' not in expected:
+                actual.pop('motion', None)  # pre-gyro schema-4 backups remain valid
+            if blob is None or actual != expected:
                 mismatches.append(f'profile {bank}')
         dock_blob = g7pro.stitch_blob(0x20, g7pro.DOCK_BLOB_SIZE, control.reg_result)
         if dock_blob is None or g7pro.decode_dock(dock_blob) != data['device_settings']:

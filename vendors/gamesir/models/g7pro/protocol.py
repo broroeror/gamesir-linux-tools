@@ -11,6 +11,7 @@ package.  This is an independent integration for Deadband's transport model.
 
 from __future__ import annotations
 
+import struct
 import time
 
 from vendors.gamesir.usb_transport import InterruptHandle
@@ -45,6 +46,8 @@ PID_AMZ_DONGLE = 0x10BB
 # tie-break 0575 already uses for the Cyclone / idle 8K dongle.
 PID_WT_WIRED = 0x1003
 PID_WT_DOCK = 0x1004
+# Wuchang Edition, identified and hardware-tested by its owner over USB.
+PID_WUCHANG_WIRED = 0x10A7
 PID_HID = 0x100A
 PID_NATIVE = 0x1022
 # THE BAR FOR THIS TUPLE: evidence from a real G7 Pro that config reads AND
@@ -68,8 +71,15 @@ PID_NATIVE = 0x1022
 #              read-confirmation #9 publicly set as the bar for re-enabling; the
 #              WRITE side rests on the map being identical, now proven on three
 #              other identities. Weaker than a watched round-trip, and noted as such.
+#   10a7       Wuchang Edition, firmware 5.41, 2026-10-05: all 46 profile/dock
+#              chunks read; paddle remaps saved and confirmed working by the
+#              owner outside configuration mode; 35 Aim/Tilt writes read back
+#              on an inactive profile, then all four profiles and the dock
+#              restored byte-for-byte. Owner confirmed gyro-to-right-stick
+#              response, input-range sensitivity and all four individual motor
+#              tests. Configuration opens directly, without an identity switch.
 CONFIG_PIDS = (PID_WIRED, PID_DONGLE, PID_AMZ_WIRED, PID_AMZ_DONGLE,
-               PID_WT_WIRED, PID_WT_DOCK)
+               PID_WT_WIRED, PID_WT_DOCK, PID_WUCHANG_WIRED)
 
 # Product ids belonging to OTHER GameSir devices, from mainline xpad. An id here
 # may appear in CONFIG_PIDS ONLY if it is also in SHARED_PIDS, i.e. is resolved
@@ -103,6 +113,7 @@ EDITIONS = {
     PID_AMZ_DONGLE: 'Amazon edition (dongle)',
     PID_WT_WIRED: 'White Trimode',
     PID_WT_DOCK: 'White Trimode (dock)',
+    PID_WUCHANG_WIRED: 'Wuchang Edition (wired)',
 }
 
 # Editions seen on a real G7 Pro but with no confirmation that config reads back
@@ -111,6 +122,9 @@ EDITIONS = {
 # the confirmation, a CONFIG_PIDS entry and a 70-gamesir.rules line in one commit.
 UNCONFIRMED_EDITIONS = {
     0x105E: 'Zenless Zone Zero (dongle)',
+    # Observed locally with standard xpad input. A bounded configuration
+    # query returned no data; keep this identity on the input-only path.
+    0x10A8: 'USB 10a8 (firmware 5.18)',
 }
 UNCONFIRMED_PIDS = tuple(UNCONFIRMED_EDITIONS)
 
@@ -193,6 +207,36 @@ LONG_SUFFIX = {
     0x015F: 13, 0x0160: 12, 0x0161: 12, 0x0162: 11,
     0x00CF: 19, 0x00D0: 20, 0x00D1: 20, 0x00D2: 19,
     0x00EB: 19, 0x00EC: 20, 0x00ED: 20, 0x00EE: 19,
+    0x01A0: 13, 0x01A1: 12, 0x01A2: 12, 0x01A3: 11,
+    0x01C2: 13, 0x01C3: 12, 0x01C4: 12, 0x01C5: 11,
+}
+
+# G7 Pro captures: g7ctl/PROTOCOL.md, Motion (test72–test77).
+# Tilt has a 0x22 stride, except Invert Yaw; Invert Roll is Aim-only.
+MOTION_MAP = {
+    'enum_unknown_index': -1,
+    'act_method': 0x19C, 'act_buttons': (0x19D,),
+    'xaxis': 0x19E, 'xaxis_modes': (('Yaw', 1), ('Yaw + Roll', 3)),
+    'dz_min': 0x1A0, 'dz_max': 0x1A1, 'dz_wide': False,
+    'adz_min': 0x1A2, 'adz_max': 0x1A3, 'adz_wide': False,
+    'curve': 0x1A5, 'curve_npts': 3, 'curve_points_offset': 4,
+    'curve_strength': False, 'curve_mode_only_custom': True,
+    'curve_presets': (
+        bytes.fromhex('00 64 00 00 28 28 80 81 d7 d7'),
+        bytes.fromhex('01 64 00 00 5e 17 ae 4f e8 a2'),
+        bytes.fromhex('02 64 00 00 28 4c 80 81 d7 b3'),
+    ),
+    'inverts': (('Invert Roll', 0x1B2), ('Invert Y', 0x1B3), ('Invert Yaw', 0x1B4)),
+    'tilt_inverts': (None, 0x1D5, 0x1D4),
+    'xaxis_gates_inverts': True,
+    'xy_scale': 0x1B5, 'output': 0x1B7, 'sens': None, 'tilt_offset': 0x22,
+    # Convenience sensitivity control over the captured dz_max endpoint.
+    # No independent overall-gain register has been confirmed on this model.
+    'range_sensitivity': True,
+    'outputs': (('Left Stick', 1), ('Right Stick', 2), ('Button Binds', 3), ('Mouse', 4)),
+    'overlap_area': 0x1B8,
+    'dir_macros': (0x1B9, 0x1BA, 0x1BB, 0x1BC),
+    'direction_empty': 0xFF, 'buttons': GAMEPAD_TARGETS,
 }
 
 
@@ -261,7 +305,34 @@ def decode_profile(blob: bytes):
         'rs_invert_x': bool(b(0x171)), 'rs_invert_y': bool(b(0x172)),
         'rs_sensitivity': b(0x173, 50),
         'remap': decode_remaps(blob),
+        'motion': decode_motion(blob),
     }
+
+
+def motion_fields():
+    """Documented scalar fields, including Tilt's two exceptions."""
+    mp = MOTION_MAP
+    common = ('act_method', 'xaxis', 'dz_min', 'dz_max', 'adz_min', 'adz_max',
+              'xy_scale', 'output', 'overlap_area')
+    for section, off in (('Aim', 0), ('Tilt', mp['tilt_offset'])):
+        fields = {key: mp[key] + off for key in common}
+        fields['act_button'] = mp['act_buttons'][0] + off
+        for key, addr in zip(('up', 'down', 'left', 'right'), mp['dir_macros']):
+            fields['direction_' + key] = addr + off
+        inv = mp['tilt_inverts'] if off else tuple(a for _n, a in mp['inverts'])
+        for key, addr in zip(('invert_roll', 'invert_y', 'invert_yaw'), inv):
+            if addr is not None:
+                fields[key] = addr
+        yield section, fields, mp['curve'] + off
+
+
+def decode_motion(blob):
+    """Lossless documented motion values for schema-4 exports (raw enum codes)."""
+    result = {}
+    for section, fields, curve in motion_fields():
+        result[section] = {key: blob[addr] for key, addr in fields.items()}
+        result[section]['curve'] = list(blob[curve:curve + 10])
+    return result
 
 
 def decode_dock(blob: bytes):
@@ -310,6 +381,13 @@ def parse_input(report, state):
         'lt': report[12], 'rt': report[13],
         'charging': report[32] == 1, 'battery': min(report[33], 100),
         'mode_ok': True,
+        # Report 0x10/E0 carries six signed little-endian sensor channels.
+        # Scale factors and the physical axis orientation are not calibrated.
+        # Raw 10a7/fw 5.41 capture, flat and still: bytes 17..22 have
+        # median (0, 0, 0); bytes 23..28 retain the gravity vector.
+        'gyro': struct.unpack_from('<3h', report, 17),
+        'accel': struct.unpack_from('<3h', report, 23),
+        'imu_time': time.monotonic(),
     })
     return True
 
@@ -320,7 +398,7 @@ def parse_input(report, state):
 # added, so Amazon-edition owners got a blank wired/wireless hint (issue #10).
 # That is the third table in this project to drift from CONFIG_PIDS, hence the
 # check instead of the good intention.
-WIRED_PIDS = (PID_WIRED, PID_AMZ_WIRED, PID_WT_WIRED)
+WIRED_PIDS = (PID_WIRED, PID_AMZ_WIRED, PID_WT_WIRED, PID_WUCHANG_WIRED)
 DONGLE_PIDS = (PID_DONGLE, PID_AMZ_DONGLE, PID_WT_DOCK)    # the dock is the wireless link
 
 
@@ -336,6 +414,24 @@ def connection_kind(pid: int):
 def is_standard_input(report: bytes):
     """Whether ``report`` is a 20-byte standard XInput frame, not telemetry."""
     return len(report) == 20 and report[:2] == bytes((0x00, 0x14))
+
+
+def rumble_packet(sequence: int, left: int, right: int,
+                  trigger_left: int = 0, trigger_right: int = 0):
+    """GIP direct four-motor command: 400 ms, no repeats.
+
+    MS-GIPUSB 3.1.5.6.1 specifies percentages and a duration in 10 ms units.
+    Unlike vendor commands this is a 13-byte GIP packet, not a 64-byte report.
+    Zero duration cancels all motors; it is also used for the explicit stop.
+    Payload order is LT, RT, left grip, right grip, as in xone's
+    driver/gamepad.c:gip_gamepad_pkt_rumble. Enable all four channels so
+    zero amplitudes also silence motors not selected for an isolated test.
+    """
+    amplitudes = [max(0, min(255, int(v)))
+                  for v in (trigger_left, trigger_right, left, right)]
+    percentages = [(v * 100 + 127) // 255 for v in amplitudes]
+    return bytes((0x09, 0x00, sequence, 0x09, 0x00, 0x0F,
+                  *percentages, 40 if any(percentages) else 0, 0x00, 0x00))
 
 
 def handshake_packets():
