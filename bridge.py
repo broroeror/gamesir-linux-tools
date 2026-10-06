@@ -1982,14 +1982,28 @@ class GamesirBridge(QObject):
         if key not in self._scalars:
             return
         addr, label = self._scalars[key]
-        if self._prof.dz_wide and key in _WIDE_SCALAR_KEYS:
-            w = max(0, min(1000, int(round(value * 10))))   # percent (0.1 steps) -> 16-bit ×10
-            data = [(w >> 8) & 0xFF, w & 0xFF]
-            disp = '%.1f' % (w / 10.0)
-        else:
-            data = [max(0, min(255, int(round(value))))]
-            disp = str(data[0])
+        data, disp = self._scalar_bytes(key, value)
+        # A value equal to what's on the pad is NOT a change: cancel any pending
+        # edit for it instead of staging one. Range sliders report both handles on
+        # every drag, so moving only the min used to stage "max = (unchanged)" too
+        # -- "2 changes" for one edit -- and dragging a value back to where it
+        # started left a pending no-op write.
+        loaded = self._config.get(key)
+        if loaded is not None and self._scalar_bytes(key, loaded)[0] == data:
+            edit = state.get('edit_profile') or state.get('profile')
+            pkey = (self._prof.profile_bank(edit), addr)
+            if self._pending.pop(pkey, None) is not None:
+                self.pendingChanged.emit()
+            return
         self._queue(addr, data, label, disp)
+
+    def _scalar_bytes(self, key, value):
+        """(device bytes, display text) for a scalar field's value."""
+        if self._prof.dz_wide and key in _WIDE_SCALAR_KEYS:
+            w = max(0, min(1000, int(round(float(value) * 10))))   # percent (0.1 steps) -> 16-bit ×10
+            return [(w >> 8) & 0xFF, w & 0xFF], '%.1f' % (w / 10.0)
+        v = max(0, min(255, int(round(float(value)))))
+        return [v], str(v)
 
     @Slot(str, int)
     def setTraj(self, side, index):
