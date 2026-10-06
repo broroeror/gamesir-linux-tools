@@ -207,6 +207,7 @@ class GamesirBridge(QObject):
         self._m = {}
         self._m_loaded = {}
         self._m_dirty = False
+        self._m_init = {}               # section -> staged full block (blank-block repair)
         self._m_profile = None          # profile the loaded motion state belongs to
         self._m_loading = False
         self._motion_sensors = {'available': False, 'gyro': [], 'accel': []}
@@ -364,6 +365,7 @@ class GamesirBridge(QObject):
         self._m = {}
         self._m_loaded = {}
         self._m_dirty = False
+        self._m_init = {}
         self._m_profile = None
         self._m_loading = False
         self.motionLoaded.emit()
@@ -506,6 +508,7 @@ class GamesirBridge(QObject):
                    for name, off in motion.sections(mp)}
         self._m_loaded = copy.deepcopy(self._m)
         self._m_dirty = False
+        self._m_init = {}
         self.motionLoaded.emit()
 
     def _write_motion(self, addr, data, label='Gyro', display=''):
@@ -516,8 +519,45 @@ class GamesirBridge(QObject):
         fold it into the stick/trigger config cache, which matches by address."""
         if not self._has_motion():
             return
+        if self._stage_into_block(addr, data):
+            self._m_dirty = True
+            return
         self._queue(addr, list(data), label, display, kind='motion')
         self._m_dirty = True
+
+    def _stage_into_block(self, addr, data):
+        """Blank-block repair (G7 Pro). If the section containing `addr` is blank
+        on the pad -- or already being repaired in this batch -- fold the edit into
+        a complete default block and stage that as ONE write, instead of a lone
+        field the firmware would ignore. The section's model is re-decoded from
+        the block so the page shows the defaults plus the edit, and the next edit
+        lands in the same block. Returns False when the normal path applies."""
+        mp = self._mp()
+        blocks, n = mp.get('default_blocks'), mp.get('block_len')
+        if not blocks or not n:
+            return False
+        for name, off in motion.sections(mp):
+            base = mp['act_method'] + off
+            if not base <= addr < base + n or name not in blocks:
+                continue
+            buf = self._m_init.get(name)
+            if buf is None:
+                if not motion.is_blank_section(mp, self._m_loaded.get(name)):
+                    return False
+                buf = bytearray(blocks[name])
+                self._m_init[name] = buf
+                # drop any single-field entries this block now supersedes
+                for k in [k for k, r in self._pending.items()
+                          if r.get('kind') == 'motion' and base <= r['addr'] < base + n]:
+                    del self._pending[k]
+            i = addr - base
+            buf[i:i + len(data)] = bytes(data)[:n - i]
+            self._m[name] = motion.decode_block(mp, name, off, buf)
+            self._queue(base, list(buf), 'Gyro %s · Set up (blank on this controller)' % name,
+                        'defaults + your changes', key=('motion_block', name), kind='motion')
+            self.motionLoaded.emit()
+            return True
+        return False
 
     def _has_macros(self):
         return profiles.is_recognized() and self._prof.has_macros
@@ -2114,6 +2154,7 @@ class GamesirBridge(QObject):
         if self._m_dirty:                      # staged motion becomes the baseline
             self._m_loaded = copy.deepcopy(self._m)
             self._m_dirty = False
+        self._m_init = {}                      # any staged full block is being written
 
         style = self._prof.write_style     # capture: don't reframe if we switch
         gen = control.generation()         # pin to the live device session
@@ -2231,6 +2272,7 @@ class GamesirBridge(QObject):
         self._pending = {}
         self.pendingChanged.emit()
         self.configLoaded.emit()        # snap controls back to last-loaded values
+        self._m_init = {}
         if self._m_dirty:               # motion edits live in self._m: restore it
             self._m = copy.deepcopy(self._m_loaded)
             self._m_dirty = False
@@ -2341,6 +2383,7 @@ class GamesirBridge(QObject):
             self._m = {}
             self._m_loaded = {}
             self._m_dirty = False
+            self._m_init = {}
             self._m_profile = None
             self._m_loading = False
             self.motionLoaded.emit()

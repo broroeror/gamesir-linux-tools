@@ -83,7 +83,7 @@ Item {
                 }
                 PillButton {
                     objectName: "testLeftGrip"
-                    label: "Test big motor (left)"
+                    label: "Test left grip (heavy motor)"
                     enabled: !page.testRunning && vibL.value > 0
                              && (!bridge.isG7Pro || bridge.configClaimed)
                     onClicked: page.testMotor("left", vibL.value)
@@ -102,10 +102,19 @@ Item {
                 }
                 PillButton {
                     objectName: "testRightGrip"
-                    label: "Test small motor (right)"
+                    label: "Test right grip (light motor)"
                     enabled: !page.testRunning && vibR.value > 0
                              && (!bridge.isG7Pro || bridge.configClaimed)
                     onClicked: page.testMotor("right", vibR.value)
+                }
+                // Xbox-style pads have ONE motor per grip: a heavy one on the left and
+                // a light one on the right. The old "big motor (left)" / "small motor
+                // (right)" labels read as two of four, and a tester went looking for
+                // the missing "big right" and "small left".
+                Text {
+                    width: parent.width; wrapMode: Text.WordWrap
+                    text: "Each grip has one motor: a heavy one on the left and a light one on the right."
+                    color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                 }
                 PillButton {
                     label: "Test both grip motors"
@@ -119,6 +128,14 @@ Item {
 
             Card {
                 visible: bridge.isG7Pro; title: "Trigger motors"; Layout.fillWidth: true
+                // GameSir doesn't document what Force and Sync do, so say only what
+                // was observed: with Force on, a trigger's test stays silent
+                // (Amazon edition, 2026-10-06) -- it read as a broken test.
+                Text {
+                    width: parent.width; wrapMode: Text.WordWrap
+                    text: "A trigger's test can stay silent while its Force option is on."
+                    color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                }
                 // Sliders, like the grip motors above and every other controller's
                 // vibration. These were 0/25/50/75/100 pills; the pad stores any
                 // 0-100 value (60 written, read back and kept, 2026-10-01).

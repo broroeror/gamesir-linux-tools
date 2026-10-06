@@ -237,6 +237,22 @@ MOTION_MAP = {
     'overlap_area': 0x1B8,
     'dir_macros': (0x1B9, 0x1BA, 0x1BB, 0x1BC),
     'direction_empty': 0xFF, 'buttons': GAMEPAD_TARGETS,
+    # A section's whole storage block, and what to fill a BLANK one with. Seen on
+    # an Amazon edition (10ba, fw 2.36): profile 1's Aim/Tilt blocks were zeros
+    # apart from the deadzones (how they got that way is unknown). Writing single
+    # fields into such a block leaves the axis mode and curve invalid, and the
+    # firmware ignores the output setting (gyro drove the LEFT stick with Right
+    # Stick selected, vertical axis only with Left). Writing this complete block
+    # made the same pad aim with the right stick on both axes. Values are the
+    # Wuchang's stored defaults (tests/test_motion.py CAPTURE) with activation
+    # set to Off, so initialising never switches the gyro on by itself.
+    'block_len': 0x22,
+    'default_blocks': {
+        'Aim': bytes.fromhex('00 ff 03 01 00 64 00 64 01 00 64 00 00 29 29 80 80 d6 d6 '
+                             'ff ff 01 00 00 00 32 32 01 00 ff ff ff ff ff'),
+        'Tilt': bytes.fromhex('00 ff 02 01 05 64 00 64 01 00 64 00 00 28 29 81 80 d7 d6 '
+                              'ff ff 01 00 00 00 32 32 00 00 ff ff ff ff ff'),
+    },
 }
 
 

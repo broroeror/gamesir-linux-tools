@@ -184,3 +184,25 @@ def decode_section(mp, vals, off):
     if 'overlap_area' in mp:
         d['overlap_area'] = g(mp['overlap_area'])
     return d
+
+
+def is_blank_section(mp, sec):
+    """True when a decoded section's storage looks uninitialised: a response
+    curve whose points are all zero, which no real curve is. (An axis mode the
+    app doesn't name is NOT a sign of blankness -- the Wuchang's real Tilt block
+    stores 0x02 there, and the PR's own tests caught that.) Only models with
+    `default_blocks` can be repaired, so only they are ever reported blank."""
+    if 'default_blocks' not in mp or not sec:
+        return False
+    pts = sec.get('curve_points') or []
+    return bool(pts) and all(list(p) == [0, 0] for p in pts)
+
+
+def decode_block(mp, name, off, block):
+    """Decode one section from its raw storage block (as staged, not as read)."""
+    base = mp['act_method'] + off
+    vals = {}
+    for a, n in read_addrs(mp):
+        i = a - base
+        vals[a] = list(block[i:i + n]) if 0 <= i and i + n <= len(block) else [0] * n
+    return decode_section(mp, vals, off)
