@@ -833,6 +833,19 @@ class GamesirBridge(QObject):
     def activeProfile(self):
         return int(state['profile']) if state.get('profile') else 0
 
+    @Property(bool, notify=controllerChanged)
+    def profileResetSupported(self):
+        """Any recognized, vendor-writable model can reset its profile: the ones
+        with a captured factory image (Cyclone) restore the exact out-of-box bytes;
+        the rest get a field-by-field write of documented default values.
+
+        Deleted by accident in 976a62a (removing firmware backup/restore) along
+        with profileCount, and missed when profileCount was restored: QML reads
+        a missing property as undefined, so the Reset-profile button just never
+        appeared, and resetProfileToDefault() would have raised on its own guard.
+        smoke_test now checks every bridge.<name> the QML uses exists."""
+        return profiles.is_recognized() and self._prof.input_style == 'cyclone_0x12'
+
     @Property(int, notify=controllerChanged)
     def profileCount(self):
         """How many editable profile banks the active controller has.

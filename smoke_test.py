@@ -174,6 +174,33 @@ def _qml_handler_named_properties():
     return bad
 
 
+def _qml_missing_bridge_members():
+    """bridge.<name> / mouse.<name> used in QML that the Python object lacks.
+
+    QML reads a missing property as `undefined` and silently carries on: the
+    profile bar rendered zero pills (profileCount, Sept) and the Reset-profile
+    button never appeared (profileResetSupported, deleted Sept 8, found Oct 6).
+    Both were deleted together by one refactor. This reads every member name the
+    QML uses and checks it exists on the class."""
+    import re
+    from bridge import GamesirBridge
+    from mouse_bridge import MouseBridge
+    classes = {'bridge': GamesirBridge, 'mouse': MouseBridge}
+    pat = re.compile(r'\b(bridge|mouse)\.([A-Za-z_]\w*)')
+    missing = {}
+    for root, _dirs, files in os.walk(os.path.join(HERE, 'qml')):
+        for name in files:
+            if not name.endswith('.qml'):
+                continue
+            path = os.path.join(root, name)
+            for i, line in enumerate(open(path, encoding='utf-8'), 1):
+                code = line.split('//', 1)[0]
+                for obj, member in pat.findall(code):
+                    if not hasattr(classes[obj], member):
+                        missing.setdefault(f'{obj}.{member}', f'{os.path.relpath(path, HERE)}:{i}')
+    return [f'{k} (first used at {v})' for k, v in sorted(missing.items())]
+
+
 def main():
     from PySide6.QtCore import QUrl
     from PySide6.QtGui import QGuiApplication
@@ -217,8 +244,9 @@ def main():
     kind_bad = _connection_kind_gaps()
     doc_bad = _doctor_identity_gaps()
     qml_on = _qml_handler_named_properties()
+    qml_missing = _qml_missing_bridge_members()
     ok = (qml_ok and not slot_bad and not udev_bad and not foreign and not kind_bad
-          and not doc_bad and not qml_on)
+          and not doc_bad and not qml_on and not qml_missing)
     print("=== startup smoke test ===")
     print(f"  QML (Main.qml) loaded : {'OK' if qml_ok else 'FAIL — did not load'}")
     print(f"  @Slot signatures      : "
@@ -240,6 +268,10 @@ def main():
     print(f"  QML on[A-Z] properties: "
           + ('OK' if not qml_on else f'FAIL — {len(qml_on)} found'))
     for m in qml_on:
+        print(f"      {m}")
+    print(f"  QML bridge members    : "
+          + ('OK' if not qml_missing else f'FAIL — {len(qml_missing)} missing'))
+    for m in qml_missing:
         print(f"      {m}")
     print(f"  foreign PID claims    : "
           + ('OK' if not foreign else f'FAIL — {len(foreign)}'))
