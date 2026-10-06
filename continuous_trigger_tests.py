@@ -60,7 +60,7 @@ class ContinuousTriggerTests(unittest.TestCase):
         # Linux UI harness loads the complete QObject and real QML.
         tree = ast.parse((Path(__file__).parent / 'bridge.py').read_text(encoding='utf-8'))
         names = {'_apply_profile', '_build_config', '_queue', 'hasContinuousTrigger',
-                 'setContinuousTrigger', 'applyConfig', '_apply_cyclone_config', '_fold'}
+                 'setContinuousTrigger', 'applyConfig', '_apply_transactional', '_fold'}
         constants = {'_SCALAR_FIELDS', '_CURVE_FIELDS', '_TRAJ_FIELDS', '_HAIR_FIELDS'}
         assignments = [n for n in tree.body if isinstance(n, ast.Assign)
                        and any(isinstance(t, ast.Name) and t.id in constants for t in n.targets)]
@@ -200,7 +200,7 @@ class ContinuousTriggerTests(unittest.TestCase):
         expected = bytearray(before)
         expected[0xb6] = 1
         self.assertEqual(self.memory, expected)
-        self.assertIn('Applied and verified', self.pad.applyStatus)
+        self.assertIn('Applied ✓', self.pad.applyStatus)
         directory = os.path.join(self.temp.name, 'deadband', 'controller-backups')
         paths = os.listdir(directory)
         self.assertEqual(len(paths), 1)

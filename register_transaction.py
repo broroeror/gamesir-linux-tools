@@ -1,4 +1,10 @@
-"""Verified controller Apply with durable recovery data; transport is injected."""
+"""Verified controller Apply with durable recovery data; transport is injected.
+
+This is THE save path for every controller on the family register protocol
+(Cyclone 2, G7 Pro 8K, Tarantula Pro 8K). It began as a second, stricter
+Save used only for Continuous Trigger batches (#22); two save paths drift,
+so it now handles every batch for those models. (The G7 Pro saves through
+its own enveloped channel in bridge.applyConfig.)"""
 import json
 import os
 import tempfile
@@ -13,8 +19,9 @@ def prune(directory, keep=KEEP_RECOVERY_FILES):
     VERIFIED apply -- a failed one keeps everything, since that is when the
     history matters. Only this module's own files are ever touched."""
     try:
+        # 'before_apply_' (current) and 'cyclone2_before_apply_' (#22's name)
         files = sorted((os.path.join(directory, f) for f in os.listdir(directory)
-                        if f.startswith('cyclone2_before_apply_') and f.endswith('.json')),
+                        if 'before_apply_' in f and f.endswith('.json')),
                        key=os.path.getmtime, reverse=True)
     except OSError:
         return
@@ -25,14 +32,22 @@ def prune(directory, keep=KEEP_RECOVERY_FILES):
             pass
 
 
-def apply(changes, read, write, directory, device):
+def apply(changes, read, write, directory, device, unverified=()):
     """Snapshot changed registers before writing; verify and recover on failure.
 
     read/write must reject a changed device session. The recovery file uses the
     existing labelled GameSir schema, so Backup & Restore can import it.
+
+    `unverified` = (bank, addr) writes that can't be read back because the pad
+    re-enumerates after them -- the poll rate on the 8K and Tarantula. They are
+    moved to the END of the batch (after everything else is verified) and are
+    written without a read-back; a reconnect afterwards is expected, not failure.
     """
     if not changes:
         return True, 'No changes to apply'
+    unverified = set(unverified)
+    changes = ([c for c in changes if (c[0], c[1]) not in unverified]
+               + [c for c in changes if (c[0], c[1]) in unverified])
     original = []
     for bank, addr, data in changes:
         raw = list(read(bank, addr, len(data)))
@@ -50,7 +65,7 @@ def apply(changes, read, write, directory, device):
             address = addr + offset
             fields[f'0x{address:04x}'] = {'addr': f'0x{address:04x}', 'bytes': [byte]}
     os.makedirs(directory, exist_ok=True)
-    fd, pending = tempfile.mkstemp(prefix='cyclone2_before_apply_', suffix='.pending', dir=directory)
+    fd, pending = tempfile.mkstemp(prefix='before_apply_', suffix='.pending', dir=directory)
     path = pending[:-len('.pending')] + '.json'
     try:
         with os.fdopen(fd, 'w', encoding='utf-8') as f:
@@ -76,6 +91,8 @@ def apply(changes, read, write, directory, device):
             attempted.append(original[i])       # include an interrupted write
             if not write(bank, addr, data):
                 raise OSError('write refused or device session changed')
+            if (bank, addr) in unverified:
+                continue                        # pad reconnects; nothing to read
             if list(read(bank, addr, len(data))) != list(data):
                 raise OSError(f'read-back mismatch at 0x{addr:04x}')
     except Exception as failure:
@@ -89,4 +106,6 @@ def apply(changes, read, write, directory, device):
         result = 'original settings restored and verified' if restored else 'recovery NOT confirmed'
         return False, f'Apply failed ({failure}); {result}; recovery file: {path}'
     prune(directory)
-    return True, f'Applied and verified {len(changes)} changes; recovery file: {path}'
+    n = len(changes); checked = n - sum(1 for c in changes if (c[0], c[1]) in unverified)
+    note = ' · poll rate set, controller reconnecting' if checked < n else ''
+    return True, f'Applied ✓  {checked}/{checked} confirmed{note}'

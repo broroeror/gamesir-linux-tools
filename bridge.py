@@ -2210,9 +2210,14 @@ class GamesirBridge(QObject):
 
     @Slot()
     def applyConfig(self):
-        # A toggle Save may include its remap; snapshot/verify that batch together.
-        if any(r.get('kind') == 'continuous_trigger' for r in self._pending.values()):
-            self._apply_cyclone_config()
+        # Every controller on the family register protocol saves through ONE
+        # path: snapshot -> recovery file -> write -> read-back verify ->
+        # rollback on failure (register_transaction). It used to be reserved for
+        # Continuous Trigger batches (#22) while everything else took the path
+        # below; two save paths drift. The G7 Pro keeps the path below -- its
+        # writes go over its own enveloped channel with per-field quirks.
+        if self._prof.write_style == 'cyclone':
+            self._apply_transactional()
             return
         edit = state.get('edit_profile') or state.get('profile')
         default_bank = self._prof.profile_bank(edit)
@@ -2261,10 +2266,10 @@ class GamesirBridge(QObject):
         self._pending = {}
         self.pendingChanged.emit()
 
-    def _apply_cyclone_config(self):
+    def _apply_transactional(self):
         if self._backup_busy or not self._pending:
             return
-        if (self._prof is not profiles.CYCLONE or profiles.active() is not self._prof
+        if (self._prof.write_style != 'cyclone' or profiles.active() is not self._prof
                 or not profiles.is_recognized() or not state.get('connected')
                 or self._driving != state.get('driving')
                 or state.get('driving') != state.get('selected')):
@@ -2338,8 +2343,13 @@ class GamesirBridge(QObject):
         def run():
             try:
                 base = os.environ.get('XDG_DATA_HOME') or os.path.expanduser('~/.local/share')
+                # poll rate: written last, no read-back -- the 8K and Tarantula
+                # re-enumerate on this change (seen in USB captures and live)
+                unverified = ({(b, a) for b, a, _d in changes if a == prof.POLL_RATE}
+                              if prof.POLL_RATE is not None else set())
                 ok, message = register_transaction.apply(
-                    changes, read, write, os.path.join(base, 'deadband', 'controller-backups'), prof.name)
+                    changes, read, write, os.path.join(base, 'deadband', 'controller-backups'),
+                    prof.name, unverified=unverified)
                 if ok:
                     for key, r in snapshot_pending.items():
                         if r.get('kind') != 'motion':
@@ -2349,6 +2359,7 @@ class GamesirBridge(QObject):
                     if snapshot_motion is not None:
                         self._m_loaded = snapshot_motion
                         self._m_dirty = self._m != snapshot_motion
+                    self._m_init = {}
                     # A fresh poll discards pending edits. Defer it if the user
                     # staged another edit while this batch was being applied.
                     if not self._pending:
