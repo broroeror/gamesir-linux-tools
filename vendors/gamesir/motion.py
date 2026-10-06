@@ -1,6 +1,6 @@
 """GameSir motion (gyro) config — map-driven.
 
-The Cyclone and 8K gyro blocks differ (base, field offsets, curve point-count,
+The Cyclone, G7 Pro and 8K gyro blocks differ (base, field offsets, curve point-count,
 deadzone width, feature set), so the ADDRESSES live in each controller profile's
 `motion` dict and every function here takes that map (`mp`). Shared enums live
 here. DATA ONLY; the bridge does the reads/writes.
@@ -15,7 +15,13 @@ motion map keys (section = Aim; Tilt = same fields + `tilt_offset`):
   inverts                                   : tuple of (label, addr)
   xaxis_gates_inverts                       : bool (Roll/Yaw inverts gated by X-axis mode)
   tilt_offset                               : int, or None if the model has no Tilt
+Optional G7 Pro overrides: xaxis_modes, outputs, buttons, tilt_inverts (absolute
+addresses, None for absent fields), curve_points_offset, curve_presets,
+curve_mode_only_custom, curve_strength, direction_empty, overlap_area,
+range_sensitivity (a convenience control over the existing input endpoint).
 """
+import math
+
 import vendors.gamesir.config as cfg
 
 ACT_METHODS = [("Off", 0x00), ("Hold", 0x01), ("Press to switch", 0x02), ("Always on", 0x03)]
@@ -62,6 +68,27 @@ def dz_max_bytes(pct, wide):
     return [pct]
 
 
+def range_sensitivity(dz_min, dz_max):
+    """Input-span compression relative to dz_max=100, not an IMU gain.
+
+    The curve's output span and points stay unchanged. This describes the
+    input range only; nonlinear curves and game settings affect actual aim.
+    Degenerate ranges have no meaningful multiplier.
+    """
+    if not 0 <= dz_min < dz_max <= 100:
+        return None
+    return (100 - dz_min) / (dz_max - dz_min)
+
+
+def sensitivity_dz_max(dz_min, multiplier):
+    """Keep the lower deadzone and compress only the upper input endpoint."""
+    if not 0 <= dz_min < 100 or not math.isfinite(multiplier):
+        return None
+    span = 100 - dz_min
+    multiplier = max(1.0, min(float(span), multiplier))
+    return dz_min + max(1, round(span / multiplier))
+
+
 # --- curve --------------------------------------------------------------------
 def curve_points_for(npts, type_idx, intensity, custom_pts=None):
     presets = CURVE_PRESETS[npts]
@@ -89,42 +116,71 @@ def sections(mp):
     return out
 
 
+def enum_table(mp, field):
+    return mp.get({'xaxis': 'xaxis_modes', 'output': 'outputs'}.get(field, ''),
+                  {'act_method': ACT_METHODS, 'xaxis': XAXIS_MODES, 'output': OUTPUTS}.get(field))
+
+
+def invert_addrs(mp, off):
+    if off and 'tilt_inverts' in mp:
+        return mp['tilt_inverts']
+    return tuple(a + off for _label, a in mp['inverts'])
+
+
+def curve_payload(mp, type_idx, intensity=100):
+    """Captured model-specific presets; Custom may select its existing LUT only."""
+    if mp.get('curve_mode_only_custom') and type_idx == 3:
+        return [3]
+    if 'curve_presets' in mp:
+        return list(mp['curve_presets'][type_idx])
+    return curve_block(mp['curve_npts'], type_idx, intensity)
+
+
 def read_addrs(mp):
     """(addr, length) reads populating the whole motion view (all sections)."""
     reads = []
     for _name, off in sections(mp):
         singles = [mp['act_method'], mp['xaxis'], mp['output'],
                    mp['dz_min'], mp['adz_min']] + list(mp['act_buttons']) \
-                  + [a for _l, a in mp['inverts']] + [mp['xy_scale']]
+                  + [mp['xy_scale']]
         if mp.get('sens') is not None:
             singles.append(mp['sens'])
         reads += [(a + off, 1) for a in singles]
+        reads += [(a, 1) for a in invert_addrs(mp, off) if a is not None]
+        if 'overlap_area' in mp:
+            reads.append((mp['overlap_area'] + off, 1))
         reads += [(mp['dz_max'] + off, 2 if mp['dz_wide'] else 1),
                   (mp['adz_max'] + off, 2 if mp['adz_wide'] else 1)]
         reads += [(mp['curve'] + off, 1), (mp['curve'] + 1 + off, 1)]
-        reads += [(mp['curve'] + 2 + off + 2 * i, 2) for i in range(mp['curve_npts'])]
+        point_off = mp.get('curve_points_offset', 2)
+        reads += [(mp['curve'] + point_off + off + 2 * i, 2) for i in range(mp['curve_npts'])]
         reads += [(a + off, 1) for a in mp.get('dir_macros', ())]
     return reads
 
 
 def decode_section(mp, vals, off):
     g = lambda a: vals[a + off][0]
+    enum = lambda field: _index_of(enum_table(mp, field), g(mp[field]),
+                                  mp.get('enum_unknown_index', 0))
     d = {
-        'act_method':  _index_of(ACT_METHODS, g(mp['act_method'])),
+        'act_method':  enum('act_method'),
         'act_slots':   [g(a) for a in mp['act_buttons']],
-        'xaxis':       _index_of(XAXIS_MODES, g(mp['xaxis'])),
+        'xaxis':       enum('xaxis'),
         'dz_min':      dz_min_from(vals, mp['dz_min'] + off),
         'dz_max':      dz_max_from(vals, mp['dz_max'] + off, mp['dz_wide']),
         'adz_min':     dz_min_from(vals, mp['adz_min'] + off),
         'adz_max':     dz_max_from(vals, mp['adz_max'] + off, mp['adz_wide']),
         'curve_type':  _index_of(CURVE_TYPES, g(mp['curve'])),
         'curve_int':   g(mp['curve'] + 1),
-        'curve_points': [list(vals[mp['curve'] + 2 + off + 2 * i]) for i in range(mp['curve_npts'])],
+        'curve_points': [list(vals[mp['curve'] + mp.get('curve_points_offset', 2) + off + 2 * i])
+                         for i in range(mp['curve_npts'])],
         'xy_scale':    g(mp['xy_scale']),
-        'output':      _index_of(OUTPUTS, g(mp['output'])),
+        'output':      enum('output'),
         'sens':        g(mp['sens']) if mp.get('sens') is not None else 50,
         'dir_macros':  [g(a) for a in mp.get('dir_macros', ())],
     }
-    for i, (_label, addr) in enumerate(mp['inverts']):
-        d['invert_%d' % i] = bool(g(addr))
+    for i, addr in enumerate(invert_addrs(mp, off)):
+        d['invert_%d' % i] = bool(vals[addr][0]) if addr is not None else False
+    if 'overlap_area' in mp:
+        d['overlap_area'] = g(mp['overlap_area'])
     return d

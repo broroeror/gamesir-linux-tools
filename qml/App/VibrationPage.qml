@@ -12,6 +12,14 @@ Item {
     property bool syncL: false
     property bool forceR: false
     property bool syncR: false
+    property string testError: ""
+    property bool testRunning: false
+
+    function testMotor(motor, strength) {
+        testError = ""
+        testRunning = true
+        bridge.rumbleMotorTest(motor, strength)
+    }
 
     function seed() {
         var c = bridge.config
@@ -26,6 +34,13 @@ Item {
     }
     Component.onCompleted: seed()
     Connections { target: bridge; function onConfigLoaded() { page.seed() } }
+    Connections {
+        target: bridge
+        function onRumbleTestStatus(ok, message) {
+            page.testRunning = false
+            page.testError = ok ? "" : message
+        }
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -66,6 +81,13 @@ Item {
                     id: vibL; width: parent.width; from: 0; to: 100
                     onMoved: bridge.setScalar("vib_l", value)
                 }
+                PillButton {
+                    objectName: "testLeftGrip"
+                    label: "Test big motor (left)"
+                    enabled: !page.testRunning && vibL.value > 0
+                             && (!bridge.isG7Pro || bridge.configClaimed)
+                    onClicked: page.testMotor("left", vibL.value)
+                }
                 Row {
                     width: parent.width
                     Text { text: "Right"; color: Theme.textDim
@@ -79,8 +101,19 @@ Item {
                     onMoved: bridge.setScalar("vib_r", value)
                 }
                 PillButton {
-                    label: "Test rumble"
-                    onClicked: bridge.rumbleTest()
+                    objectName: "testRightGrip"
+                    label: "Test small motor (right)"
+                    enabled: !page.testRunning && vibR.value > 0
+                             && (!bridge.isG7Pro || bridge.configClaimed)
+                    onClicked: page.testMotor("right", vibR.value)
+                }
+                PillButton {
+                    label: "Test both grip motors"
+                    enabled: !page.testRunning && (!bridge.isG7Pro || bridge.configClaimed)
+                    onClicked: {
+                        page.testError = ""; page.testRunning = true
+                        bridge.rumbleTest()
+                    }
                 }
             }
 
@@ -102,6 +135,12 @@ Item {
                     AccentSlider {
                         id: trigLSlider; width: parent.width; from: 0; to: 100
                         onMoved: { page.trigL = value; bridge.setG7Extra("vib_trigger_l", value) }
+                    }
+                    PillButton {
+                        objectName: "testLeftTrigger"
+                        label: "Test left trigger"
+                        enabled: bridge.configClaimed && !page.testRunning && trigLSlider.value > 0
+                        onClicked: page.testMotor("left_trigger", trigLSlider.value)
                     }
                     Row {
                         spacing: 16
@@ -129,6 +168,12 @@ Item {
                         id: trigRSlider; width: parent.width; from: 0; to: 100
                         onMoved: { page.trigR = value; bridge.setG7Extra("vib_trigger_r", value) }
                     }
+                    PillButton {
+                        objectName: "testRightTrigger"
+                        label: "Test right trigger"
+                        enabled: bridge.configClaimed && !page.testRunning && trigRSlider.value > 0
+                        onClicked: page.testMotor("right_trigger", trigRSlider.value)
+                    }
                     Row {
                         spacing: 16
                         Row { spacing: 6; Text { text: "Force"; color: Theme.textDim }
@@ -141,6 +186,15 @@ Item {
                                              bridge.setG7Extra("vib_sync_r", checked ? 1 : 0) } } }
                     }
                 }
+            }
+
+            Text {
+                Layout.fillWidth: true
+                visible: page.testRunning || page.testError.length > 0
+                text: page.testRunning ? "Testing…" : page.testError
+                wrapMode: Text.WordWrap
+                color: Theme.textDim
+                font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
             }
 
         }

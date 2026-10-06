@@ -23,6 +23,9 @@ state = {
     'led_slot': None,    # active lighting slot (from read-reg 0x20/0x0000 -> 0x10 0x05)
     'connected': None,   # None = connecting, True = open, False = not found/lost
     'mode_ok': False,    # True when we're getting a populated Xbox-mode 0x12 report
+    'gyro': None,        # G7 vendor telemetry: signed raw X/Y/Z counts
+    'accel': None,       # signed raw accelerometer X/Y/Z counts
+    'imu_time': 0.0,     # monotonic timestamp of the last valid G7 sensor frame
     'firmware': None,    # firmware version string from USB bcdDevice (e.g. '3.52')
     'controller': None,  # detected model short name ('Cyclone 2'/'G7'), else None
     'wired': None,       # True = wired controller, False = its wireless dongle,

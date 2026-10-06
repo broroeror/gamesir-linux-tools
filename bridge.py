@@ -137,6 +137,7 @@ class GamesirBridge(QObject):
     lightingLoaded = Signal()       # fired when a slot's lighting is read back
     light8kLoaded = Signal()        # 8K simple lighting read back (bank 0x20)
     motionLoaded = Signal()         # 8K motion (Aim/Tilt) read back (profile bank)
+    motionSensorsChanged = Signal()
     macroLoaded = Signal()          # per-paddle macros read back (profile bank)
     mouseModeChanged = Signal()
     configLoaded = Signal()         # fired when a profile's config is read back
@@ -148,6 +149,7 @@ class GamesirBridge(QObject):
     backupBusyChanged = Signal()
     backupProgress = Signal(int, int)   # done, total
     backupStatus = Signal(bool, str)    # ok, message
+    rumbleTestStatus = Signal(bool, str)
     fwProgress = Signal(str)            # phase text (Entering loader / Writing / …)
     fwVersionsChanged = Signal()        # library changed (e.g. after a backup)
     diagChanged = Signal()              # diagnostics report text / busy changed
@@ -207,6 +209,7 @@ class GamesirBridge(QObject):
         self._m_dirty = False
         self._m_profile = None          # profile the loaded motion state belongs to
         self._m_loading = False
+        self._motion_sensors = {'available': False, 'gyro': [], 'accel': []}
 
         # per-paddle macros, per-profile bank. Loaded once per profile.
         self._macros = {}               # paddle name -> {enable, events}
@@ -227,6 +230,11 @@ class GamesirBridge(QObject):
         self._input_timer.setInterval(16)        # ~60 Hz
         self._input_timer.timeout.connect(self._poll_input)
         self._input_timer.start()
+
+        self._sensor_timer = QTimer(self)
+        self._sensor_timer.setInterval(50)  # 20 Hz; separate from controller redraws
+        self._sensor_timer.timeout.connect(self._poll_sensors)
+        self._sensor_timer.start()
 
         self._status_timer = QTimer(self)
         self._status_timer.setInterval(250)      # 4 Hz
@@ -312,6 +320,21 @@ class GamesirBridge(QObject):
         if csig != self._controllers_sig:
             self._controllers_sig = csig
             self.controllersChanged.emit()
+
+    def _poll_sensors(self):
+        gyro, accel = state.get('gyro'), state.get('accel')
+        stamp = state.get('imu_time', 0.0)
+        available = bool(
+            profiles.is_recognized() and profiles.active() is self._prof is profiles.G7_PRO
+            and state.get('config_claimed') and state.get('driving') is not None
+            and state['driving'] == state['selected']
+            and gyro is not None and accel is not None
+            and stamp > 0 and 0 <= time.monotonic() - stamp <= 0.5)
+        values = {'available': available, 'gyro': list(gyro) if available else [],
+                  'accel': list(accel) if available else []}
+        if values != self._motion_sensors:
+            self._motion_sensors = values
+            self.motionSensorsChanged.emit()
 
     def _reset_device_caches(self):
         """Forget the previously-driven unit's config + lighting so nothing from
@@ -461,12 +484,10 @@ class GamesirBridge(QObject):
         return profiles.is_recognized() and self._prof.has_motion
 
     def _poll_motion(self):
-        """Load the active profile's motion (Aim/Tilt) block once per profile.
-        Lives in the profile bank alongside the analog config, but writes apply
-        immediately (like lighting), so we re-read only when the profile changes."""
+        """Load motion for the edited profile; edits wait for Save to Profile."""
         if not self._has_motion() or state['driving'] != state['selected']:
             return
-        prof = state['profile']
+        prof = state.get('edit_profile') or state['profile']
         bank = self._prof.profile_bank(prof)
         mp = self._mp()
         if bank is None or not mp:
@@ -1322,36 +1343,42 @@ class GamesirBridge(QObject):
         self._l8['dock_bright'] = v
         self._write8k(led8k.DOCK_BRIGHT, [v])
 
-    # -------------------------------------------------------- 8K motion (Aim/Tilt)
-    # Field routing tables: name -> (Aim-block addr, option list) for enums, or a
-    # bare addr for scalar/bool fields. The Tilt equivalents add motion.TILT_OFFSET.
-    _MOTION_ENUM_TABLE = {'act_method': motion.ACT_METHODS,
-                          'xaxis':      motion.XAXIS_MODES,
-                          'output':     motion.OUTPUTS}
-
+    # ----------------------------------------------------------- motion (Aim/Tilt)
     def _mp(self):
         return self._prof.motion or {}
 
-    @Property('QVariantList', constant=True)
+    @Property('QVariantList', notify=controllerChanged)
     def motionActMethods(self):
         return [n for n, _ in motion.ACT_METHODS]
 
-    @Property('QVariantList', constant=True)
+    @Property('QVariantList', notify=controllerChanged)
     def motionOutputs(self):
-        return [n for n, _ in motion.OUTPUTS]
+        return [n for n, _ in motion.enum_table(self._mp(), 'output')]
 
-    @Property('QVariantList', constant=True)
+    @Property('QVariantList', notify=controllerChanged)
     def motionXAxisModes(self):
-        return [n for n, _ in motion.XAXIS_MODES]
+        return [n for n, _ in motion.enum_table(self._mp(), 'xaxis')]
 
-    @Property('QVariantList', constant=True)
+    @Property('QVariantList', notify=controllerChanged)
     def motionCurveTypes(self):
         return [n for n, _ in motion.CURVE_TYPES]
 
-    @Property('QVariantList', constant=True)
+    @Property('QVariantList', notify=controllerChanged)
     def motionButtons(self):
         """Buttons pickable for the activation combo, as {name, code}."""
-        return [{'name': n, 'code': c} for n, c in motion.ACT_BUTTONS]
+        return [{'name': n, 'code': c} for n, c in self._mp().get('buttons', motion.ACT_BUTTONS)]
+
+    @Property(bool, notify=controllerChanged)
+    def motionHasCurveStrength(self):
+        return self._mp().get('curve_strength', True)
+
+    @Property(bool, notify=controllerChanged)
+    def motionHasOverlap(self):
+        return 'overlap_area' in self._mp()
+
+    @Property(int, notify=controllerChanged)
+    def motionDirectionEmpty(self):
+        return self._mp().get('direction_empty', 0)
 
     # --- capability descriptors so the UI adapts to each controller's block ---
     @Property(int, notify=controllerChanged)
@@ -1365,6 +1392,10 @@ class GamesirBridge(QObject):
     @Property(bool, notify=controllerChanged)
     def motionHasSens(self):
         return self._mp().get('sens') is not None
+
+    @Property(bool, notify=controllerChanged)
+    def motionHasRangeSensitivity(self):
+        return bool(self._mp().get('range_sensitivity'))
 
     @Property(bool, notify=controllerChanged)
     def motionHasTilt(self):
@@ -1382,6 +1413,10 @@ class GamesirBridge(QObject):
     def motionAim(self):
         return self._m.get('Aim', {})
 
+    @Property('QVariantMap', notify=motionSensorsChanged)
+    def motionSensors(self):
+        return self._motion_sensors
+
     @Property('QVariantMap', notify=motionLoaded)
     def motionTilt(self):
         return self._m.get('Tilt', {})
@@ -1392,6 +1427,7 @@ class GamesirBridge(QObject):
         'xy_scale': 'X/Y balance', 'sens': 'Sensitivity',
         'dz_min': 'Deadzone min', 'dz_max': 'Deadzone max',
         'adz_min': 'Anti-deadzone min', 'adz_max': 'Anti-deadzone max',
+        'overlap_area': 'Overlap area',
     }
 
     def _motion_off(self, section):
@@ -1404,7 +1440,7 @@ class GamesirBridge(QObject):
     def setMotionEnum(self, section, field, idx):
         """Set an enum field (act_method/xaxis/output) by option index."""
         off = self._motion_off(section); mp = self._mp()
-        table = self._MOTION_ENUM_TABLE.get(field)
+        table = motion.enum_table(mp, field)
         if off is None or table is None or field not in mp or not (0 <= idx < len(table)):
             return
         self._m.get(section, {})[field] = idx
@@ -1417,7 +1453,7 @@ class GamesirBridge(QObject):
         """Set a 0..100 scalar field (xy_scale/sens)."""
         off = self._motion_off(section); mp = self._mp()
         addr = mp.get(field)
-        if off is None or addr is None:
+        if off is None or addr is None or field not in ('xy_scale', 'sens', 'overlap_area'):
             return
         value = max(0, min(100, int(value)))
         self._m.get(section, {})[field] = value
@@ -1446,6 +1482,23 @@ class GamesirBridge(QObject):
                            'Gyro %s · %s' % (section, self._MOTION_LABELS.get(field, field)),
                            '%d%%' % pct)
 
+    @Slot(str, float, result=int)
+    def setMotionRangeSensitivity(self, section, multiplier):
+        """Stage stick sensitivity using the documented input-range endpoint.
+
+        Preserve activation, the lower deadzone, curve, output range and X/Y
+        balance. Return the quantized endpoint so both UI controls agree.
+        """
+        sec = self._m.get(section)
+        if (not self.motionHasRangeSensitivity or sec is None
+                or self._motion_off(section) is None or sec.get('output') not in (0, 1)):
+            return -1
+        high = motion.sensitivity_dz_max(sec.get('dz_min', 100), multiplier)
+        if high is None:
+            return -1
+        self.setMotionDeadzone(section, 'dz_max', high)
+        return high
+
     def _write_curve(self, section, type_idx, intensity, custom_pts=None):
         """Stage the full curve block (type + intensity + points) — the firmware
         shapes from the LUT, so type/intensity bytes alone do nothing.
@@ -1462,6 +1515,20 @@ class GamesirBridge(QObject):
         sec['curve_type'] = type_idx
         sec['curve_int'] = intensity
         name = motion.CURVE_TYPES[type_idx][0] if 0 <= type_idx < len(motion.CURVE_TYPES) else '?'
+        if 'curve_presets' in mp:
+            blk = motion.curve_payload(mp, type_idx)
+            if len(blk) > 1:
+                sec['curve_int'] = blk[1]
+                sec['curve_points'] = [blk[i:i + 2] for i in (4, 6, 8)]
+            else:
+                # Custom selects the controller's existing shape. A previously
+                # staged preset is replaced, so its points will not be written.
+                baseline = self._m_loaded.get(section, {})
+                sec['curve_int'] = baseline.get('curve_int', intensity)
+                sec['curve_points'] = copy.deepcopy(baseline.get('curve_points', []))
+            self._write_motion(mp['curve'] + off, blk,
+                               'Gyro %s · Response curve' % section, name)
+            return
         if type_idx == 3:                      # custom: keep the current points
             pts = sec.get('curve_points') or []
             if len(pts) < npts:                # points never read: type byte only
@@ -1485,6 +1552,8 @@ class GamesirBridge(QObject):
 
     @Slot(str, int)
     def setMotionCurveStrength(self, section, v):
+        if not self.motionHasCurveStrength:
+            return
         sec = self._m.get(section, {})
         self._write_curve(section, sec.get('curve_type', 0), max(0, min(100, int(v))))
 
@@ -1492,7 +1561,8 @@ class GamesirBridge(QObject):
     def setMotionCurvePoint(self, section, idx, x, y):
         """Set custom curve control point `idx` to (x, y) — direct 2-byte write."""
         off = self._motion_off(section); mp = self._mp()
-        if off is None or 'curve' not in mp or not (0 <= idx < mp['curve_npts']):
+        if (off is None or 'curve' not in mp or mp.get('curve_mode_only_custom')
+                or not (0 <= idx < mp['curve_npts'])):
             return
         x = max(0, min(255, int(x))); y = max(0, min(255, int(y)))
         sec = self._m.get(section)
@@ -1510,6 +1580,13 @@ class GamesirBridge(QObject):
         slots_addr = mp.get('act_buttons', ())
         sec = self._m.get(section)
         if off is None or sec is None or not slots_addr:
+            return
+        if code not in {c for _n, c in mp.get('buttons', motion.ACT_BUTTONS)}:
+            return
+        if on and len(slots_addr) == 1:
+            sec['act_slots'] = [code]
+            self._write_motion(slots_addr[0] + off, [code],
+                               'Gyro %s · Activation button' % section, self.targetLabel(code))
             return
         slots = list(sec.get('act_slots', [motion.ACT_BTN_EMPTY] * len(slots_addr)))
         if on:
@@ -1533,8 +1610,11 @@ class GamesirBridge(QObject):
         off = self._motion_off(section); inv = self._mp().get('inverts', ())
         if off is None or not (0 <= idx < len(inv)):
             return
+        addr = motion.invert_addrs(self._mp(), off)[idx]
+        if addr is None:
+            return
         self._m.get(section, {})['invert_%d' % idx] = bool(on)
-        self._write_motion(inv[idx][1] + off, [1 if on else 0],
+        self._write_motion(addr, [1 if on else 0],
                            'Gyro %s · Invert %s' % (section, inv[idx][0]), 'on' if on else 'off')
 
     @Slot(str, int, int)
@@ -1544,7 +1624,7 @@ class GamesirBridge(QObject):
         off = self._motion_off(section); dirs = self._mp().get('dir_macros', ())
         if off is None or not (0 <= idx < len(dirs)):
             return
-        code = 0 if code < 0 else (code & 0xff)
+        code = self.motionDirectionEmpty if code < 0 else (code & 0xff)
         sec = self._m.get(section)
         if sec is not None:
             d = list(sec.get('dir_macros', [0] * len(dirs)))
@@ -1553,7 +1633,7 @@ class GamesirBridge(QObject):
         self._write_motion(dirs[idx] + off, [code],
                            'Gyro %s · Directional %s' % (section, ('up', 'down', 'left', 'right')[idx]
                                                          if idx < 4 else idx),
-                           self.targetLabel(code) if code else 'cleared')
+                           self.targetLabel(code) if code != self.motionDirectionEmpty else 'cleared')
 
     # ------------------------------------------------------------ macros (paddles)
     @Property('QVariantList', notify=controllerChanged)
@@ -2258,6 +2338,12 @@ class GamesirBridge(QObject):
             state['edit_profile'] = n
             self._loaded_profile = None
             self._config_loading = None
+            self._m = {}
+            self._m_loaded = {}
+            self._m_dirty = False
+            self._m_profile = None
+            self._m_loading = False
+            self.motionLoaded.emit()
             if self._pending:
                 self._pending = {}
                 self.pendingChanged.emit()
@@ -2278,4 +2364,17 @@ class GamesirBridge(QObject):
 
     @Slot()
     def rumbleTest(self):
-        control.rumble_test()
+        control.rumble_test(on_done=self.rumbleTestStatus.emit)
+
+    @Slot(str, int)
+    def rumbleMotorTest(self, motor, strength):
+        """Preview one motor at the slider's percentage without saving settings."""
+        if motor not in ('left', 'right', 'left_trigger', 'right_trigger'):
+            self.rumbleTestStatus.emit(False, 'Unknown vibration motor.')
+            return
+        if motor.endswith('_trigger') and self._prof is not profiles.G7_PRO:
+            self.rumbleTestStatus.emit(False, 'Trigger tests require a supported G7 Pro.')
+            return
+        percent = max(0, min(100, int(strength)))
+        amplitude = (percent * 255 + 50) // 100
+        control.rumble_test(on_done=self.rumbleTestStatus.emit, motor=motor, strength=amplitude)

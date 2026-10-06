@@ -17,6 +17,7 @@ import time
 
 from gs_common import pad
 import controller_profile as profiles
+from vendors.gamesir.models.g7pro import protocol as g7pro
 
 _write_lock = threading.Lock()   # one COMMAND at a time (send_cmd)
 _wseq_lock = threading.Lock()    # one write SEQUENCE at a time (write_reg) — the
@@ -56,7 +57,7 @@ def generation():
     return _generation
 
 
-def send_cmd(*payload, gen=None, probe=False):
+def send_cmd(*payload, gen=None, probe=False, padded=True):
     """Thread-safe padded command write to the current device.
 
     Refuses (returns False) when the connected controller is NOT a recognized
@@ -73,7 +74,8 @@ def send_cmd(*payload, gen=None, probe=False):
     If `gen` is given and no longer matches the live session generation, the write
     is refused (the device was rebound under the caller — e.g. a controller
     switch). All checks and the write are atomic under the lock, so no write can
-    straddle a rebind."""
+    straddle a rebind. ``padded=False`` keeps GIP motor commands at their exact
+    packet length while retaining the same device and session guards."""
     with _write_lock:
         if _device is None:
             return False
@@ -82,7 +84,7 @@ def send_cmd(*payload, gen=None, probe=False):
         if gen is not None and gen != _generation:
             return False
         try:
-            _device.write(pad(*payload))
+            _device.write(pad(*payload) if padded else bytes(payload))
             return True
         except Exception:
             return False
@@ -92,16 +94,58 @@ def set_profile(n):
     send_cmd(0x0F, 0x07, n)          # device will reply to the periodic get-profile
 
 
-def rumble(left, right):
-    send_cmd(0x0F, 0x20, 0x66, 0x55, left, right)
+_gip_seq = 0
+_gip_seq_lock = threading.Lock()
 
 
-def rumble_test():
+def rumble(left, right, gen=None, write_style=None, trigger_left=0, trigger_right=0):
+    style = write_style or profiles.active().write_style
+    if style not in ('g7', 'cyclone'):
+        return False
+    if style == 'g7':
+        global _gip_seq
+        with _gip_seq_lock:
+            _gip_seq = (_gip_seq % 255) + 1  # GIP reserves sequence zero
+            packet = g7pro.rumble_packet(_gip_seq, left, right, trigger_left, trigger_right)
+            return send_cmd(*packet, gen=gen, padded=False)
+    if trigger_left or trigger_right:
+        return False
+    return send_cmd(0x0F, 0x20, 0x66, 0x55, left, right, gen=gen)
+
+
+def rumble_test(on_done=None, motor='grips', strength=0xC0):
+    gen = generation()
+    style = profiles.active().write_style
+
     def run():
-        rumble(0xC0, 0xC0)
-        time.sleep(0.4)
-        rumble(0x00, 0x00)
-    threading.Thread(target=run, daemon=True).start()
+        strength_value = max(0, min(255, int(strength)))
+        motors = {
+            'grips': (strength_value, strength_value, 0, 0),
+            'left': (strength_value, 0, 0, 0),
+            'right': (0, strength_value, 0, 0),
+            'left_trigger': (0, 0, strength_value, 0),
+            'right_trigger': (0, 0, 0, strength_value),
+        }
+        if motor not in motors or (motor.endswith('_trigger') and style != 'g7'):
+            if on_done:
+                on_done(False, 'This motor test is not supported for the selected controller.')
+            return
+        left, right, trigger_left, trigger_right = motors[motor]
+        if not rumble(left, right, gen=gen, write_style=style,
+                      trigger_left=trigger_left, trigger_right=trigger_right):
+            if on_done:
+                on_done(False, 'Could not send rumble. Connect the controller and choose Configure controller.')
+            return
+        try:
+            time.sleep(0.4)
+        finally:
+            stopped = rumble(0x00, 0x00, gen=gen, write_style=style)
+        if on_done:
+            on_done(stopped, '' if stopped else 'Controller disconnected or changed during the test.')
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    return thread
 
 
 _g7_seq = 0            # rolling sequence for the G7's enveloped writes

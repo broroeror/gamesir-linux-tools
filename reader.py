@@ -121,7 +121,7 @@ def _probe_live(ctrl, prof=None):
     # The G7 family speaks GIP over evdev and NEVER emits the 0x12 vendor stream,
     # so the probe can't see it and would brand a perfectly live pad an empty
     # dongle. We have no empty-vs-live signal for those — assume live.
-    if prof is not None and prof.input_style == 'evdev':
+    if prof is not None and prof.input_style in ('evdev', 'g7_usb'):
         return True
     key = _live_key(ctrl)
     if key not in _live_cache:
@@ -164,7 +164,13 @@ def _pick_selected(controllers):
     for c in controllers:
         if c['id'] == sel:
             return c
-    return next((c for c in controllers if _probe_live(c)), controllers[0])
+    live = [c for c in controllers if _probe_live(c)]
+    # An input-only identity (including an idle receiver) must not take the
+    # initial selection away from a controller this app can configure.
+    return next((c for c in live
+                 if profiles.detect_one(c['pid'], c.get('product'))
+                 not in (None, profiles.G7_NATIVE, profiles.G7_PRO_OTHER)),
+                (live or controllers)[0])
 
 
 
@@ -716,6 +722,7 @@ def read_session_g7usb(ctrl):
 
     _active_g7_handle = handle
     control.set_device(handle)
+    state.update(gyro=None, accel=None, imu_time=0.0)
     state['driving'] = ctrl['id']
     state['config_claimed'] = True
     state['config_status'] = 'Configuring · controller unavailable to games'
@@ -799,6 +806,7 @@ def read_session_g7usb(ctrl):
             _active_g7_handle = None
         state['driving'] = None
         state['config_claimed'] = False
+        state.update(gyro=None, accel=None, imu_time=0.0)
         if not state.get('config_wanted') and not telemetry_error and not session_error:
             state['config_status'] = 'Released to games'
 

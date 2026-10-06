@@ -17,24 +17,40 @@ Item {
     property var aim: ({})
     property var tilt: ({})
     readonly property var cur: sec === 0 ? aim : tilt
+    readonly property bool rangeSensitivityVisible: bridge.motionHasRangeSensitivity
+                                                    && (cur.output === 0 || cur.output === 1)
+    readonly property real rangeSensitivity: inputSensitivity()
+
+    function inputSensitivity(source) {
+        var d = source === undefined ? cur : source
+        var low = num(d.dz_min, 0), high = num(d.dz_max, 100)
+        return low >= 0 && high > low && high <= 100 ? (100 - low) / (high - low) : 0
+    }
 
     function seed() {
         aim = bridge.motionAim
         tilt = bridge.motionTilt
         reseed()
     }
-    function reseed() {
-        dzRange.lo = num(cur.dz_min, 0);   dzRange.hi = num(cur.dz_max, 100)
-        adzRange.lo = num(cur.adz_min, 0); adzRange.hi = num(cur.adz_max, 100)
-        xySlider.value = num(cur.xy_scale, 50)
-        sensSlider.value = num(cur.sens, 50)
-        curveIntSlider.value = num(cur.curve_int, 100)
+    function reseed(source) {
+        var d = source === undefined ? cur : source
+        dzRange.lo = num(d.dz_min, 0);   dzRange.hi = num(d.dz_max, 100)
+        adzRange.lo = num(d.adz_min, 0); adzRange.hi = num(d.adz_max, 100)
+        xySlider.value = num(d.xy_scale, 50)
+        overlapSlider.value = num(d.overlap_area, 0)
+        sensSlider.value = num(d.sens, 50)
+        var sensitivity = inputSensitivity(d)
+        rangeSensSlider.value = sensitivity > 0 ? sensitivity : 1
+        curveIntSlider.value = num(d.curve_int, 100)
     }
     function num(v, d) { return v !== undefined ? v : d }
     Component.onCompleted: seed()
-    Connections { target: bridge; function onMotionLoaded() { page.seed() } }
+    Connections {
+        target: bridge
+        function onMotionLoaded() { page.seed() }
+    }
     onVisibleChanged: if (visible) seed()
-    onSecChanged: reseed()
+    onSecChanged: reseed(sec === 0 ? aim : tilt)
 
     function apply(field, val) {
         var d = sec === 0 ? aim : tilt
@@ -45,29 +61,30 @@ Item {
     function setEnum(field, idx)  { apply(field, idx); bridge.setMotionEnum(section, field, idx) }
     function setVal(field, v)     { apply(field, v);   bridge.setMotionValue(section, field, v) }
     function setInvert(i, on)     { apply("invert_" + i, on); bridge.setMotionInvert(section, i, on) }
+    function setRangeSensitivity(v) {
+        var high = bridge.setMotionRangeSensitivity(section, v)
+        if (high < 0) return
+        apply("dz_max", high)
+        dzRange.hi = high
+    }
 
     // Directional-Macros output: 4 target-code slots (up/down/left/right).
     property int dirEdit: -1
     function dirLabel(i) {
         var d = cur.dir_macros
         var c = (d && d.length > i) ? d[i] : 0
-        return c > 0 ? bridge.targetLabel(c) : "—"
+        return c > 0 && c !== bridge.motionDirectionEmpty ? bridge.targetLabel(c) : "—"
     }
     function setDir(i, code) {
         var d = cur.dir_macros ? cur.dir_macros.slice() : [0, 0, 0, 0]
-        d[i] = code < 0 ? 0 : code; apply("dir_macros", d)
+        d[i] = code < 0 ? bridge.motionDirectionEmpty : code; apply("dir_macros", d)
         bridge.setMotionDir(section, i, code)
     }
-    function setCurveType(idx)    { apply("curve_type", idx); bridge.setMotionCurveType(section, idx) }
+    function setCurveType(idx)    { bridge.setMotionCurveType(section, idx); seed() }
     function setCurveStrength(v)  { apply("curve_int", v);    bridge.setMotionCurveStrength(section, v) }
 
-    // deadzone writes are single-field + cheap, but debounce a drag anyway
-    Timer { id: dzTimer; interval: 200
-            onTriggered: { bridge.setMotionDeadzone(page.section, "dz_min", dzRange.lo)
-                           bridge.setMotionDeadzone(page.section, "dz_max", dzRange.hi) } }
-    Timer { id: adzTimer; interval: 200
-            onTriggered: { bridge.setMotionDeadzone(page.section, "adz_min", adzRange.lo)
-                           bridge.setMotionDeadzone(page.section, "adz_max", adzRange.hi) } }
+    // Only stage in memory while dragging. Avoid delayed edits that can miss
+    // Save/Discard or arrive after a section/profile switch. _queue merges drags.
 
     // activation combo
     readonly property int slotEmpty: 255
@@ -76,7 +93,7 @@ Item {
     function selCount() { var n = 0; for (var i = 0; i < slots.length; i++) if (slots[i] !== slotEmpty) n++; return n }
     function toggleBtn(code) {
         var on = !isSel(code)
-        if (on && selCount() >= bridge.motionButtonMax) return
+        if (on && bridge.motionButtonMax > 1 && selCount() >= bridge.motionButtonMax) return
         bridge.setMotionButton(section, code, on)
         seed()                                    // re-pull slots from the bridge
     }
@@ -85,6 +102,11 @@ Item {
     // inverts aren't gated.
     function invLive(label) {
         if (!bridge.motionXAxisGatesInverts) return true
+        if (bridge.isG7Pro) {
+            if (label.indexOf("Roll") >= 0) return sec === 0 && cur.xaxis === 1 && cur.output === 2
+            if (label.indexOf("Yaw") >= 0) return cur.xaxis === 1 && cur.output !== 2
+            return true
+        }
         if (label.indexOf("Roll") >= 0) return cur.xaxis === 1 || cur.xaxis === 2
         if (label.indexOf("Yaw") >= 0)  return cur.xaxis === 0 || cur.xaxis === 2
         return true
@@ -105,6 +127,11 @@ Item {
             id: fitBox
             width: scroller.availableWidth
             spacing: Math.max(6, Math.round(14 * Theme.vComp))
+
+            MotionSensors {
+                width: parent.width
+                visible: bridge.isG7Pro
+            }
 
             Row {
                 spacing: 8
@@ -128,6 +155,7 @@ Item {
 
             RowLayout {
                 width: parent.width; spacing: 20
+                enabled: !bridge.isG7Pro || (bridge.configClaimed && page.cur.act_method !== undefined)
 
                 // ================= left column =================
                 ColumnLayout {
@@ -167,6 +195,7 @@ Item {
                                     highlight: page.isSel(modelData.code)
                                     enabled: page.cur.act_method !== 0
                                              && (page.isSel(modelData.code)
+                                                 || bridge.motionButtonMax === 1
                                                  || page.selCount() < bridge.motionButtonMax)
                                     onClicked: page.toggleBtn(modelData.code)
                                 }
@@ -202,6 +231,33 @@ Item {
                             visible: bridge.motionHasSens
                             onMoved: page.setVal("sens", value)
                         }
+                        RowLayout {
+                            width: parent.width; visible: page.rangeSensitivityVisible
+                            Text { text: "Sensitivity (input range)"; color: Theme.textDim
+                                   Layout.fillWidth: true
+                                   font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
+                            Text { text: page.rangeSensitivity > 0
+                                         ? page.rangeSensitivity.toFixed(2) + "×" : "Invalid range"
+                                   color: Theme.text
+                                   font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
+                        }
+                        AccentSlider {
+                            id: rangeSensSlider; objectName: "motionRangeSensitivity"
+                            width: parent.width; from: 1
+                            to: Math.max(1, Math.min(100 - page.num(page.cur.dz_min, 0),
+                                                    Math.max(10, page.rangeSensitivity)))
+                            integer: false
+                            visible: page.rangeSensitivityVisible
+                            enabled: page.num(page.cur.dz_min, 100) < 100
+                            onMoved: page.setRangeSensitivity(value)
+                        }
+                        Text {
+                            width: parent.width; visible: page.rangeSensitivityVisible
+                            text: "Higher = stronger stick response. Adjusts the upper input limit; "
+                                  + "1× uses the full input range. Save to Profile to apply."
+                            wrapMode: Text.WordWrap
+                            color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                        }
                         Row {
                             width: parent.width; topPadding: 4
                             Text { text: "Horizontal"; color: Theme.textDim
@@ -224,8 +280,18 @@ Item {
                     // Directional-Macros output: assign each gyro direction to a
                     // button / key / mouse click (both controllers, when RE'd).
                     Card {
-                        title: "Directional Macros"; Layout.fillWidth: true
+                        title: bridge.isG7Pro ? "Button Binds" : "Directional Macros"; Layout.fillWidth: true
                         visible: page.cur.output === 2 && bridge.motionHasDirMacros
+                        Text {
+                            visible: bridge.motionHasOverlap
+                            text: "Overlap area: " + overlapSlider.value + "%"
+                            color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                        }
+                        AccentSlider {
+                            id: overlapSlider; width: parent.width; from: 0; to: 100
+                            visible: bridge.motionHasOverlap
+                            onMoved: page.setVal("overlap_area", value)
+                        }
                         Repeater {
                             model: [{ n: "Up", i: 0 }, { n: "Down", i: 1 },
                                     { n: "Left", i: 2 }, { n: "Right", i: 3 }]
@@ -283,6 +349,7 @@ Item {
                                     required property string modelData
                                     required property int index
                                     width: parent.width
+                                    visible: !bridge.isG7Pro || page.sec === 0 || modelData !== "Invert Roll"
                                     opacity: page.invLive(modelData) ? 1.0 : 0.4
                                     Text { text: modelData; color: Theme.text
                                            font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
@@ -309,8 +376,14 @@ Item {
                                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                         }
                         RangeSlider {
-                            id: dzRange; width: parent.width; from: 0; to: 100
-                            onMoved: { page.apply("dz_min", lo); page.apply("dz_max", hi); dzTimer.restart() }
+                            id: dzRange; objectName: "motionDeadzone"
+                            width: parent.width; from: 0; to: 100
+                            onMoved: {
+                                page.apply("dz_min", lo); page.apply("dz_max", hi)
+                                rangeSensSlider.value = page.rangeSensitivity > 0 ? page.rangeSensitivity : 1
+                                bridge.setMotionDeadzone(page.section, "dz_min", lo)
+                                bridge.setMotionDeadzone(page.section, "dz_max", hi)
+                            }
                         }
                         Row {
                             width: parent.width; topPadding: 4
@@ -321,8 +394,13 @@ Item {
                                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                         }
                         RangeSlider {
-                            id: adzRange; width: parent.width; from: 0; to: 100
-                            onMoved: { page.apply("adz_min", lo); page.apply("adz_max", hi); adzTimer.restart() }
+                            id: adzRange; objectName: "motionAntiDeadzone"
+                            width: parent.width; from: 0; to: 100
+                            onMoved: {
+                                page.apply("adz_min", lo); page.apply("adz_max", hi)
+                                bridge.setMotionDeadzone(page.section, "adz_min", lo)
+                                bridge.setMotionDeadzone(page.section, "adz_max", hi)
+                            }
                         }
                         Text { text: "Response curve"; color: Theme.textDim; topPadding: 6
                                font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
@@ -339,9 +417,15 @@ Item {
                                 }
                             }
                         }
+                        Text {
+                            width: parent.width; wrapMode: Text.WordWrap
+                            visible: bridge.isG7Pro && page.cur.curve_type === 3
+                            text: "Custom uses the curve points already stored in this profile."
+                            color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                        }
                         Row {
                             width: parent.width; topPadding: 4
-                            visible: page.cur.curve_type === 1 || page.cur.curve_type === 2
+                            visible: bridge.motionHasCurveStrength && (page.cur.curve_type === 1 || page.cur.curve_type === 2)
                             Text { text: "Curve strength"; color: Theme.textDim
                                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                             Item { width: parent.width - 130; height: 1 }
@@ -350,7 +434,7 @@ Item {
                         }
                         AccentSlider {
                             id: curveIntSlider; width: parent.width; from: 0; to: 100
-                            visible: page.cur.curve_type === 1 || page.cur.curve_type === 2
+                            visible: bridge.motionHasCurveStrength && (page.cur.curve_type === 1 || page.cur.curve_type === 2)
                             onMoved: page.setCurveStrength(value)
                         }
                     }

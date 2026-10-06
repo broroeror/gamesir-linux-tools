@@ -48,3 +48,5 @@ SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="10bb", TAG+="uaccess
 SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="1003", TAG+="uaccess"
 SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="1004", TAG+="uaccess"
 SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="100a", TAG+="uaccess"
+# G7 Pro Wuchang Edition (firmware 5.41): configuration reads/writes verified.
+SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="10a7", TAG+="uaccess"

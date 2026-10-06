@@ -282,7 +282,7 @@ CYCLONE = ControllerProfile(
 # EDITION SCOPE: the G7 Pro ships in editions that differ ONLY by USB product id
 # (the same trap as the 8K's Nioh/Aimlabs pair — they all report a generic
 # product string). The editions and their USB ids -- Shadow Ember, Amazon,
-# White Trimode, and the detect-only Zenless -- live in models/g7pro/protocol.py,
+# White Trimode, Wuchang, and the detect-only Zenless -- live in models/g7pro/protocol.py,
 # along with the evidence behind each; do not restate PIDs here (a copy of this
 # list once drifted and carried a wrong claim about 1004).
 #
@@ -315,6 +315,8 @@ G7_PRO = ControllerProfile(
     profile_banks=(1, 2, 3, 4),
     supports_hair_thresholds=False,
     device_settings_style='g7pro',
+    has_motion=True,
+    motion=_g7.MOTION_MAP,
     VIB_L=0x0020, VIB_R=0x0021,             # grip vibration L/R
     POLL_RATE=0x0030,                       # report rate (encoding differs)
     LT_DZ_MIN=0x00cf, LT_DZ_MAX=0x00d0,

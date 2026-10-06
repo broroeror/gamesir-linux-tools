@@ -32,7 +32,8 @@ Window {
     // Tabs follow what the connected controller actually has, so a profile
     // without (say) mapped lighting or vibration motors doesn't get an empty page.
     readonly property var controllerTabs: bridge.isG7Pro
-        ? ["Rebinds", "Sticks", "Triggers", "Vibration", "Device"]
+        ? ["Rebinds", "Sticks"].concat(bridge.hasMotion ? ["Motion"] : [])
+          .concat(["Triggers", "Vibration", "Device"])
         : ["Rebinds", "Sticks"]
           .concat(bridge.hasMotion ? ["Motion"] : [])
           .concat(["Triggers"])
