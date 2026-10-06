@@ -273,6 +273,60 @@ def classify_open_failure(node):
 PLATFORM_VENDORS = {0x057E: 'Nintendo', 0x054C: 'Sony', 0x045E: 'Microsoft'}
 
 
+def _usb_links():
+    """Link speed and fastest input rate of every GameSir/Logitech USB device.
+
+    A pad's poll rate is only real if the link can carry it. At USB Full Speed
+    (12 Mb/s) an interrupt endpoint is polled at most once per millisecond, so
+    1000 reports/s is a hard ceiling; GameSir's "8K" pads re-enumerate as High
+    Speed (480 Mb/s) with a 125 us input endpoint when set above 1000 Hz. A pad
+    stuck at Full Speed while set higher produces reports faster than the host
+    can collect them (issue #21) -- this line is what tells those apart.
+    -> [{port, vid, pid, product, speed_mbps, in_interval_us, max_rate}]"""
+    out = []
+    for d in sorted(glob.glob('/sys/bus/usb/devices/*/')):
+        try:
+            vid = int(open(d + 'idVendor').read(), 16)
+            if vid not in VENDOR_NAMES:
+                continue
+            pid = int(open(d + 'idProduct').read(), 16)
+            speed = float(open(d + 'speed').read())
+        except (OSError, ValueError):
+            continue
+        # Logitech makes webcams and headsets too; only its HID devices (mice,
+        # receivers) belong in a controller report.
+        if vid == 0x046D:
+            classes = set()
+            for ifc in glob.glob(d + '*:*/bInterfaceClass'):
+                try:
+                    classes.add(open(ifc).read().strip())
+                except OSError:
+                    pass
+            if '03' not in classes or '0e' in classes or '01' in classes:
+                continue
+        try:
+            product = open(d + 'product').read().strip()
+        except OSError:
+            product = ''
+        fastest = None
+        for ep in glob.glob(d + '*:*/ep_*'):
+            try:
+                if open(ep + '/type').read().strip() != 'Interrupt':
+                    continue
+                if not int(open(ep + '/bEndpointAddress').read(), 16) & 0x80:
+                    continue                                  # IN endpoints only
+                iv = open(ep + '/interval').read().strip()    # e.g. "125us", "1ms"
+                us = float(iv[:-2]) * (1000 if iv.endswith('ms') else 1)
+            except (OSError, ValueError):
+                continue
+            if us > 0 and (fastest is None or us < fastest):
+                fastest = us
+        out.append({'port': os.path.basename(d.rstrip('/')), 'vid': vid, 'pid': pid,
+                    'product': product, 'speed_mbps': speed, 'in_interval_us': fastest,
+                    'max_rate': round(1e6 / fastest) if fastest else None})
+    return out
+
+
 def _platform_mode_devices():
     """USB devices presenting as another platform's controller.
 
@@ -382,6 +436,7 @@ def collect():
         'rules': {},
         'nodes': [],
         'usb_devices': [],
+        'usb_links': [],
         'evdev': [],
         'verdict': [],
     }
@@ -610,6 +665,10 @@ def collect():
         rep['verdict'].append(
             'Logitech mouse found but not openable — install its udev rule '
             '(Settings shows the commands on the mouse page) and replug.')
+    try:
+        rep['usb_links'] = _usb_links()
+    except Exception:
+        pass                      # best effort: never cost someone their report
     return rep
 
 
@@ -635,6 +694,14 @@ def format_report(rep):
         L.append(f'- udev rule ({label}): {status}')
     L.append('')
     L.append('### Devices')
+    # Link speed per physical device: decides what poll rate is actually deliverable.
+    for u in rep.get('usb_links', []):
+        sp = u['speed_mbps']
+        kind = ('High Speed' if sp >= 480 else 'Full Speed' if sp >= 12 else 'Low Speed')
+        rate = (f', input every {u["in_interval_us"]:g} us (up to {u["max_rate"]} reports/s)'
+                if u.get('max_rate') else '')
+        L.append(f'- USB {u["port"]}  {VENDOR_NAMES.get(u["vid"], hex(u["vid"]))} '
+                 f'{u["pid"]:04x}  "{u["product"]}"  link: {sp:g}M ({kind}){rate}')
     if not rep['nodes']:
         L.append('(no GameSir/Logitech HID devices enumerated)')
     for n in rep['nodes']:
