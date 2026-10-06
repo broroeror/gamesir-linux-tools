@@ -8,8 +8,10 @@ import QtQuick.Layouts
 // to live here; it's in the header beside the profile pills now.
 Item {
     id: page
+    objectName: "controllerButtonsPage"
     property string sel: "A"
     property var localRemap: ({})        // staged overrides shown before Save
+    property var localContinuous: ({})
     property bool dpadSwap: false
     property bool dpadLock: false
 
@@ -26,8 +28,19 @@ Item {
         var m = Object.assign({}, localRemap); m[src] = code; localRemap = m
         bridge.setRemapCode(src, code)
     }
+    function continuousState(src) {
+        if (localContinuous[src] !== undefined) return localContinuous[src]
+        var flags = bridge.config.continuous_trigger
+        return flags && flags[src] !== undefined ? flags[src] : -1
+    }
+    function macroAllowsToggle(src) {
+        if (bridge.macroSlots.indexOf(src) < 0) return true
+        var m = bridge.macros[src]
+        return m !== undefined && !m.enable
+    }
     Connections { target: bridge; function onConfigLoaded() {
         page.localRemap = ({})
+        page.localContinuous = ({})
         if (bridge.config.dpad_swap !== undefined) page.dpadSwap = bridge.config.dpad_swap
         if (bridge.config.dpad_lock !== undefined) page.dpadLock = bridge.config.dpad_lock
     } }
@@ -79,7 +92,7 @@ Item {
                                     anchors.right: parent.right; anchors.rightMargin: 8
                                     anchors.verticalCenter: parent.verticalCenter
                                     elide: Text.ElideRight
-                                    text: modelData + "  →  " + page.targetLabel(modelData)
+                                    text: modelData + (page.targetCode(modelData) >= 0 ? "  →  " + page.targetLabel(modelData) : "")
                                     color: page.targetCode(modelData) < 0 ? Theme.textDim : Theme.text
                                     font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                                 }
@@ -158,6 +171,42 @@ Item {
                 spacing: 14
 
                 Card {
+                    visible: bridge.hasContinuousTrigger
+                    title: "Continuous Trigger"; Layout.fillWidth: true
+                    RowLayout {
+                        width: parent.width
+                        Text {
+                            text: "Tap to hold / release"
+                            Layout.fillWidth: true; wrapMode: Text.WordWrap
+                            color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                        }
+                        ToggleSwitch {
+                            objectName: "continuousTriggerSwitch"
+                            checked: page.continuousState(page.sel) === 1
+                            enabled: page.continuousState(page.sel) >= 0 && page.macroAllowsToggle(page.sel)
+                                     && !bridge.backupBusy && bridge.connected
+                            opacity: enabled ? 1 : 0.4
+                            onToggled: function(on) {
+                                if (bridge.setContinuousTrigger(page.sel, on)) {
+                                    var flags = Object.assign({}, page.localContinuous)
+                                    flags[page.sel] = on ? 1 : 0; page.localContinuous = flags
+                                }
+                                checked = Qt.binding(function() { return page.continuousState(page.sel) === 1 })
+                            }
+                        }
+                    }
+                    Text {
+                        width: parent.width; wrapMode: Text.WordWrap
+                        text: page.continuousState(page.sel) < 0
+                              ? "Waiting for a supported setting from the controller."
+                              : !page.macroAllowsToggle(page.sel)
+                                ? "Use a normal mapping for this paddle; disable its macro first."
+                                : "After Save, tap " + page.sel + " to hold its output, then tap again to release. Saved in this profile; works after Deadband closes."
+                        color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                    }
+                }
+
+                Card {
                     title: "Assign — " + page.sel; Layout.fillWidth: true
                     Flow {
                         width: parent.width; spacing: 6
@@ -178,7 +227,7 @@ Item {
                     }
                     Text { text: "Keyboard & mouse"; color: Theme.textDim; topPadding: 6
                            font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
-                    Row {
+                    Flow {
                         width: parent.width; spacing: 6
                         PillButton { label: "⌨ Keyboard"; onClicked: rebindPicker.open("keyboard") }
                         PillButton { label: "🖱 Mouse";    onClicked: rebindPicker.open("mouse") }

@@ -33,6 +33,7 @@ import kf_cache
 import kwin
 import vendors.gamesir.models.cyclone2.factory as factory
 import backup
+import register_transaction
 from vendors.gamesir.models.cyclone2.led import LIGHTS
 
 from PySide6.QtCore import QUrl
@@ -182,6 +183,8 @@ class GamesirBridge(QObject):
         # Per-profile config read-back + staged edits (Sticks/Triggers/Vibration).
         self._loaded_profile = None
         self._config_loading = None     # bank awaiting replies, or None
+        self._config_loading_gen = None
+        self._config_generation = None
         self._config = {}               # friendly key -> loaded value
         self._pending = {}              # addr -> {'data','label','display'}
         self._apply_status = ''         # transient Apply read-back result (UI hint)
@@ -268,6 +271,8 @@ class GamesirBridge(QObject):
         self._addr_to_hair = {addr: side for side, addr in self._hair_addr.items()}
         self._addr_to_remap = {addr: name for name, addr in prof.REMAP_SLOTS}
         self._remap_addr = {name: addr for name, addr in prof.REMAP_SLOTS}
+        self._continuous_addr = dict(prof.CONTINUOUS_TRIGGER_SLOTS)
+        self._addr_to_continuous = {addr: name for name, addr in prof.CONTINUOUS_TRIGGER_SLOTS}
 
     # ------------------------------------------------------------------ polls
     def _poll_input(self):
@@ -349,6 +354,8 @@ class GamesirBridge(QObject):
         # config editor
         self._loaded_profile = None
         self._config_loading = None
+        self._config_loading_gen = None
+        self._config_generation = None
         self._config = {}
         self._g7_dock = None
         self._g7_dock_loading = False
@@ -665,11 +672,19 @@ class GamesirBridge(QObject):
             else:
                 reqs = [(bank, addr, ln) for addr, ln in self._prof.read_fields()]
                 reqs += [(bank, addr, 2) for _n, addr in self._prof.REMAP_SLOTS]
+            self._config_loading_gen = control.generation()
             control.request_regs(reqs)
             self._config_loading = bank
 
         bank = self._config_loading
         if bank is None:
+            return
+        if self._config_loading_gen != control.generation():
+            self._loaded_profile = None
+            self._config_loading = None
+            self._config_generation = None
+            self._config = {}
+            self.configLoaded.emit()
             return
         if self._prof is profiles.G7_PRO:
             blob = g7pro.stitch_blob(bank, g7pro.PROFILE_BLOB_SIZE, control.reg_result)
@@ -688,6 +703,7 @@ class GamesirBridge(QObject):
                 self._loaded_profile = None
                 return
             self._config = cand
+            self._config_generation = self._config_loading_gen
             self.configLoaded.emit()
             return
         vals = {addr: control.reg_result(bank, addr)
@@ -707,6 +723,7 @@ class GamesirBridge(QObject):
             self._loaded_profile = None
             return
         self._config = cand
+        self._config_generation = self._config_loading_gen
         self.configLoaded.emit()
 
     @staticmethod
@@ -763,6 +780,10 @@ class GamesirBridge(QObject):
             # rebinds share one path; the UI resolves the label via targetLabel().
             remap[name] = (rec[1] if len(rec) > 1 else 0) if rec[0] else -1
         out['remap'] = remap
+        if p.CONTINUOUS_TRIGGER_SLOTS:
+            out['continuous_trigger'] = {
+                name: cfg.continuous_trigger_state(vals.get(addr))
+                for name, addr in p.CONTINUOUS_TRIGGER_SLOTS}
         return out
 
     # --------------------------------------------------------- input readouts
@@ -1698,11 +1719,12 @@ class GamesirBridge(QObject):
         """Buttons pickable as a macro event target, as {name, code}."""
         return [{'name': n, 'code': c} for n, c in macro.TARGETS]
 
-    @Property('QVariantList', constant=True)
+    @Property('QVariantList', notify=controllerChanged)
     def targetCategories(self):
         """Categorized targets for the macro/remap picker: [{name, targets:[{name,code}]}].
         Buttons (gamepad) + Keyboard + Mouse — the controller emits all three."""
-        return [{'name': cat, 'targets': [{'name': n, 'code': c} for n, c in items]}
+        return [{'name': cat, 'targets': [{'name': n, 'code': c} for n, c in
+                (self._prof.REMAP_TARGETS if cat == 'Buttons' else items) if c != 0xff]}
                 for cat, items in cfg.TARGET_CATEGORIES]
 
     @Slot(int, result=str)
@@ -2022,6 +2044,36 @@ class GamesirBridge(QObject):
     def remapSources(self):
         return [name for name, _ in self._prof.REMAP_SLOTS]
 
+    @Property(bool, notify=controllerChanged)
+    def hasContinuousTrigger(self):
+        return bool(self._prof.CONTINUOUS_TRIGGER_SLOTS)
+
+    @Slot(str, bool, result=bool)
+    def setContinuousTrigger(self, source, on):
+        """Stage one onboard flag only after this unit/profile has been read."""
+        edit = state.get('edit_profile') or state.get('profile')
+        addr = self._continuous_addr.get(source)
+        flags = self._config.get('continuous_trigger', {})
+        if (addr is None or self._prof is not profiles.CYCLONE
+                or profiles.active() is not self._prof or not profiles.is_recognized()
+                or self._backup_busy or not state.get('connected')
+                or self._driving != state.get('driving')
+                or state.get('driving') != state.get('selected')
+                or self._loaded_profile != edit or self._config_loading is not None
+                or self._config_generation != control.generation()
+                or flags.get(source, -1) not in (0, 1)):
+            return False
+        if source in dict(self._prof.MACRO_SLOTS):
+            if (self._macro_profile != edit or self._macro_loading
+                    or source not in self._macros or self._macros[source]['enable']):
+                return False
+        gen = self._config_generation
+        self._queue(addr, [int(on)], 'Continuous Trigger ' + source,
+                    'On — tap to hold/release' if on else 'Off — hold normally',
+                    kind='continuous_trigger')
+        self._pending[(edit, addr)]['generation'] = gen
+        return True
+
     @Property('QVariantList', constant=True)
     def remapTargets(self):
         targets = self._prof.REMAP_TARGETS
@@ -2152,9 +2204,16 @@ class GamesirBridge(QObject):
         elif addr in self._addr_to_remap:
             rec = self._config.setdefault('remap', {})
             rec[self._addr_to_remap[addr]] = (data[1] if len(data) > 1 else 0) if data[0] else -1
+        elif addr in self._addr_to_continuous:
+            self._config.setdefault('continuous_trigger', {})[
+                self._addr_to_continuous[addr]] = cfg.continuous_trigger_state(data)
 
     @Slot()
     def applyConfig(self):
+        # A toggle Save may include its remap; snapshot/verify that batch together.
+        if any(r.get('kind') == 'continuous_trigger' for r in self._pending.values()):
+            self._apply_cyclone_config()
+            return
         edit = state.get('edit_profile') or state.get('profile')
         default_bank = self._prof.profile_bank(edit)
         if default_bank is None:
@@ -2201,6 +2260,112 @@ class GamesirBridge(QObject):
         threading.Thread(target=run, daemon=True).start()
         self._pending = {}
         self.pendingChanged.emit()
+
+    def _apply_cyclone_config(self):
+        if self._backup_busy or not self._pending:
+            return
+        if (self._prof is not profiles.CYCLONE or profiles.active() is not self._prof
+                or not profiles.is_recognized() or not state.get('connected')
+                or self._driving != state.get('driving')
+                or state.get('driving') != state.get('selected')):
+            self._set_apply_status('Apply refused: controller selection changed; reload its settings')
+            return
+        snapshot_pending = copy.deepcopy(self._pending)
+        snapshot_motion = copy.deepcopy(self._m) if self._m_dirty else None
+        changes = [(r['bank'], r['addr'], list(r['data'])) for r in snapshot_pending.values()]
+        try:
+            for r in snapshot_pending.values():
+                if r.get('kind') == 'continuous_trigger':
+                    edit = state.get('edit_profile') or state.get('profile')
+                    if (r.get('generation') != control.generation()
+                            or r['bank'] != edit or self._loaded_profile != edit):
+                        raise ValueError('Continuous Trigger settings belong to an older session/profile; reload')
+            backup._validate_writes(changes)
+        except ValueError as e:
+            self._set_apply_status(f'Apply refused: {e}')
+            return
+        prof, gen = self._prof, control.generation()
+        edit_profile = state.get('edit_profile') or state.get('profile')
+        original_profile = state.get('profile')
+        self._backup_busy = True
+        self.backupBusyChanged.emit()
+        self._set_apply_status('Backing up and applying…')
+
+        def check_session():
+            if (gen != control.generation() or self._prof is not prof
+                    or profiles.active() is not prof
+                    or not state.get('connected')
+                    or (state.get('edit_profile') or state.get('profile')) != edit_profile
+                    or self._driving != state.get('driving')
+                    or state.get('driving') != state.get('selected')):
+                raise OSError('device session changed')
+
+        def select(bank):
+            check_session()
+            if bank in prof.profile_banks and state.get('profile') != bank:
+                control.send_cmd(0x0F, 0x07, bank, gen=gen)
+                deadline = time.monotonic() + 2.5
+                while time.monotonic() < deadline:
+                    check_session()
+                    if state.get('profile') == bank:
+                        break
+                    time.sleep(0.04)
+                else:
+                    raise OSError('could not confirm selected profile')
+                time.sleep(0.2)
+
+        def read(bank, addr, length):
+            select(bank)
+            control.request_regs([(bank, addr, length)])
+            deadline = time.monotonic() + 3.0
+            while time.monotonic() < deadline:
+                check_session()
+                raw = control.reg_result(bank, addr)
+                if raw is not None:
+                    if addr in self._addr_to_continuous and length == 1:
+                        if cfg.continuous_trigger_state(raw) < 0:
+                            raise OSError(f'unknown Continuous Trigger flag at 0x{addr:04x}; write refused')
+                    return list(raw)
+                time.sleep(0.04)
+            raise OSError(f'no register reply at 0x{addr:04x}')
+
+        def write(bank, addr, data):
+            select(bank)
+            ok = control.write_reg(bank, addr, data, write_style=prof.write_style, gen=gen)
+            time.sleep(0.03)
+            return ok
+
+        def run():
+            try:
+                base = os.environ.get('XDG_DATA_HOME') or os.path.expanduser('~/.local/share')
+                ok, message = register_transaction.apply(
+                    changes, read, write, os.path.join(base, 'deadband', 'controller-backups'), prof.name)
+                if ok:
+                    for key, r in snapshot_pending.items():
+                        if r.get('kind') != 'motion':
+                            self._fold(r['addr'], r['data'])
+                        if self._pending.get(key) == r:
+                            del self._pending[key]
+                    if snapshot_motion is not None:
+                        self._m_loaded = snapshot_motion
+                        self._m_dirty = self._m != snapshot_motion
+                    # A fresh poll discards pending edits. Defer it if the user
+                    # staged another edit while this batch was being applied.
+                    if not self._pending:
+                        self._loaded_profile = None
+                        self._config_loading = None
+                self._set_apply_status(message)
+                self.pendingChanged.emit()
+            except Exception as e:
+                self._set_apply_status(f'Apply refused: {e}')
+            finally:
+                if (original_profile in prof.profile_banks and gen == control.generation()
+                        and self._prof is prof and profiles.active() is prof
+                        and self._driving == state.get('driving') == state.get('selected')):
+                    control.send_cmd(0x0F, 0x07, original_profile, gen=gen)
+                self._backup_busy = False
+                self.backupBusyChanged.emit()
+        threading.Thread(target=run, daemon=True).start()
 
     def _set_apply_status(self, msg):
         self._apply_status = msg

@@ -120,6 +120,7 @@ class ControllerProfile:
     CURVE_BLOCKS: tuple = tuple(CURVE_BLOCKS)
     REMAP_TARGETS: tuple = tuple(REMAP_TARGETS)
     REMAP_SLOTS: tuple = ()                 # (name, addr) source-button records
+    CONTINUOUS_TRIGGER_SLOTS: tuple = ()    # independently verified per model
     MACRO_SLOTS: tuple = ()                 # (name, addr) paddles that hold macros
     macro_max: int = 32                     # max macro steps (paddle-block dependent)
     motion: dict = field(default_factory=dict)   # per-controller gyro block map
@@ -192,6 +193,7 @@ class ControllerProfile:
                           ('lt', self.LT_CURVE), ('rt', self.RT_CURVE)):
             if base is not None:
                 fields.append((base, self.curve_len(key)))
+        fields += [(addr, 1) for _name, addr in self.CONTINUOUS_TRIGGER_SLOTS]
         return fields
 
     def profile_bank(self, profile):
@@ -222,6 +224,8 @@ class ControllerProfile:
         labels = {a: n for a, n in pairs if a is not None}
         for name, addr in self.REMAP_SLOTS:
             labels[addr] = 'Remap ' + name
+        for name, addr in self.CONTINUOUS_TRIGGER_SLOTS:
+            labels[addr] = 'Continuous Trigger ' + name
         return labels
 
 
@@ -268,6 +272,10 @@ CYCLONE = ControllerProfile(
     ST_ADZ_MIN=_cy.ST_ADZ_MIN, ST_ADZ_MAX=_cy.ST_ADZ_MAX,
     ST_CURVE=_cy.ST_CURVE, RS_OFFSET=_cy.RS_OFFSET,
     REMAP_SLOTS=tuple(_cy.REMAP_SLOTS),
+    # Connect C2's xa/Ua mapping table and Fa key enum, scoped to this model.
+    REMAP_TARGETS=tuple(_cy.REMAP_TARGETS[:-1]) + (
+        ('View', 0x0e), ('Menu', 0x0f), ('Capture', 0x10), _cy.REMAP_TARGETS[-1]),
+    CONTINUOUS_TRIGGER_SLOTS=_cy.CONTINUOUS_TRIGGER_SLOTS,
     MACRO_SLOTS=(('L4', 0xb2), ('R4', 0x151)),   # Cyclone has 2 back paddles
     macro_max=30,                                # tighter paddle block (R4 @0x151) -> 30 steps
 )

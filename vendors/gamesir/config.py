@@ -221,7 +221,8 @@ def enum_index(value, table, default=0):
 # --- button remap ----------------------------------------------------------
 # Each remappable input has a 7-byte record; we only touch its first two bytes:
 #   [enabled (0x01/0x00), target_code]
-# leaving the rest (turbo/macro params) untouched. Clearing = [0x00, 0x00].
+# leaving the other mapping slots and Continuous Trigger flag untouched.
+# Clearing = [0x00, 0x00].
 # Decoded from captures 10_*..14_*. '*' = inferred from the regular 7-byte stride
 # / "code == index+1" pattern rather than directly captured (high confidence).
 
@@ -242,7 +243,25 @@ REMAP_SLOTS = [           # SOURCE button -> its record address (bank 0x01)
     ('R4',         0x0151),
     ('LT',         0x01f5),
     ('RT',         0x0211),
+    # Official C2 normal-button order: Home, View, Menu, Capture. Home is
+    # excluded from Connect's CanMappingKeys; the other three are remappable.
+    ('View',       0x009d),
+    ('Menu',       0x00a4),
+    ('Capture',    0x00ab),
 ]
+
+# Cyclone 2 only: official Connect 1.14.2's C2 serializer puts toggle_en
+# four bytes after map_en, including paddle and trigger records. See
+# docs/CONTINUOUS-TRIGGER.md for the traced model/serializer/wire path.
+CONTINUOUS_TRIGGER_SLOTS = tuple((name, addr + 4) for name, addr in REMAP_SLOTS)
+
+
+def continuous_trigger_state(raw):
+    """0/1 for a known flag; -1 for missing, short or unknown firmware data."""
+    if (raw is not None and len(raw) == 1 and type(raw[0]) is int
+            and raw[0] in (0, 1)):
+        return raw[0]
+    return -1
 
 REMAP_TARGETS = [         # what a source can be mapped TO -> code byte
     ('Dpad Up',    0x01),     # *

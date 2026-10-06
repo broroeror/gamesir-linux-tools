@@ -73,6 +73,18 @@ you're experimenting (see below).
 Remap any input to another: pick a source button and a target, or clear a remap to
 restore the default. Remaps are part of the profile, so a backup captures them.
 
+### Continuous Trigger (Cyclone 2)
+
+Under **Rebinds**, select any remappable source, choose a controller, keyboard
+or mouse output, enable **Continuous Trigger → Tap to hold / release**, then
+**Save**. The setting belongs to the onboard profile: the intended behavior
+is first tap to hold and second tap to release after the app closes. Turbo is
+separate; disable a paddle macro before using its normal mapping.
+
+The encoding is traced to official GameSir Connect, but physical behavior and
+persistence still need a Cyclone 2 test. Save creates a recovery snapshot and
+verifies the changed registers. See [evidence and verification steps](docs/CONTINUOUS-TRIGGER.md).
+
 ### Backup / Restore
 
 **Backup / Restore → Export** snapshots **all four profiles + device settings** to a JSON
