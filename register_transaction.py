@@ -5,6 +5,26 @@ import tempfile
 from datetime import datetime, timezone
 
 
+KEEP_RECOVERY_FILES = 20      # newest kept per folder; older ones are pruned
+
+
+def prune(directory, keep=KEEP_RECOVERY_FILES):
+    """Delete all but the newest `keep` recovery files. Called only after a
+    VERIFIED apply -- a failed one keeps everything, since that is when the
+    history matters. Only this module's own files are ever touched."""
+    try:
+        files = sorted((os.path.join(directory, f) for f in os.listdir(directory)
+                        if f.startswith('cyclone2_before_apply_') and f.endswith('.json')),
+                       key=os.path.getmtime, reverse=True)
+    except OSError:
+        return
+    for old in files[keep:]:
+        try:
+            os.unlink(old)
+        except OSError:
+            pass
+
+
 def apply(changes, read, write, directory, device):
     """Snapshot changed registers before writing; verify and recover on failure.
 
@@ -68,4 +88,5 @@ def apply(changes, read, write, directory, device):
                 restored = False
         result = 'original settings restored and verified' if restored else 'recovery NOT confirmed'
         return False, f'Apply failed ({failure}); {result}; recovery file: {path}'
+    prune(directory)
     return True, f'Applied and verified {len(changes)} changes; recovery file: {path}'
