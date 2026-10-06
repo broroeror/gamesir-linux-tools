@@ -81,9 +81,9 @@ or mouse output, enable **Continuous Trigger → Tap to hold / release**, then
 is first tap to hold and second tap to release after the app closes. Turbo is
 separate; disable a paddle macro before using its normal mapping.
 
-The encoding is traced to official GameSir Connect, but physical behavior and
-persistence still need a Cyclone 2 test. Save creates a recovery snapshot and
-verifies the changed registers. See [evidence and verification steps](docs/CONTINUOUS-TRIGGER.md).
+It's been tested on a Cyclone 2. Behaviour after a reconnect or power cycle
+hasn't been checked yet. Save creates a recovery snapshot and verifies the
+changed registers. See [the format and verification notes](docs/CONTINUOUS-TRIGGER.md).
 
 ### Backup / Restore
 

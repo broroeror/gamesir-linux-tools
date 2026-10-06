@@ -272,7 +272,7 @@ CYCLONE = ControllerProfile(
     ST_ADZ_MIN=_cy.ST_ADZ_MIN, ST_ADZ_MAX=_cy.ST_ADZ_MAX,
     ST_CURVE=_cy.ST_CURVE, RS_OFFSET=_cy.RS_OFFSET,
     REMAP_SLOTS=tuple(_cy.REMAP_SLOTS),
-    # Connect C2's xa/Ua mapping table and Fa key enum, scoped to this model.
+    # The Cyclone's standard targets plus View/Menu/Capture (codes 0e/0f/10).
     REMAP_TARGETS=tuple(_cy.REMAP_TARGETS[:-1]) + (
         ('View', 0x0e), ('Menu', 0x0f), ('Capture', 0x10), _cy.REMAP_TARGETS[-1]),
     CONTINUOUS_TRIGGER_SLOTS=_cy.CONTINUOUS_TRIGGER_SLOTS,

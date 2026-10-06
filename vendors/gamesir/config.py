@@ -243,16 +243,16 @@ REMAP_SLOTS = [           # SOURCE button -> its record address (bank 0x01)
     ('R4',         0x0151),
     ('LT',         0x01f5),
     ('RT',         0x0211),
-    # Official C2 normal-button order: Home, View, Menu, Capture. Home is
-    # excluded from Connect's CanMappingKeys; the other three are remappable.
+    # The record before View (0x0096) is Home, which isn't remappable.
+    # View/Menu/Capture verified on hardware 2026-10-06 (View -> A).
     ('View',       0x009d),
     ('Menu',       0x00a4),
     ('Capture',    0x00ab),
 ]
 
-# Cyclone 2 only: official Connect 1.14.2's C2 serializer puts toggle_en
-# four bytes after map_en, including paddle and trigger records. See
-# docs/CONTINUOUS-TRIGGER.md for the traced model/serializer/wire path.
+# Cyclone 2 only: the Continuous Trigger flag sits four bytes after a record's
+# enable byte, paddle and trigger records included. Verified on hardware
+# 2026-10-06 (L4 -> RT toggled); see docs/CONTINUOUS-TRIGGER.md.
 CONTINUOUS_TRIGGER_SLOTS = tuple((name, addr + 4) for name, addr in REMAP_SLOTS)
 
 
