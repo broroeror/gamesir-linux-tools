@@ -6,22 +6,27 @@
 
 A Linux GUI for gaming input devices, driven over each device's vendor (hidraw)
 interface (or vendor-class USB for the G7 Pro). Currently supports the **GameSir
-Cyclone 2**, **G7 Pro**, and **G7 Pro 8K PC** controllers and the **Logitech G502 X LIGHTSPEED**
-mouse (see Tested hardware); the protocol modules are per-vendor
+Cyclone 2**, **G7 Pro**, **G7 Pro 8K PC** and **Tarantula Pro 8K** controllers and the
+**Logitech G502 X LIGHTSPEED** mouse (see Tested hardware); the protocol modules are per-vendor
 (`vendors/gamesir`, `vendors/logitech`), so other manufacturers can be added
 alongside. It covers:
 
 - **Live input view** — sticks, triggers, all buttons (incl. the L4/R4/M/Home/
   Share extras), D-pad, battery + charging, firmware version, and a mode warning.
-- **Profiles** — read the active profile and switch (1–4); rumble test.
-- **Lighting** — per-light RGB, captured effect presets, brightness/speed,
+- **Profiles** — pick which of the four profiles you're editing; a dot marks the
+  one the controller is actually running. Reset a profile to its defaults.
+- **Lighting** (Cyclone 2 and G7 Pro 8K) — per-light RGB, captured effect presets, brightness/speed,
   audio-reactive / pick-up-to-wake / sleep timeout, and a **custom keyframe
   animation editor** (add/remove keyframes, randomize, play/pause).
-- **Config editor** — deadzones, anti-deadzones, stick trajectory, sensitivity
-  curves (presets **and** a draggable custom-curve editor), trigger tuning
-  (hair-trigger + response curve), vibration, poll rate, and button remap.
-- **Gamepad macros** — a per-paddle (L4/R4, plus L5/R5 on the 8K) sequence
-  editor with per-step hold/delay timing.
+- **Config editor** — deadzones and anti-deadzones (drag, or type exact values),
+  stick trajectory, sensitivity curves (presets **and** a draggable custom-curve
+  editor), trigger tuning (hair-trigger + response curve), vibration with
+  per-motor tests, poll rate, and button remap — plus **Continuous Trigger**
+  (tap to hold, tap to release) on the Cyclone 2. Edits wait in a pending bar
+  until **Save to Profile**, which reads every change back to confirm it landed.
+- **Gamepad macros** — a per-button sequence editor with per-step hold/delay
+  timing: L4/R4, plus L5/R5 on the 8K and all nine programmable buttons on the
+  Tarantula.
 - **Motion / gyro** (G7 Pro, G7 Pro 8K PC, Cyclone 2, Tarantula Pro 8K) —
   activation, axis setup, deadzones, output routing and response curves;
   controls adapt to each model's register layout.
@@ -41,7 +46,8 @@ alongside. It covers:
 - **Demo mode** — preview one of each supported controller in software, no
   hardware connected.
 - **Diagnostics** — a built-in doctor that pinpoints permission, udev, and
-  hidapi-backend problems, with a copy-paste report for bug reports (see
+  hidapi-backend problems, and shows each controller's USB link speed and
+  vendor channel, with a copy-paste report for bug reports (see
   [Something not working?](#something-not-working)).
 
 Every page wears your palette — six built-in theme presets (and full custom
@@ -75,9 +81,10 @@ first and read back to verify, and the app refuses to write to a device it
 can't positively identify. Fork it and customize it however you like.
 
 > ### ⚠️ Tested hardware
-> Everything here has only been developed and verified on a **GameSir Cyclone 2**,
-> a **GameSir G7 Pro 8K PC**, a **GameSir Tarantula Pro 8K**, and a **Logitech G502 X
-> LIGHTSPEED** mouse — **nothing else.**
+> Everything here has been developed and verified on a **GameSir Cyclone 2**, a
+> **GameSir G7 Pro** (Amazon edition), a **GameSir G7 Pro 8K PC**, a **GameSir
+> Tarantula Pro 8K**, and a **Logitech G502 X LIGHTSPEED** mouse. Other editions
+> listed below were verified by their owners.
 >
 > The **Tarantula Pro 8K** is configured in its PC mode, `3537:103d`: rebinds for all
 > nine extra buttons (L4, R4, C1–C4, T1–T3), macros, sticks, triggers, gyro and
@@ -91,8 +98,8 @@ can't positively identify. Fork it and customize it however you like.
 > (`3537:10ba` wired, `3537:10bb` dongle — my own pad, write-tested on both) and
 > the **White Trimode** (`3537:1003` wired, `3537:1004` on its charging dock —
 > confirmed by an owner whose settings read back exactly as set on Windows).
-> The **Wuchang Edition** (`3537:10a7` wired, firmware **5.41**) is hardware-tested
-> by its owner: configuration reads, saved paddle remaps, Aim/Tilt register
+> The **Wuchang Edition** (`3537:10a7` wired, firmware **5.41**) was contributed and
+> hardware-tested by its owner, [@sinchrotron](https://github.com/sinchrotron): configuration reads, saved paddle remaps, Aim/Tilt register
 > round-trips, live gyro/accel readings, gyro aiming through the right stick,
 > input-range sensitivity, and independent tests of all four vibration motors.
 > The separate `3537:10a8` identity remains input-only: no configuration response
@@ -206,11 +213,12 @@ it, run `./uninstall.sh`. Upgrading from the old `gamesir-cyclone2` install?
 
 ## Running
 
-Put the controller in **Xbox / XInput mode**. A G7 Pro at `3537:100a` is switched
-automatically to its wired `3537:109b` or dongle `3537:109c` configuration
-identity. If it is at `3537:1022`, hold **SHARE + MENU (☰)** together — note this also resets the active profile's remaps and the Shift layer. Use the
-Start / pause mode control on the other supported GameSir controllers. The app's
-header warns when it detects an unsupported mode.
+Put the controller in **Xbox / XInput mode** (on the Tarantula Pro 8K, **PC mode**:
+**Home + X** for 2 seconds). A G7 Pro at `3537:100a` is switched automatically to
+its configuration identity. If it is at `3537:1022`, hold **SHARE + MENU (☰)**
+together — note this also resets the active profile's remaps and the Shift layer.
+The app's header warns when it detects an unsupported mode, and the diagnostics
+report says which mode a controller is in.
 
 **Grant device access (recommended, once):**
 
@@ -276,9 +284,13 @@ everything it does is **reversible** and stays **on your machine**. The specific
 
 - **What it writes.** Edits go to the controller's *config* registers — deadzones,
   curves, button remaps, vibration, poll rate, and lighting — over the vendor
-  channel, the same settings the official app changes. Writes **auto-persist** to
-  the controller (there's no separate "commit" step), but they're ordinary config,
+  channel, the same settings the official app changes. They're ordinary config,
   not firmware — nothing here touches the bootloader.
+- **Nothing is written until you Save.** Edits wait in the pending bar; **Discard**
+  throws them away. On the Cyclone 2, G7 Pro 8K and Tarantula, Save first records
+  the current values in a recovery file, then writes, reads every change back, and
+  puts the old values back automatically if any write fails. (Macros and lighting
+  are the exceptions: they're written as you edit them, and the pages say so.)
 - **Back up before you experiment.** **Backup / Restore → Export** snapshots all
   four profiles + lighting to a JSON file; **Restore** writes it back. Take one
   before you start changing things and you can always return to a known-good state.
@@ -298,15 +310,13 @@ everything it does is **reversible** and stays **on your machine**. The specific
   online.
 - **Permissions.** Prefer the udev rule (per-user `uaccess`) over running as root —
   see [Running](#running). Under `sudo`, `~` is `/root`, so backups land there.
-- **Tested hardware.** Cyclone 2, G7 Pro 8K PC, Tarantula Pro 8K (`3537:103d`) and the
-  G502 X are verified here.
-  G7 Pro support was contributed and verified by [@brcly](https://github.com/brcly)
-  on the Shadow Ember edition (wired `3537:109b`, dongle `3537:109c`; `3537:100a`
-  is transitioned automatically — hold SHARE + MENU if the pad is showing
-  `3537:1022`), plus the Amazon edition (wired `3537:10ba`, dongle `3537:10bb`),
-  write-tested here on both. Other G7 Pro editions are
-  recognised but not configured. Treat anything not listed as unproven and use it
-  at your own risk.
+- **Tested hardware.** Cyclone 2, G7 Pro (Amazon edition, wired `3537:10ba` and
+  dongle `3537:10bb`), G7 Pro 8K PC, Tarantula Pro 8K (`3537:103d`) and the G502 X
+  are verified here. Other G7 Pro editions were verified by their owners: Shadow
+  Ember (`109b`/`109c`, [@brcly](https://github.com/brcly)), Wuchang (`10a7`,
+  [@sinchrotron](https://github.com/sinchrotron)) and White Trimode (`1003`/`1004`).
+  Zenless Zone Zero (`105e`) is recognised but not configured. Treat anything not
+  listed as unproven and use it at your own risk.
 
 ## How it works
 
@@ -340,15 +350,19 @@ read/switch, rumble, full per-light RGB + effect presets + lighting power settin
 **custom keyframe animation editor** (1–8 frames, play/pause), a **config editor**
 (deadzones, anti-deadzones, stick trajectory + sensitivity curves incl. a draggable
 custom-curve editor, trigger tuning, vibration, poll rate), **button remap**,
-**per-paddle gamepad macros** (read-back-verified writes), **8K motion/gyro**, and
-**backup / restore** — all verified end-to-end on hardware. Restore is
+**per-paddle gamepad macros** (read-back-verified writes), **motion/gyro**,
+**Continuous Trigger**, and **backup / restore** — all verified end-to-end on hardware. Restore is
 write-verify-retry; only the active profile + lighting are guaranteed (banks
 `0x02`–`0x04`, the stored profiles, appear read-only on this controller).
 
-**G7 Pro:** contributed by [@brcly](https://github.com/brcly) and verified on
-their hardware, not mine (see Tested hardware). Wired `3537:109b` and dongle
-`3537:109c` configuration identities,
-with automatic transition from `3537:100a`; four editable profiles, 21 default-layer
+**Tarantula Pro 8K:** rebinds for all nine programmable buttons, macros,
+sticks, triggers, gyro and poll rate up to 8000 Hz, in its PC mode (`3537:103d`).
+Decoded from USB captures and verified on my own pad. Lighting isn't supported yet.
+
+**G7 Pro:** contributed by [@brcly](https://github.com/brcly), with the Wuchang
+edition and gyro support from [@sinchrotron](https://github.com/sinchrotron), and
+verified on my own Amazon edition too (see Tested hardware). Configuration
+identities per edition, with automatic transition from `3537:100a`; four editable profiles, 21 default-layer
 remap sources, stick/trigger shaping, resolution/inversion/sensitivity, four-motor
 vibration, report rate, D-pad options, dock settings, and semantic backup/restore.
 The Vibration tab can test the big left grip motor, small right grip motor,
@@ -377,7 +391,10 @@ using an inactive profile and then restoring every
 profile and dock byte. Named curves use G7 Pro's captured presets; Custom selects
 the shape already stored in the controller. Custom gyro point editing is not
 implemented. Backups include gyro settings; restoring a Custom gyro curve with
-different stored points is refused before any settings are written.
+different stored points is refused before any settings are written. If a
+profile's gyro settings block is blank (seen on an Amazon edition), the first
+gyro edit fills in the whole block with defaults, since the firmware ignores
+single settings written into a blank block.
 The shared Shift layer, Continuous Trigger, advanced directional/mouse stick output,
 Bluetooth, and the native `3537:1022` protocol are not yet exposed.
 
