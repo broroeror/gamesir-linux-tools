@@ -405,8 +405,11 @@ G7_8K = ControllerProfile(
                                             #   (reported in issue #5; the wired/dongle
                                             #   split follows the pair convention, not
                                             #   verified here — we own the Nioh edition)
-                  0x1032, 0x1033),          # Royal2 edition:  1032 wired / 1033 dongle
-    wired_products=(0x10c7, 0x10c5, 0x1032),
+                  0x1032, 0x1033,           # Royal2 edition:  1032 wired / 1033 dongle
+                  0x10b8, 0x10b9),          # Championship edition: 10b8 wired / 10b9
+                                            #   dongle (10b9 owner-verified, issue #23;
+                                            #   10b8 follows the pair convention)
+    wired_products=(0x10c7, 0x10c5, 0x1032, 0x10b8),
     write_style='cyclone',                  # bare 0f03 writes (NOT the g7 envelope)
     input_style='cyclone_0x12',             # live 0x12 on the vendor hidraw
     profile_banks=(1, 2, 3, 4),             # 4 profiles, confirmed via the app

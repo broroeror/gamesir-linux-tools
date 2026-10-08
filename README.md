@@ -86,6 +86,12 @@ can't positively identify. Fork it and customize it however you like.
 > Tarantula Pro 8K**, and a **Logitech G502 X LIGHTSPEED** mouse. Other editions
 > listed below were verified by their owners.
 >
+> The **G7 Pro 8K PC** comes in several editions that are the same controller under
+> different USB ids: **Nioh** (`3537:10c7` wired, `3537:10c8` dongle — my own pad),
+> **Royal2** (`1032`/`1033`, added by its owner [@kakxem](https://github.com/kakxem)),
+> **Championship** (`10b9` dongle verified by its owner; wired `10b8` follows the
+> pattern) and **Aimlabs** (`10c5`/`10c6`, recognised from a user report).
+>
 > The **Tarantula Pro 8K** is configured in its PC mode, `3537:103d`: rebinds for all
 > nine extra buttons (L4, R4, C1–C4, T1–T3), macros, sticks, triggers, gyro and
 > poll rate. Lighting isn't supported yet. If it shows up as `3537:103c` instead, it
@@ -311,10 +317,11 @@ everything it does is **reversible** and stays **on your machine**. The specific
 - **Permissions.** Prefer the udev rule (per-user `uaccess`) over running as root —
   see [Running](#running). Under `sudo`, `~` is `/root`, so backups land there.
 - **Tested hardware.** Cyclone 2, G7 Pro (Amazon edition, wired `3537:10ba` and
-  dongle `3537:10bb`), G7 Pro 8K PC, Tarantula Pro 8K (`3537:103d`) and the G502 X
+  dongle `3537:10bb`), G7 Pro 8K PC (Nioh edition), Tarantula Pro 8K (`3537:103d`) and the G502 X
   are verified here. Other G7 Pro editions were verified by their owners: Shadow
   Ember (`109b`/`109c`, [@brcly](https://github.com/brcly)), Wuchang (`10a7`,
   [@sinchrotron](https://github.com/sinchrotron)) and White Trimode (`1003`/`1004`).
+  The G7 Pro 8K PC Royal2 and Championship editions were added by their owners.
   Zenless Zone Zero (`105e`) is recognised but not configured. Treat anything not
   listed as unproven and use it at your own risk.
 
