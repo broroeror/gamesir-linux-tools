@@ -436,6 +436,7 @@ def collect():
         'rules': {},
         'nodes': [],
         'usb_devices': [],
+        'g7se_devices': [],
         'usb_links': [],
         'evdev': [],
         'verdict': [],
@@ -506,6 +507,26 @@ def collect():
     try:
         from gs_common import find_controllers
         for dev in find_controllers():
+            if dev.get('pid') == 0x1010:
+                meta = dev.get('usb') or {}
+                node = '/dev/bus/usb/%03d/%03d' % (meta.get('bus', 0), meta.get('address', 0))
+                rep['g7se_devices'].append({
+                    'pid': dev['pid'], 'identity': 'G7 SE (rear-button remapping)',
+                    'product': dev.get('product', ''), 'port': dev['port'],
+                    'bcd': dev.get('bcd'), 'node': node,
+                    'access': os.access(node, os.R_OK | os.W_OK),
+                    'interfaces': _interfaces(meta.get('sysfs')),
+                })
+                supported = dev.get('bcd') == 0x0630
+                rep['verdict'].append(
+                    'G7 SE (3537:1010) found. ' + (
+                    'L4/R4 gamepad remapping is verified on descriptor 6.30. '
+                    'Configuration uses native USB with a fresh Xbox authentication '
+                    'exchange when needed (requires OpenSSL). Release to games afterward.'
+                    if supported else 'This firmware is input-only; configuration was '
+                    'verified only on descriptor 6.30.') + ('' if os.access(node, os.R_OK | os.W_OK)
+                        else ' USB access is missing; install the G7 SE udev rule and reconnect.'))
+                continue
             if dev.get('pid') not in G7_IDENTITIES:
                 continue
             # 3537:1004 is shared with the T4 Kaleid (mainline xpad); only report
@@ -537,7 +558,7 @@ def collect():
             'configured. Configuration needs its PC/XBOX mode (3537:103d). GameSir\'s '
             'manual: hold Home + X for 2 seconds (the light turns green); holding Home '
             'for 10 seconds restores automatic mode detection.')
-    if not gsnodes and not rep['usb_devices']:
+    if not gsnodes and not rep['usb_devices'] and not rep['g7se_devices']:
         others = _platform_mode_devices()
         if others:
             found = ', '.join(f'{o["vendor"]} {o["vid"]:04x}:{o["pid"]:04x}'
@@ -724,10 +745,12 @@ def format_report(rep):
                      'straight through and Deadband\'s button names may be wrong '
                      'for this pad. Please mention this on an issue.')
 
-    for n in rep.get('usb_devices', []):
+    for n in rep.get('usb_devices', []) + rep.get('g7se_devices', []):
         L.append(f'- {n["node"]}  GameSir {n["pid"]:04x} '
                  f'({n.get("identity", "unknown")})  "{n["product"]}" port {n["port"]}')
-        if n['pid'] not in G7_NEEDS_USB:
+        if n['pid'] == 0x1010:
+            L.append('    diagnostic USB access: ' + ('OK' if n['access'] else 'PERMISSION DENIED'))
+        elif n['pid'] not in G7_NEEDS_USB:
             # Deadband only opens the identities it can configure, plus the one
             # it transitions through. Everything else -- a detect-only edition,
             # or 1022, which is transitioned by holding SHARE + MENU on the pad

@@ -27,6 +27,7 @@ from typing import Optional
 
 import vendors.gamesir.config as _cy
 from vendors.gamesir.models.g7pro import protocol as _g7
+from vendors.gamesir.models.g7se import protocol as _se
 
 
 # --- shared enums / block formats (identical across the vendor family) -------
@@ -371,6 +372,15 @@ G7_PRO_OTHER = ControllerProfile(
     profile_banks=(),
 )
 
+# Separate identity with verified rear-record semantics. Never inherit G7 Pro
+# settings, targets or dock requests. Configuration is gated in the SE protocol.
+G7_SE = ControllerProfile(
+    name='GameSir G7 SE', short='G7 SE', usb_products=(0x1010,),
+    wired_products=(0x1010,), write_style='g7se', input_style='evdev', transport='usb',
+    profile_banks=_se.PROFILE_BANKS, REMAP_TARGETS=_se.GAMEPAD_TARGETS,
+    REMAP_SLOTS=_se.REMAP_SLOTS, supports_hair_thresholds=False,
+)
+
 # Compatibility name for code/tests that referred to the old misidentified G7.
 G7 = G7_PRO
 
@@ -599,7 +609,7 @@ TARANTULA_PRO_8K = ControllerProfile(
 )
 
 
-ALL = (CYCLONE, G7_PRO, G7_NATIVE, G7_PRO_OTHER, G7_8K, TARANTULA_PRO_8K)
+ALL = (CYCLONE, G7_PRO, G7_NATIVE, G7_PRO_OTHER, G7_SE, G7_8K, TARANTULA_PRO_8K)
 DEFAULT = CYCLONE
 
 

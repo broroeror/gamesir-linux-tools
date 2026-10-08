@@ -14,6 +14,12 @@ Item {
     property var localContinuous: ({})
     property bool dpadSwap: false
     property bool dpadLock: false
+    readonly property bool canRemap: bridge.profileCount > 0 && bridge.profile > 0
+                                     && bridge.remapSources.length > 0
+    Component.onCompleted: {
+        if (bridge.remapSources.indexOf(sel) < 0)
+            sel = bridge.remapSources.length ? bridge.remapSources[0] : ""
+    }
 
     function targetCode(src) {                    // -1 = unmapped (Default)
         if (localRemap[src] !== undefined) return localRemap[src]
@@ -43,6 +49,11 @@ Item {
         page.localContinuous = ({})
         if (bridge.config.dpad_swap !== undefined) page.dpadSwap = bridge.config.dpad_swap
         if (bridge.config.dpad_lock !== undefined) page.dpadLock = bridge.config.dpad_lock
+    }
+    function onControllerChanged() {
+        page.localRemap = ({})
+        if (bridge.remapSources.indexOf(page.sel) < 0)
+            page.sel = bridge.remapSources.length ? bridge.remapSources[0] : ""
     } }
 
     // Scroll fallback: fills the viewport in a tall window (content stretches to
@@ -68,7 +79,7 @@ Item {
 
             // -------- LEFT: source list --------
             ColumnLayout {
-                visible: bridge.profile > 0
+                visible: page.canRemap
                 Layout.fillWidth: true
                 Layout.minimumWidth: 250; Layout.preferredWidth: 290; Layout.maximumWidth: 340
                 Layout.fillHeight: true
@@ -119,14 +130,42 @@ Item {
                         anchors.horizontalCenter: parent.horizontalCenter
                         width: Math.min(implicitWidth, centerArea.width - 24)
                         height: width / aspect
-                        highlightSource: bridge.profile > 0 ? page.sel : ""
-                        highlightTarget: bridge.profile > 0 ? page.targetLabel(page.sel) : ""
+                        highlightSource: page.canRemap ? page.sel : ""
+                        highlightTarget: page.canRemap ? page.targetLabel(page.sel) : ""
+                    }
+
+                    Card {
+                        visible: bridge.remapOnly
+                        width: parent.width
+                        title: "Live input"
+                        Grid {
+                            width: parent.width
+                            columns: 2; spacing: 8
+                            Repeater {
+                                model: [
+                                    "LT  " + Math.round(bridge.leftTrigger * 100) + "%",
+                                    "RT  " + Math.round(bridge.rightTrigger * 100) + "%",
+                                    "Left stick  X " + bridge.leftStickX.toFixed(2)
+                                        + "  Y " + bridge.leftStickY.toFixed(2),
+                                    "Right stick  X " + bridge.rightStickX.toFixed(2)
+                                        + "  Y " + bridge.rightStickY.toFixed(2)
+                                ]
+                                delegate: Text {
+                                    required property string modelData
+                                    width: (parent.width - 8) / 2
+                                    text: modelData
+                                    color: Theme.text
+                                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                                    wrapMode: Text.WordWrap
+                                }
+                            }
+                        }
                     }
 
                     // "<source> → <target>" caption under the pad.
                     Rectangle {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        visible: bridge.profile > 0
+                        visible: page.canRemap
                         width: capRow.implicitWidth + 28; height: 34; radius: 8
                         color: Theme.card; border.color: Theme.cardBorder; border.width: 1
                         Row {
@@ -152,11 +191,15 @@ Item {
                     }
 
                     Text {
+                        objectName: "remapUnavailableMessage"
                         anchors.horizontalCenter: parent.horizontalCenter
-                        visible: bridge.profile === 0
+                        visible: !page.canRemap
                         width: Math.min(implicitWidth, centerArea.width - 24)
                         horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap
-                        text: "Select a profile (1–4) above to remap buttons."
+                        text: bridge.profileCount > 0
+                              ? "Select a profile above to remap buttons."
+                              : "Button remapping is unavailable for " + bridge.controllerName
+                                + " in this app. Configuration is disabled."
                         color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
                     }
                 }
@@ -164,7 +207,9 @@ Item {
 
             // -------- RIGHT: assign target --------
             ColumnLayout {
-                visible: bridge.profile > 0
+                visible: page.canRemap
+                enabled: !bridge.remapOnly || (bridge.config.remap !== undefined
+                         && bridge.connected && !bridge.backupBusy)
                 Layout.fillWidth: true
                 Layout.minimumWidth: 200; Layout.preferredWidth: 240; Layout.maximumWidth: 300
                 Layout.fillHeight: true
@@ -225,9 +270,10 @@ Item {
                             }
                         }
                     }
-                    Text { text: "Keyboard & mouse"; color: Theme.textDim; topPadding: 6
+                    Text { visible: !bridge.remapOnly; text: "Keyboard & mouse"; color: Theme.textDim; topPadding: 6
                            font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                     Flow {
+                        visible: !bridge.remapOnly
                         width: parent.width; spacing: 6
                         PillButton { label: "⌨ Keyboard"; onClicked: rebindPicker.open("keyboard") }
                         PillButton { label: "🖱 Mouse";    onClicked: rebindPicker.open("mouse") }

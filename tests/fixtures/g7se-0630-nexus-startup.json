@@ -1,0 +1,77 @@
+{
+  "firmware_descriptor": "0630",
+  "packet_candidates": [
+    {
+      "capture": "g7 se/startup-20261008-154802.pcap",
+      "sha256": "c7c657ba06de8019c057cb9fe11e72980bcbc5c13c5b5e9eb272b681e1d37ef7",
+      "frame": 7,
+      "request": "0520290105"
+    },
+    {
+      "capture": "g7 se/startup-20261008-154802.pcap",
+      "sha256": "c7c657ba06de8019c057cb9fe11e72980bcbc5c13c5b5e9eb272b681e1d37ef7",
+      "frame": 1031,
+      "request": "05202a0105"
+    },
+    {
+      "capture": "g7 se/startup-20261008-154802.pcap",
+      "sha256": "c7c657ba06de8019c057cb9fe11e72980bcbc5c13c5b5e9eb272b681e1d37ef7",
+      "frame": 1039,
+      "request": "05202b0105"
+    },
+    {
+      "capture": "g7 se/startup-20261008-154802.pcap",
+      "sha256": "c7c657ba06de8019c057cb9fe11e72980bcbc5c13c5b5e9eb272b681e1d37ef7",
+      "frame": 1045,
+      "request": "05202c0105"
+    },
+    {
+      "capture": "g7 se/startup-20261008-154802.pcap",
+      "sha256": "c7c657ba06de8019c057cb9fe11e72980bcbc5c13c5b5e9eb272b681e1d37ef7",
+      "frame": 1051,
+      "request": "05202d0105"
+    },
+    {
+      "capture": "g7 se/startup-20261008-154802.pcap",
+      "sha256": "c7c657ba06de8019c057cb9fe11e72980bcbc5c13c5b5e9eb272b681e1d37ef7",
+      "frame": 1057,
+      "request": "05202e0105"
+    },
+    {
+      "capture": "g7 se/persistence-20261008-163059.pcap",
+      "sha256": "300f51974a4d2ddd3b6c4a79e77f7133e3fe909ab08c2b1573ec5fa220d335c4",
+      "frame": 7,
+      "request": "0520900105"
+    },
+    {
+      "capture": "g7 se/persistence-20261008-163059.pcap",
+      "sha256": "300f51974a4d2ddd3b6c4a79e77f7133e3fe909ab08c2b1573ec5fa220d335c4",
+      "frame": 11,
+      "request": "0520910105"
+    },
+    {
+      "capture": "g7 se/persistence-20261008-163059.pcap",
+      "sha256": "300f51974a4d2ddd3b6c4a79e77f7133e3fe909ab08c2b1573ec5fa220d335c4",
+      "frame": 981,
+      "request": "0520920105"
+    },
+    {
+      "capture": "g7 se/persistence-20261008-163059.pcap",
+      "sha256": "300f51974a4d2ddd3b6c4a79e77f7133e3fe909ab08c2b1573ec5fa220d335c4",
+      "frame": 1167,
+      "request": "0520050105"
+    },
+    {
+      "capture": "g7 se/persistence-20261008-163059.pcap",
+      "sha256": "300f51974a4d2ddd3b6c4a79e77f7133e3fe909ab08c2b1573ec5fa220d335c4",
+      "frame": 1173,
+      "request": "0520060105"
+    },
+    {
+      "capture": "g7 se/persistence-20261008-163059.pcap",
+      "sha256": "300f51974a4d2ddd3b6c4a79e77f7133e3fe909ab08c2b1573ec5fa220d335c4",
+      "frame": 2165,
+      "request": "0520070105"
+    }
+  ]
+}

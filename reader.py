@@ -25,6 +25,8 @@ from gs_state import state
 import vendors.gamesir.control as control
 import controller_profile as profiles
 from vendors.gamesir.models.g7pro import protocol as g7pro
+from vendors.gamesir.models.g7se import protocol as g7se
+from vendors.gamesir.models.g7se import input as g7se_input
 
 
 _active_g7_handle = None
@@ -169,7 +171,7 @@ def _pick_selected(controllers):
     # initial selection away from a controller this app can configure.
     return next((c for c in live
                  if profiles.detect_one(c['pid'], c.get('product'))
-                 not in (None, profiles.G7_NATIVE, profiles.G7_PRO_OTHER)),
+                 not in (None, profiles.G7_NATIVE, profiles.G7_PRO_OTHER, profiles.G7_SE)),
                 (live or controllers)[0])
 
 
@@ -284,6 +286,7 @@ def read_controller():
             state['edit_profile'] = None
             state['config_claimed'] = False
             state['config_status'] = ''
+            state['usb_bcd'] = None
             profiles.set_active(None)   # nothing connected: mark unrecognised
             time.sleep(1.0)
             continue
@@ -293,6 +296,7 @@ def read_controller():
         if sel['id'] != last_id:
             state['profile'] = None    # different unit: don't carry the old one's
             state['edit_profile'] = None
+            state['config_status'] = ''
             last_id = sel['id']        # profile number onto it (drives bank select)
         prof = profiles.detect_one(sel['pid'], sel.get('product'))
         profiles.set_active(prof)                      # rest of app follows this
@@ -300,6 +304,7 @@ def read_controller():
         # Pin the version to THIS physical unit (bcdDevice on one of its nodes),
         # not the first device with this pid — matters with two identical units.
         _bcd = sel.get('bcd') or (device_bcd(sel['nodes'][0]) if sel['nodes'] else None)
+        state['usb_bcd'] = _bcd
         state['firmware'] = firmware_version(sel['nodes'][0]) if sel['nodes'] else (
             f'{_bcd >> 8:x}.{_bcd & 0xff:02x}' if _bcd else None)
         state['wired'] = _is_wired(prof, sel['pid'], _bcd)   # wired / dongle hint
@@ -331,9 +336,28 @@ def read_controller():
             time.sleep(0.3)
             continue
 
+        # G7 SE: separately verified remap-only channel; no G7 Pro settings.
+        if prof is profiles.G7_SE:
+            state['connected'] = True
+            if (g7se.CONFIGURATION_VERIFIED and state.get('config_wanted', True)
+                    and _bcd == g7se.TESTED_DESCRIPTOR):
+                read_session_seusb(sel)
+            else:
+                state['config_wanted'] = False
+                if not g7se.CONFIGURATION_VERIFIED:
+                    state['config_status'] = 'G7 SE configuration disabled: cold-start replies unverified'
+                elif _bcd != g7se.TESTED_DESCRIPTOR:
+                    state['config_status'] = 'G7 SE remapping is tested only on firmware descriptor 6.30'
+                elif not state.get('config_status', '').startswith(
+                        ('G7 SE configuration ended', 'G7 SE input restoration failed')):
+                    state['config_status'] = 'Released to games'
+                read_session_evdev(sel['id'], force_wrong_mode=True)
+            state['connected'] = False
+            time.sleep(0.3)
+            continue
+
         # A G7 Pro edition we can name but have never driven. Input still works;
-        # only configuration is off the table. Says which edition and asks for a
-        # report, rather than showing a bare USB id or nothing at all.
+        # only configuration is off the table.
         if prof is profiles.G7_PRO_OTHER:
             edition = g7pro.edition_name(sel['pid']) or 'unrecognised edition'
             state['connected'] = True
@@ -570,7 +594,7 @@ def read_session_evdev(driving_id, force_wrong_mode=False):
         while True:
             if state.get('demo'):                       # demo mode took over
                 break
-            if profiles.active() is profiles.G7_PRO and state.get('config_wanted'):
+            if profiles.active() in (profiles.G7_PRO, profiles.G7_SE) and state.get('config_wanted'):
                 break
             now = time.time()
             if now - last_scan > 1.0:
@@ -702,6 +726,83 @@ def transition_g7_identity(ctrl):
         'Timed out waiting for configuration identity 109b or 109c')
     state['config_wanted'] = False
     return False
+
+
+def read_session_seusb(ctrl):
+    """Own only the SE remap channel; release xpad on every exit path."""
+    global _active_g7_handle
+    handle = None
+    startup = None
+    try:
+        meta = ctrl['usb']
+        handle = g7se.open_device(meta['bus'], meta['address'], meta['sysfs'])
+        _active_g7_handle = handle
+        from vendors.gamesir.models.g7se.startup import Startup
+        state.update(config_claimed=True, mode_ok=False,
+                     config_status='Initializing G7 SE rear-button configuration…')
+        startup = Startup(handle, meta['bus'], meta['address'], meta['sysfs'],
+            active=lambda: state.get('config_wanted') and not state.get('demo')
+                and state.get('selected') in (None, ctrl['id'])
+                and profiles.active() is profiles.G7_SE)
+        startup.run()
+        state.update(driving=ctrl['id'], config_claimed=True, mode_ok=True, access='ok',
+                     config_status='Configuring rear buttons · controller unavailable to games')
+        state['profile'] = None
+        state['edit_profile'] = None
+        control.set_device(handle)
+        gen = control.generation()
+        last_heartbeat = last_query = last_scan = 0
+        query_sequence = None
+        while state.get('config_wanted') and not state.get('demo'):
+            if state.get('selected') not in (None, ctrl['id']) or profiles.active() is not profiles.G7_SE:
+                break
+            startup.check_identity()
+            now = time.monotonic()
+            if now - last_heartbeat >= 0.25:
+                if control.se_send(2, b'\xf2\x00', gen) is None:
+                    raise OSError('SE heartbeat refused; device/session changed')
+                last_heartbeat = now
+            if now - last_query >= 2:
+                query_sequence = control.se_send(1, b'\x0b', gen)
+                last_query = now
+            if now - last_scan >= 1:
+                current = next((c for c in _rescan() if c['id'] == ctrl['id']), None)
+                if current is None or current.get('usb') != meta:
+                    break
+                last_scan = now
+            control.pump_reads()
+            report = handle.read(64, timeout_ms=100)
+            if len(report) >= 9 and report[:2] == b'\x10\x00' and report[3:5] == b'\x3c\x05':
+                control.store_se_reply(report)
+            elif (len(report) == 64 and report[:2] == b'\x10\x00'
+                    and report[2] == query_sequence and report[3:5] == b'\x3c\x0c'
+                    and report[5] in g7se.PROFILE_BANKS):
+                state['profile'] = report[5]
+                if state.get('edit_profile') is None:
+                    state['edit_profile'] = report[5]
+            elif len(report) >= 18 and report[0] == 0x20:
+                values = g7se_input.decode(report)
+                if values is not None:
+                    state.update(values)
+    except Exception as exc:
+        state['config_status'] = 'G7 SE configuration ended: ' + str(exc)
+        state['access'] = 'no-access' if getattr(exc, 'errno', None) in (errno.EACCES, errno.EPERM) else None
+        state['config_wanted'] = False
+    finally:
+        control.clear_device()
+        if handle is not None:
+            try:
+                if startup is not None:
+                    startup.restore_input()
+            except Exception as exc:
+                state['config_status'] = 'G7 SE input restoration failed: ' + str(exc)
+            finally:
+                handle.close()
+        if _active_g7_handle is handle:
+            _active_g7_handle = None
+        state.update(driving=None, config_claimed=False, mode_ok=False)
+        if not state.get('config_wanted') and not state.get('config_status', '').startswith(('G7 SE configuration ended', 'G7 SE input restoration failed')):
+            state['config_status'] = 'Released to games'
 
 
 def read_session_g7usb(ctrl):

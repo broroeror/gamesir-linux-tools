@@ -1,0 +1,111 @@
+{
+  "device": "3537:1010",
+  "bcdDevice": "0630",
+  "captured_utc": "2026-10-07T22:04:36.476427+00:00",
+  "scope": "Confirmed GIP identification only, no remapping semantics",
+  "events": [
+    {
+      "request": "04200100",
+      "interface": 0,
+      "stage": "before-power-on"
+    },
+    {
+      "request": "012001090004203a000000ba00",
+      "interface": 0,
+      "stage": "identification-ack"
+    },
+    {
+      "response": "04f0013af4011000010000000000000000000000f400870016001b001c0023002900460000000000000000000101000200000601020304060705010405060a01",
+      "matched": false,
+      "interface": 0
+    },
+    {
+      "response": "04a001ba003a1a0057696e646f77732e58626f782e496e7075742e47616d657061640456ff7697fd9b8145ad45b645bba526d62c402e08df07e145a5aba3127a",
+      "matched": false,
+      "interface": 0
+    },
+    {
+      "response": "04a001ba0074f197b5e71ff3b88673e940a9f82f21263acfb7fed2ddec87d39442bd961a712e3dc77d0417002020000100100000000000000000000000000000",
+      "matched": false,
+      "interface": 0
+    },
+    {
+      "response": "04a0013aae010017000909000100080000000000000000000000000000001700103c0001001000000000000000000000000000000017000f3c00010008000000",
+      "matched": false,
+      "interface": 0
+    },
+    {
+      "request": "01200109000420f40000000000",
+      "interface": 0,
+      "stage": "identification-ack"
+    },
+    {
+      "response": "04b0010ce801000000000000000000000000",
+      "matched": false,
+      "interface": 0
+    },
+    {
+      "response": "04a00100f401",
+      "matched": true,
+      "interface": 0
+    }
+  ],
+  "payload": "1000010000000000000000000000f400870016001b001c0023002900460000000000000000000101000200000601020304060705010405060a011a0057696e646f77732e58626f782e496e7075742e47616d657061640456ff7697fd9b8145ad45b645bba526d62c402e08df07e145a5aba3127af197b5e71ff3b88673e940a9f82f21263acfb7fed2ddec87d39442bd961a712e3dc77d04170020200001001000000000000000000000000000000017000909000100080000000000000000000000000000001700103c0001001000000000000000000000000000000017000f3c00010008000000000000000000000000000000",
+  "decoded": {
+    "offsets": {
+      "client_commands": 135,
+      "firmware_versions": 22,
+      "audio_formats": 27,
+      "capabilities_out": 28,
+      "capabilities_in": 35,
+      "classes": 41,
+      "interfaces": 70,
+      "hid_descriptor": 0
+    },
+    "client_commands": [
+      {
+        "command": 32,
+        "length": 32,
+        "options": 16,
+        "raw": "1700202000010010000000000000000000000000000000"
+      },
+      {
+        "command": 9,
+        "length": 9,
+        "options": 8,
+        "raw": "1700090900010008000000000000000000000000000000"
+      },
+      {
+        "command": 16,
+        "length": 60,
+        "options": 16,
+        "raw": "1700103c00010010000000000000000000000000000000"
+      },
+      {
+        "command": 15,
+        "length": 60,
+        "options": 8,
+        "raw": "17000f3c00010008000000000000000000000000000000"
+      }
+    ],
+    "firmware_versions": [
+      [
+        1,
+        2
+      ]
+    ],
+    "interfaces": [
+      "9776ff56-9bfd-4581-ad45-b645bba526d6",
+      "082e402c-07df-45e1-a5ab-a3127af197b5",
+      "b8f31fe7-7386-40e9-a9f8-2f21263acfb7",
+      "ecddd2fe-d387-4294-bd96-1a712e3dc77d"
+    ],
+    "audio_formats": "",
+    "capabilities_out": "010203040607",
+    "capabilities_in": "010405060a",
+    "hid_descriptor": "",
+    "classes": [
+      "Windows.Xbox.Input.Gamepad"
+    ]
+  }
+}
