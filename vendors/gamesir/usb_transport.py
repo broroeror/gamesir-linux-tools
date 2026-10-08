@@ -221,6 +221,8 @@ def _validate_identity(sysfs, vendor, products, bus, address):
 class InterruptHandle:
     """Claimed interrupt interface with a hidapi-compatible handle surface."""
 
+    transfer_name = 'libusb_interrupt_transfer'
+
     def __init__(self, lib, context, handle, interface, ep_out, ep_in):
         self._lib = lib
         self._context = context
@@ -306,10 +308,10 @@ class InterruptHandle:
         with self._io_lock:
             if self._closed:
                 raise UsbTransportError('USB interface is closed')
-            result = self._lib.libusb_interrupt_transfer(
+            result = getattr(self._lib, self.transfer_name)(
                 self._handle, self._ep_out, buffer, len(payload),
                 ctypes.byref(transferred), 1000)
-            _check(self._lib, result, 'USB interrupt write')
+            _check(self._lib, result, f'USB {self.transfer_name.split("_")[1]} write')
             return transferred.value
 
     def read(self, length=64, timeout_ms=200):
@@ -321,12 +323,12 @@ class InterruptHandle:
         with self._io_lock:
             if self._closed:
                 raise UsbTransportError('USB interface is closed')
-            result = self._lib.libusb_interrupt_transfer(
+            result = getattr(self._lib, self.transfer_name)(
                 self._handle, self._ep_in, buffer, size,
                 ctypes.byref(transferred), max(1, int(timeout_ms)))
             if result == _ERROR_TIMEOUT:
                 return b''
-            _check(self._lib, result, 'USB interrupt read')
+            _check(self._lib, result, f'USB {self.transfer_name.split("_")[1]} read')
             return bytes(buffer[:transferred.value])
 
     def close(self):

@@ -27,6 +27,7 @@ state = {
     'accel': None,       # signed raw accelerometer X/Y/Z counts
     'imu_time': 0.0,     # monotonic timestamp of the last valid G7 sensor frame
     'firmware': None,    # firmware version string from USB bcdDevice (e.g. '3.52')
+    'usb_bcd': None,     # selected unit's raw bcdDevice; firmware capability gate
     'controller': None,  # detected model short name ('Cyclone 2'/'G7'), else None
     'wired': None,       # True = wired controller, False = its wireless dongle,
                          # None = unknown (display hint; not a flash gate)

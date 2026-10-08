@@ -17,7 +17,7 @@ re-tread them. This is a hobby RE effort; corrections and additions welcome.
 |---|---|---|---|---|
 | **Cyclone 2** *(GameSir, VID 0x3537)* | `0575` / `100b` / `1053` | ✅ vendor `0x12` | ✅ full | **Fully supported** |
 | **G7 Pro** *(Shadow Ember, Amazon)* | `109b` (wired config) · `109c` (dongle config) · `10ba` / `10bb` (Amazon wired / dongle config) · `100a` (transition) · `1022` (native/GIP) · `1003` / `1004` (White Trimode wired / dock; 1004 shared with the T4 Kaleid) · `105e` (recognised, detect-only) | ✅ evdev or claimed USB telemetry | ✅ four profiles + core/extras | **Writes on 109b/109c/10ba/10bb/1003/1004** — 109b/109c contributed and verified by [@brcly](https://github.com/brcly); 10ba/10bb write round-trip verified on my own pad; 1003/1004 confirmed by an owner (#9) |
-| G7 SE *(not owned)* | `1010` | ✅ mainline `xpad` | n/a | Reference only |
+| **G7 SE** | `1010` | ✅ mainline `xpad` / claimed USB | ✅ L4/R4 gamepad remaps | **Remap-only support on descriptor 6.30**, [protocol notes](docs/g7se.md) |
 | **G7 Pro 8K PC** | `10c5`–`10c8` + `1032`/`1033` (Royal2) edition pairs | ✅ vendor `0x12` | ✅ full incl. motion/macros/lights | **Fully supported** |
 | **Tarantula Pro 8K** | `103d` (PC/XBOX mode) · `103c` (auto-detected non-PC mode, no config) | ✅ vendor `0x12` | ✅ rebinds (9 extras), macros, sticks, triggers, motion, poll rate — no lighting yet | **Supported**, write round-trip verified on my own pad |
 | **G502 X LIGHTSPEED** *(Logitech, VID 0x046d)* | `c098` (wired) · `409f` / `c547` (receiver) | ✅ standard HID | ✅ full — profiles, G-Shift, DPI, macros | **Fully supported** |

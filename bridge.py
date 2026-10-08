@@ -28,6 +28,7 @@ import vendors.gamesir.motion as motion
 import vendors.gamesir.macro as macro
 import vendors.gamesir.config as cfg
 from vendors.gamesir.models.g7pro import protocol as g7pro
+from vendors.gamesir.models.g7se import protocol as g7se
 import controller_profile as profiles
 import kf_cache
 import kwin
@@ -227,6 +228,7 @@ class GamesirBridge(QObject):
         # still drops the prior unit's staged/loaded config -- and does so only
         # once the reader has actually rebound, not when the picker changes.
         self._controller = None
+        self._controller_bcd = None
         self._driving = None
         self._apply_profile(profiles.active())
 
@@ -291,8 +293,12 @@ class GamesirBridge(QObject):
         # Model changed (Cyclone <-> G7 <-> none): rebuild the register-address
         # map and refresh the model-level properties bound to controllerChanged
         # (poll rates, remap sources).
-        if state['controller'] != self._controller:
+        # SE configuration capabilities can change between two units of the
+        # same model, so firmware changes must refresh controller bindings too.
+        bcd = state.get('usb_bcd') if profiles.active() is profiles.G7_SE else None
+        if state['controller'] != self._controller or bcd != self._controller_bcd:
             self._controller = state['controller']
+            self._controller_bcd = bcd
             self._apply_profile(profiles.active())
             self.controllerChanged.emit()
 
@@ -652,6 +658,8 @@ class GamesirBridge(QObject):
         Switching profiles discards any unsaved edits (mirrors the DPG app)."""
         if not profiles.is_recognized():
             return          # unrecognised/absent controller: don't read its regs
+        if self._prof is profiles.G7_SE and not g7se.CONFIGURATION_VERIFIED:
+            return
         if state['driving'] != state['selected']:
             return          # reader hasn't bound the selected unit's vendor
                             # session yet (or an evdev model, e.g. G7, that has no
@@ -671,7 +679,8 @@ class GamesirBridge(QObject):
                     self._g7_dock_loading = True
             else:
                 reqs = [(bank, addr, ln) for addr, ln in self._prof.read_fields()]
-                reqs += [(bank, addr, 2) for _n, addr in self._prof.REMAP_SLOTS]
+                reqs += [(bank, addr, 8 if self._prof is profiles.G7_SE else 2)
+                         for _n, addr in self._prof.REMAP_SLOTS]
             self._config_loading_gen = control.generation()
             control.request_regs(reqs)
             self._config_loading = bank
@@ -713,7 +722,14 @@ class GamesirBridge(QObject):
         if any(v is None for v in vals.values()):
             return
         self._config_loading = None
-        cand = self._build_config(vals)
+        try:
+            cand = self._build_config(vals)
+        except ValueError as exc:
+            self._config = {}
+            self._config_generation = None
+            self._set_apply_status(str(exc))
+            self.configLoaded.emit()
+            return
         # Guard against a transient/garbage read overwriting a good config (the
         # "triggers 0–0 after a page switch" bug): a deadzone MAX of 0 fully
         # deadzones the axis, which no real profile does — so it signals the
@@ -778,7 +794,8 @@ class GamesirBridge(QObject):
             rec = vals[addr]
             # store the raw target CODE (or -1 = unmapped) so keyboard/mouse
             # rebinds share one path; the UI resolves the label via targetLabel().
-            remap[name] = (rec[1] if len(rec) > 1 else 0) if rec[0] else -1
+            remap[name] = (g7se.decode_remap(rec) if p is profiles.G7_SE else
+                           (rec[1] if len(rec) > 1 else 0) if rec[0] else -1)
         out['remap'] = remap
         if p.CONTINUOUS_TRIGGER_SLOTS:
             out['continuous_trigger'] = {
@@ -877,6 +894,8 @@ class GamesirBridge(QObject):
         back to the default profile's bank count rather than 0 so an unrecognised
         controller still shows a usable bar."""
         prof = self._prof or profiles.DEFAULT
+        if prof is profiles.G7_SE and not self._se_configuration_supported():
+            return 0
         return len(prof.profile_banks)
 
     @Property(bool, notify=statusChanged)
@@ -889,6 +908,12 @@ class GamesirBridge(QObject):
 
     @Property(str, notify=statusChanged)
     def modeMessage(self):
+        if profiles.active() is profiles.G7_SE:
+            if not g7se.CONFIGURATION_VERIFIED:
+                return 'G7 SE configuration is disabled: cold-start configuration replies are unverified.'
+            if not self._se_configuration_supported():
+                return 'G7 SE remapping is tested only on firmware descriptor 6.30; input remains available.'
+            return 'Choose Configure controller to edit L4/R4, then release it to games.'
         if profiles.active() is profiles.G7_NATIVE:
             return ('Hold SHARE + MENU (☰) to switch the controller to XInput '
                     'mode. Note this also resets the active profile\'s remaps.')
@@ -1030,6 +1055,19 @@ class GamesirBridge(QObject):
     def isG7Pro(self):
         return profiles.is_recognized() and profiles.active() is profiles.G7_PRO
 
+    def _se_configuration_supported(self):
+        return (g7se.CONFIGURATION_VERIFIED
+                and state.get('usb_bcd') == g7se.TESTED_DESCRIPTOR)
+
+    @Property(bool, notify=controllerChanged)
+    def hasUsbConfiguration(self):
+        return profiles.is_recognized() and (profiles.active() is profiles.G7_PRO
+            or profiles.active() is profiles.G7_SE and self._se_configuration_supported())
+
+    @Property(bool, notify=controllerChanged)
+    def remapOnly(self):
+        return self._prof is profiles.G7_SE
+
     @Property(bool, notify=controllerChanged)
     def hasMotion(self):
         return profiles.is_recognized() and profiles.active().has_motion
@@ -1165,6 +1203,7 @@ class GamesirBridge(QObject):
         state['profile'] = 1
         state['edit_profile'] = 1
         state['firmware'] = 'demo'
+        state['usb_bcd'] = None
 
     @Property(bool, notify=demoModeChanged)
     def demoMode(self):
@@ -1204,6 +1243,7 @@ class GamesirBridge(QObject):
             state['mode_ok'] = False
             state['profile'] = None
             state['firmware'] = None
+            state['usb_bcd'] = None
             state['led_slot'] = None
             profiles.set_active(None)
         self.demoModeChanged.emit()
@@ -1723,6 +1763,8 @@ class GamesirBridge(QObject):
     def targetCategories(self):
         """Categorized targets for the macro/remap picker: [{name, targets:[{name,code}]}].
         Buttons (gamepad) + Keyboard + Mouse — the controller emits all three."""
+        if self._prof is profiles.G7_SE:
+            return [{'name': 'Buttons', 'targets': self.buttonTargets}]
         return [{'name': cat, 'targets': [{'name': n, 'code': c} for n, c in
                 (self._prof.REMAP_TARGETS if cat == 'Buttons' else items) if c != 0xff]}
                 for cat, items in cfg.TARGET_CATEGORIES]
@@ -1734,6 +1776,8 @@ class GamesirBridge(QObject):
                      + list(g7pro.NUMPAD_TARGETS) + list(g7pro.MOUSE_TARGETS))
             return dict((c, n) for n, c in items).get(code, '0x%02x' % code)
         own = dict((c, n) for n, c in self._prof.REMAP_TARGETS)
+        if self._prof is profiles.G7_SE:
+            return own.get(code, '0x%02x' % code)
         return own[code] if code in own else cfg.target_label(code)
 
     @Property('QVariantList', constant=True)
@@ -1751,6 +1795,8 @@ class GamesirBridge(QObject):
 
     @Property('QVariantList', notify=controllerChanged)
     def mouseTargets(self):
+        if self._prof is profiles.G7_SE:
+            return []
         items = g7pro.MOUSE_TARGETS if self._prof is profiles.G7_PRO else cfg.MOUSE_TARGETS
         return [{'name': n, 'code': c} for n, c in items]
 
@@ -1888,7 +1934,7 @@ class GamesirBridge(QObject):
 
     @Slot(str)
     def exportBackup(self, url):
-        if self._backup_busy:
+        if self._backup_busy or self._prof is profiles.G7_SE:
             return
         self._backup_busy = True
         self.backupBusyChanged.emit()
@@ -1898,7 +1944,7 @@ class GamesirBridge(QObject):
 
     @Slot(str)
     def importBackup(self, url):
-        if self._backup_busy:
+        if self._backup_busy or self._prof is profiles.G7_SE:
             return
         try:
             data = backup.load(self._to_path(url))
@@ -2056,6 +2102,8 @@ class GamesirBridge(QObject):
 
     @Property('QVariantList', notify=controllerChanged)
     def remapSources(self):
+        if self._prof is profiles.G7_SE and not self._se_configuration_supported():
+            return []
         return [name for name, _ in self._prof.REMAP_SLOTS]
 
     @Property(bool, notify=controllerChanged)
@@ -2095,6 +2143,13 @@ class GamesirBridge(QObject):
 
     @Slot(str, str)
     def setRemap(self, source, target):
+        if self._prof is profiles.G7_SE:
+            code = dict(self._prof.REMAP_TARGETS).get(target)
+            if target == cfg.REMAP_NONE:
+                code = -1
+            if code is not None:
+                self.setRemapCode(source, code)
+            return
         addr = self._remap_addr.get(source)
         if addr is not None:
             self._queue(addr, cfg.remap_write_bytes(target), 'Remap ' + source, target)
@@ -2105,6 +2160,24 @@ class GamesirBridge(QObject):
         all write [type=0x01, code]); code < 0 clears it to Default ([00 00])."""
         addr = self._remap_addr.get(source)
         if addr is None:
+            return
+        if self._prof is profiles.G7_SE:
+            edit = state.get('edit_profile') or state.get('profile')
+            if (not g7se.CONFIGURATION_VERIFIED or profiles.active() is not self._prof or self._backup_busy
+                    or not state.get('connected') or not state.get('config_claimed')
+                    or self._driving != state.get('driving')
+                    or state.get('driving') != state.get('selected')
+                    or self._loaded_profile != edit or self._config_loading is not None
+                    or self._config_generation != control.generation()
+                    or source not in self._config.get('remap', {})):
+                return
+            try:
+                data = g7se.remap_record(code)
+            except ValueError:
+                return
+            self._queue(addr, data, 'Rebind ' + source,
+                        cfg.REMAP_NONE if code == -1 else self.targetLabel(code), kind='se_remap')
+            self._pending[(edit, addr)]['generation'] = self._config_generation
             return
         data = [0x00, 0x00] if code < 0 else [0x01, code & 0xff]
         label = cfg.REMAP_NONE if code < 0 else self.targetLabel(code)
@@ -2217,7 +2290,8 @@ class GamesirBridge(QObject):
             self._config['poll'] = data[0]
         elif addr in self._addr_to_remap:
             rec = self._config.setdefault('remap', {})
-            rec[self._addr_to_remap[addr]] = (data[1] if len(data) > 1 else 0) if data[0] else -1
+            rec[self._addr_to_remap[addr]] = (g7se.decode_remap(data) if self._prof is profiles.G7_SE
+                else (data[1] if len(data) > 1 else 0) if data[0] else -1)
         elif addr in self._addr_to_continuous:
             self._config.setdefault('continuous_trigger', {})[
                 self._addr_to_continuous[addr]] = cfg.continuous_trigger_state(data)
@@ -2230,7 +2304,7 @@ class GamesirBridge(QObject):
         # Continuous Trigger batches (#22) while everything else took the path
         # below; two save paths drift. The G7 Pro keeps the path below -- its
         # writes go over its own enveloped channel with per-field quirks.
-        if self._prof.write_style == 'cyclone':
+        if self._prof.write_style in ('cyclone', 'g7se'):
             self._apply_transactional()
             return
         edit = state.get('edit_profile') or state.get('profile')
@@ -2283,7 +2357,10 @@ class GamesirBridge(QObject):
     def _apply_transactional(self):
         if self._backup_busy or not self._pending:
             return
-        if (self._prof.write_style != 'cyclone' or profiles.active() is not self._prof
+        if self._prof is profiles.G7_SE and not g7se.CONFIGURATION_VERIFIED:
+            self._set_apply_status('Apply refused: G7 SE cold-start replies remain unverified')
+            return
+        if (self._prof.write_style not in ('cyclone', 'g7se') or profiles.active() is not self._prof
                 or not profiles.is_recognized() or not state.get('connected')
                 or self._driving != state.get('driving')
                 or state.get('driving') != state.get('selected')):
@@ -2294,12 +2371,19 @@ class GamesirBridge(QObject):
         changes = [(r['bank'], r['addr'], list(r['data'])) for r in snapshot_pending.values()]
         try:
             for r in snapshot_pending.values():
+                if self._prof is profiles.G7_SE:
+                    edit = state.get('edit_profile') or state.get('profile')
+                    if (r.get('generation') != control.generation() or r['bank'] != edit
+                            or self._loaded_profile != edit or not state.get('config_claimed')):
+                        raise ValueError('G7 SE settings belong to an older session/profile; reload')
+                    g7se.remap_write(1, r['bank'], r['addr'], r['data'])
                 if r.get('kind') == 'continuous_trigger':
                     edit = state.get('edit_profile') or state.get('profile')
                     if (r.get('generation') != control.generation()
                             or r['bank'] != edit or self._loaded_profile != edit):
                         raise ValueError('Continuous Trigger settings belong to an older session/profile; reload')
-            backup._validate_writes(changes)
+            if self._prof is not profiles.G7_SE:
+                backup._validate_writes(changes)
         except ValueError as e:
             self._set_apply_status(f'Apply refused: {e}')
             return
@@ -2321,6 +2405,8 @@ class GamesirBridge(QObject):
 
         def select(bank):
             check_session()
+            if prof is profiles.G7_SE:
+                return  # SE bank reads/writes do not require activating the bank.
             if bank in prof.profile_banks and state.get('profile') != bank:
                 control.send_cmd(0x0F, 0x07, bank, gen=gen)
                 deadline = time.monotonic() + 2.5
@@ -2341,6 +2427,8 @@ class GamesirBridge(QObject):
                 check_session()
                 raw = control.reg_result(bank, addr)
                 if raw is not None:
+                    if prof is profiles.G7_SE:
+                        g7se.decode_remap(raw)
                     if addr in self._addr_to_continuous and length == 1:
                         if cfg.continuous_trigger_state(raw) < 0:
                             raise OSError(f'unknown Continuous Trigger flag at 0x{addr:04x}; write refused')
@@ -2384,7 +2472,7 @@ class GamesirBridge(QObject):
             except Exception as e:
                 self._set_apply_status(f'Apply refused: {e}')
             finally:
-                if (original_profile in prof.profile_banks and gen == control.generation()
+                if (prof is not profiles.G7_SE and original_profile in prof.profile_banks and gen == control.generation()
                         and self._prof is prof and profiles.active() is prof
                         and self._driving == state.get('driving') == state.get('selected')):
                     control.send_cmd(0x0F, 0x07, original_profile, gen=gen)
@@ -2579,7 +2667,9 @@ class GamesirBridge(QObject):
     def setProfile(self, n):
         if n not in self._prof.profile_banks:
             return
-        if self._prof is profiles.G7_PRO:
+        if self._prof is profiles.G7_SE and not self._se_configuration_supported():
+            return
+        if self._prof in (profiles.G7_PRO, profiles.G7_SE):
             state['edit_profile'] = n
             self._loaded_profile = None
             self._config_loading = None
@@ -2601,7 +2691,9 @@ class GamesirBridge(QObject):
     @Slot(bool)
     def setConfigClaimed(self, claimed):
         """Claim/release the selected G7 interface; the reader performs cleanup."""
-        if self._prof is not profiles.G7_PRO:
+        if self._prof not in (profiles.G7_PRO, profiles.G7_SE) or self._backup_busy:
+            return
+        if self._prof is profiles.G7_SE and not self._se_configuration_supported():
             return
         state['config_wanted'] = bool(claimed)
         state['config_status'] = ('Connecting configuration…' if claimed

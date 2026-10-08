@@ -5,6 +5,15 @@ and Logitech mice — newest first. This is the
 curated, user-facing summary; the complete history is in git. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com).
 
+## Unreleased
+
+### Added
+
+- **GameSir G7 SE** (`3537:1010`, firmware descriptor 6.30): persistent L4/R4
+  gamepad remapping across the three Nexus profiles, staged Save with durable
+  originals and verified rollback, automatic cold-connection authentication,
+  and live trigger/stick readouts. Release returns the controller to games.
+
 ## [0.4.0] — 2026-10-02
 
 ### Added

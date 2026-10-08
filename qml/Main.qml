@@ -31,7 +31,7 @@ Window {
     }
     // Tabs follow what the connected controller actually has, so a profile
     // without (say) mapped lighting or vibration motors doesn't get an empty page.
-    readonly property var controllerTabs: bridge.isG7Pro
+    readonly property var controllerTabs: bridge.remapOnly ? ["Rebinds"] : bridge.isG7Pro
         ? ["Rebinds", "Sticks"].concat(bridge.hasMotion ? ["Motion"] : [])
           .concat(["Triggers", "Vibration", "Device"])
         : ["Rebinds", "Sticks"]
@@ -311,7 +311,7 @@ Window {
                 }
                 PillButton {
                     id: g7Session
-                    visible: win.activeDevice === "controller" && bridge.isG7Pro
+                    visible: win.activeDevice === "controller" && bridge.hasUsbConfiguration
                     Layout.alignment: Qt.AlignVCenter
                     label: bridge.configClaimed ? "Release to games" : "Configure controller"
                     statusDot: bridge.configClaimed ? Theme.warn : "transparent"
@@ -730,7 +730,7 @@ Window {
             Rectangle {
                 id: g7ReleasedOverlay
                 anchors.fill: parent; z: 100
-                visible: bridge.isG7Pro && !bridge.configClaimed
+                visible: bridge.hasUsbConfiguration && !bridge.configClaimed
                 color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 0.92)
                 readonly property bool claimInProgress:
                     bridge.configStatus.indexOf("Preparing") === 0
@@ -1066,8 +1066,8 @@ Window {
                         }
 
                         Divider {}
-                        SectionHeader { text: "Backup & Restore" }
-                        BackupPanel { width: parent.width }
+                        SectionHeader { visible: !bridge.remapOnly; text: "Backup & Restore" }
+                        BackupPanel { visible: !bridge.remapOnly; width: parent.width }
 
 
                         Divider {}

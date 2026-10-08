@@ -5,15 +5,17 @@
 # Deadband — a Linux configuration app for controllers and mice
 
 A Linux GUI for gaming input devices, driven over each device's vendor (hidraw)
-interface (or vendor-class USB for the G7 Pro). Currently supports the **GameSir
-Cyclone 2**, **G7 Pro**, **G7 Pro 8K PC** and **Tarantula Pro 8K** controllers and the
+interface (or vendor-class USB for the G7 Pro and G7 SE). Currently supports the **GameSir
+Cyclone 2**, **G7 Pro**, **G7 Pro 8K PC**, **G7 SE** and **Tarantula Pro 8K** controllers and the
 **Logitech G502 X LIGHTSPEED** mouse (see Tested hardware); the protocol modules are per-vendor
 (`vendors/gamesir`, `vendors/logitech`), so other manufacturers can be added
-alongside. It covers:
+alongside.
+
+The configurable models offer:
 
 - **Live input view** — sticks, triggers, all buttons (incl. the L4/R4/M/Home/
   Share extras), D-pad, battery + charging, firmware version, and a mode warning.
-- **Profiles** — pick which of the four profiles you're editing; a dot marks the
+- **Profiles** — pick the profile you're editing (three on G7 SE, four on other models); a dot marks the
   one the controller is actually running. Reset a profile to its defaults.
 - **Lighting** (Cyclone 2 and G7 Pro 8K) — per-light RGB, captured effect presets, brightness/speed,
   audio-reactive / pick-up-to-wake / sleep timeout, and a **custom keyframe
