@@ -5,6 +5,54 @@ and Logitech mice — newest first. This is the
 curated, user-facing summary; the complete history is in git. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com).
 
+## [Unreleased]
+
+### Added
+- **GameSir Kaleid — lighting support.** The Xbox-licensed Kaleid doesn't answer
+  the GameSir hidraw vendor protocol every other model here uses; that collection
+  is present on the pad but vestigial. Deadband now reaches it the way the vendor's
+  own app does, with the same GameSir register protocol tunnelled through **Xbox
+  GIP** on its `3537:1012` identity. Its lighting turned out to be the Cyclone 2's
+  engine byte for byte — the pad's four stored records hold palettes identical to
+  this project's captured Cyclone presets, matching on keyframe count and speed —
+  so it gets the full keyframe editor, minus the slot selector, power block and
+  play/pause it doesn't have. Write round-trip verified on my own pad.
+- **The light map is per model now.** A controller profile can override which
+  render-frame positions each addressable light drives (`lighting_lights`), and one
+  light may drive several. The Cyclone's four lights sit one per position with a
+  dead position at 2; the Kaleid measured as **two** lights, left and right, each
+  flooding a whole side from a pair of positions, with its dead position at 3. The
+  Lights page sizes its zone list off the model instead of assuming four.
+- The Kaleid's other two modes (`1082` DirectInput, `1086` XInput) are recognised
+  and named, with a prompt to press `M + Xbox`, instead of falling through to the
+  Cyclone map and reporting a misleading "not in Xbox mode".
+- A startup check that no two controller profiles claim the same USB product id.
+  With eight profiles and ids a few digits apart, a duplicate would silently
+  resolve to whichever is listed first — and hand the loser the winner's map.
+
+### Fixed
+- **Lighting records could be read back misaligned on a transport with a smaller
+  reply.** The 124-byte record was always read in 56-byte chunks, which is the
+  Cyclone's hidraw limit; GIP carries 55, and the pad answers short rather than
+  refusing, so every byte after the first chunk shifted and decoded into a
+  plausible but wrong palette. The chunk size now comes from the controller
+  profile, and a short reply fails the read instead of stitching misaligned bytes.
+  Only reachable on the Kaleid, which is new here, so no released model was
+  affected.
+
+### Changed
+- The "Configure controller / Release to games" session and its released-state
+  overlay are now driven by whether a model is configured over a *claimed USB
+  interface*, rather than by "is this a G7 Pro" — the Kaleid is the second such
+  model.
+- Controllers with no editable profile banks no longer show the profile-editor
+  tabs, instead of offering pages that can read but never write.
+- `control.set_profile()` refuses on a controller whose profile declares no
+  software profile switch. On the Kaleid the vendor's profile-select command
+  (`0x07`) doesn't select anything — it writes a byte in the *profile* banks that
+  links a profile to its lighting record, collapsing several of the on-pad chords
+  onto one. Guarded at the single place the command is sent.
+
 ## [0.4.0] — 2026-10-02
 
 ### Added

@@ -25,9 +25,10 @@ from gs_state import state
 import vendors.gamesir.control as control
 import controller_profile as profiles
 from vendors.gamesir.models.g7pro import protocol as g7pro
+from vendors.gamesir.models.kaleid import protocol as kaleid
 
 
-_active_g7_handle = None
+_active_usb_handle = None
 _g7_transition_last = {}
 # ⚠ DO NOT REDUCE. Upstream g7ctl calls this HANDSHAKE_MIN_INTERVAL and documents
 # what it prevents: "Rapid re-enumeration is what wedges this firmware's read
@@ -43,15 +44,15 @@ _G7_TRANSITION_TIMEOUT = 10.0
 
 def release_controller():
     """Best-effort synchronous release used by the GUI shutdown hook."""
-    global _active_g7_handle
+    global _active_usb_handle
     state['config_wanted'] = False
-    handle = _active_g7_handle
+    handle = _active_usb_handle
     if handle is not None:
         try:
             handle.close()
         except Exception:
             pass
-        _active_g7_handle = None
+        _active_usb_handle = None
 
 
 def _is_wired(prof, pid, bcd):
@@ -121,7 +122,7 @@ def _probe_live(ctrl, prof=None):
     # The G7 family speaks GIP over evdev and NEVER emits the 0x12 vendor stream,
     # so the probe can't see it and would brand a perfectly live pad an empty
     # dongle. We have no empty-vs-live signal for those — assume live.
-    if prof is not None and prof.input_style in ('evdev', 'g7_usb'):
+    if prof is not None and prof.input_style in ('evdev', 'g7_usb', 'gip_usb'):
         return True
     key = _live_key(ctrl)
     if key not in _live_cache:
@@ -318,6 +319,33 @@ def read_controller():
                 continue
             state['connected'] = False
             state['mode_ok'] = False
+            time.sleep(0.3)
+            continue
+
+        if prof is profiles.KALEID:
+            state['connected'] = True
+            if state.get('config_wanted', True):
+                read_session_kaleid(sel)
+            else:
+                state['config_status'] = 'Released to games'
+                read_session_evdev(sel['id'])
+            if state.get('demo'):
+                continue
+            state['connected'] = False
+            state['mode_ok'] = False
+            time.sleep(0.3)
+            continue
+
+        # A Kaleid in one of its two non-GIP modes. Input works (xpad or usbhid
+        # binds it); only configuration needs the other identity, and the chord is
+        # the only way to get there.
+        if prof is profiles.KALEID_OTHER:
+            state['connected'] = True
+            state['mode_ok'] = False
+            state['config_status'] = ('Press M + Xbox to cycle the controller to '
+                                      'Xbox mode, where its lighting is editable')
+            read_session_evdev(sel['id'], force_wrong_mode=True)
+            state['connected'] = False
             time.sleep(0.3)
             continue
 
@@ -632,7 +660,7 @@ def _connected_age(sysfs):
 
 def transition_g7_identity(ctrl):
     """Move the G7's 100a HID identity to wired 109b or dongle 109c."""
-    global _active_g7_handle
+    global _active_usb_handle
     usbmeta = ctrl.get('usb') or {}
     now = time.monotonic()
     age = _connected_age(usbmeta.get('sysfs', ''))
@@ -655,7 +683,7 @@ def transition_g7_identity(ctrl):
     try:
         handle = g7pro.open_transition_device(
             usbmeta['bus'], usbmeta['address'], usbmeta['sysfs'])
-        _active_g7_handle = handle
+        _active_usb_handle = handle
         state['config_claimed'] = True
         state['access'] = 'ok'
         g7pro.send_handshake(handle)
@@ -671,8 +699,8 @@ def transition_g7_identity(ctrl):
                 handle.close()
             except Exception:
                 pass
-        if _active_g7_handle is handle:
-            _active_g7_handle = None
+        if _active_usb_handle is handle:
+            _active_usb_handle = None
         state['config_claimed'] = False
 
     state['config_status'] = 'Waiting for controller to re-enumerate…'
@@ -706,7 +734,7 @@ def transition_g7_identity(ctrl):
 
 def read_session_g7usb(ctrl):
     """Own a ready G7 vendor interface and multiplex config/live input."""
-    global _active_g7_handle
+    global _active_usb_handle
     usbmeta = ctrl.get('usb') or {}
     try:
         handle = g7pro.open_device(usbmeta['bus'], usbmeta['address'],
@@ -720,7 +748,7 @@ def read_session_g7usb(ctrl):
         state['config_wanted'] = False
         return
 
-    _active_g7_handle = handle
+    _active_usb_handle = handle
     control.set_device(handle)
     state.update(gyro=None, accel=None, imu_time=0.0)
     state['driving'] = ctrl['id']
@@ -802,12 +830,110 @@ def read_session_g7usb(ctrl):
             handle.close()
         except Exception:
             pass
-        if _active_g7_handle is handle:
-            _active_g7_handle = None
+        if _active_usb_handle is handle:
+            _active_usb_handle = None
         state['driving'] = None
         state['config_claimed'] = False
         state.update(gyro=None, accel=None, imu_time=0.0)
         if not state.get('config_wanted') and not telemetry_error and not session_error:
+            state['config_status'] = 'Released to games'
+
+
+def read_session_kaleid(ctrl):
+    """Own a Kaleid's GIP register interface so its lighting can be edited.
+
+    Much simpler than the G7's session, and deliberately so:
+      * NO heartbeat command. The pad answers register reads for as long as the
+        claim is held, with no liveness command of its own to send.
+      * It does still need TRAFFIC, though. The pad idles its lighting animation
+        after ~15-30s of silence on the claimed interface (kaleid.ANIM_IDLE_TIMEOUT),
+        so the slot poll below is load-bearing: it is what keeps the animation
+        playing while the owner edits, not just how the editor follows the slot.
+        Do not back it off or make it event-driven without replacing it with
+        something else that talks to the pad at least that often.
+      * NO identity transition. A Kaleid is only detected as KALEID when it is
+        already in the GIP identity; the other two modes are KALEID_OTHER, which
+        asks for the chord instead. Nothing in software moves the pad between
+        them (`M + Xbox` is firmware).
+
+    No input telemetry is decoded. The pad does stream it on this channel -- its
+    sticks rest at 0x80, so 8-bit axes -- but the frame layout has not been
+    mapped, so telemetry is dropped rather than guessed at. Claiming interface 0
+    detaches xpad, which is why this is a visible claim with a Release button, as
+    on the G7: while it is held the controller is unavailable to games.
+
+    Releasing the claim does NOT change the pad's USB identity: it stays at 1012
+    and `xpad` re-binds to it, so nothing is asked of the owner afterwards. (An
+    earlier note here claimed a release re-enumerated it back to 1082 and the
+    status line said to press `M + Xbox` again -- measured wrong: the identity was
+    still 1012 90 seconds after a release, with the pad untouched. Only the chord
+    moves it between identities.)
+    """
+    global _active_usb_handle
+    usbmeta = ctrl.get('usb') or {}
+    try:
+        handle = kaleid.open_device(usbmeta['bus'], usbmeta['address'],
+                                    usbmeta['sysfs'])
+    except Exception as exc:
+        state['config_claimed'] = False
+        state['config_status'] = str(exc)
+        state['access'] = ('no-access' if getattr(exc, 'errno', None)
+                           in (errno.EACCES, errno.EPERM) else None)
+        state['mode_ok'] = False
+        state['config_wanted'] = False
+        return
+
+    _active_usb_handle = handle
+    control.set_device(handle)
+    state['driving'] = ctrl['id']
+    state['config_claimed'] = True
+    state['config_status'] = 'Configuring lighting · controller unavailable to games'
+    state['access'] = 'ok'
+    state['mode_ok'] = True
+    last_slot = last_scan = 0.0
+    session_error = False
+    try:
+        while state.get('config_wanted', True):
+            if state.get('demo'):
+                break
+            now = time.time()
+            control.pump_reads()
+            # Which lighting record the pad is showing, AND the keepalive that
+            # stops it idling its animation (see the note above).
+            if now - last_slot >= kaleid.KEEPALIVE_SECS:
+                control.request_regs([(kaleid.LIGHT_BANK, 0x0000, 1)])
+                last_slot = now
+            if now - last_scan >= 1.0:
+                last_scan = now
+                ids = [c['id'] for c in _rescan()]
+                if ctrl['id'] not in ids or state.get('selected') not in (None, ctrl['id']):
+                    break
+            report = handle.read(kaleid.REPORT_SIZE, timeout_ms=120)
+            if not report:
+                continue
+            decoded = kaleid.register_reply(report)
+            if decoded is None:
+                continue                  # input telemetry, or not ours
+            bank, addr, data = decoded
+            control.store_reg_result(bank, addr, data)
+            if bank == kaleid.LIGHT_BANK and addr == 0x0000 and data:
+                state['led_slot'] = data[0]
+    except Exception as exc:
+        session_error = True
+        state['config_wanted'] = False
+        state['config_status'] = 'USB session ended: ' + str(exc)
+    finally:
+        control.clear_device()
+        try:
+            handle.close()
+        except Exception:
+            pass
+        if _active_usb_handle is handle:
+            _active_usb_handle = None
+        state['driving'] = None
+        state['config_claimed'] = False
+        state['led_slot'] = None
+        if not state.get('config_wanted') and not session_error:
             state['config_status'] = 'Released to games'
 
 

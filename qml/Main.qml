@@ -34,10 +34,15 @@ Window {
     readonly property var controllerTabs: bridge.isG7Pro
         ? ["Rebinds", "Sticks"].concat(bridge.hasMotion ? ["Motion"] : [])
           .concat(["Triggers", "Vibration", "Device"])
-        : ["Rebinds", "Sticks"]
-          .concat(bridge.hasMotion ? ["Motion"] : [])
-          .concat(["Triggers"])
-          .concat(bridge.hasVibration ? ["Vibration"] : [])
+          // A controller with no editable profile banks (the Kaleid: lighting is
+          // mapped, its profile banks are read-confirmed only) gets no profile
+          // editor tabs, rather than pages that can read but never write.
+        : (bridge.hasProfileEditor
+             ? ["Rebinds", "Sticks"]
+               .concat(bridge.hasMotion ? ["Motion"] : [])
+               .concat(["Triggers"])
+               .concat(bridge.hasVibration ? ["Vibration"] : [])
+             : [])
           .concat(bridge.lightingStyle !== "none" ? ["Lights"] : [])
           .concat(bridge.hasMacros ? ["Macros"] : [])
     readonly property var mouseTabs: ["Buttons", "DPI", "Macros"]
@@ -311,7 +316,7 @@ Window {
                 }
                 PillButton {
                     id: g7Session
-                    visible: win.activeDevice === "controller" && bridge.isG7Pro
+                    visible: win.activeDevice === "controller" && bridge.hasConfigSession
                     Layout.alignment: Qt.AlignVCenter
                     label: bridge.configClaimed ? "Release to games" : "Configure controller"
                     statusDot: bridge.configClaimed ? Theme.warn : "transparent"
@@ -730,7 +735,7 @@ Window {
             Rectangle {
                 id: g7ReleasedOverlay
                 anchors.fill: parent; z: 100
-                visible: bridge.isG7Pro && !bridge.configClaimed
+                visible: bridge.hasConfigSession && !bridge.configClaimed
                 color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 0.92)
                 readonly property bool claimInProgress:
                     bridge.configStatus.indexOf("Preparing") === 0
@@ -739,7 +744,10 @@ Window {
                     || bridge.configStatus.indexOf("Connecting") === 0
                 readonly property bool claimFailed:
                     bridge.configStatus.length > 0
-                    && bridge.configStatus !== "Released to games"
+                    // prefix, not equality, so a model can append its own
+                    // follow-up hint to the released status without this reading
+                    // the release as a failure
+                    && bridge.configStatus.indexOf("Released to games") !== 0
                     && bridge.configStatus.indexOf("Releasing") !== 0
                     && !g7ReleasedOverlay.claimInProgress
                 Card {

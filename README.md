@@ -5,8 +5,9 @@
 # Deadband — a Linux configuration app for controllers and mice
 
 A Linux GUI for gaming input devices, driven over each device's vendor (hidraw)
-interface (or vendor-class USB for the G7 Pro). Currently supports the **GameSir
-Cyclone 2**, **G7 Pro**, **G7 Pro 8K PC** and **Tarantula Pro 8K** controllers and the
+interface (or vendor-class USB for the G7 Pro and the Kaleid). Currently supports
+the **GameSir Cyclone 2**, **G7 Pro**, **G7 Pro 8K PC** and **Tarantula Pro 8K**
+controllers, the **GameSir Kaleid** (lighting only) and the
 **Logitech G502 X LIGHTSPEED** mouse (see Tested hardware); the protocol modules are per-vendor
 (`vendors/gamesir`, `vendors/logitech`), so other manufacturers can be added
 alongside. It covers:
@@ -15,9 +16,13 @@ alongside. It covers:
   Share extras), D-pad, battery + charging, firmware version, and a mode warning.
 - **Profiles** — pick which of the four profiles you're editing; a dot marks the
   one the controller is actually running. Reset a profile to its defaults.
-- **Lighting** (Cyclone 2 and G7 Pro 8K) — per-light RGB, captured effect presets, brightness/speed,
-  audio-reactive / pick-up-to-wake / sleep timeout, and a **custom keyframe
-  animation editor** (add/remove keyframes, randomize, play/pause).
+- **Lighting** (Cyclone 2, G7 Pro 8K and Kaleid) — per-light RGB, captured effect
+  presets, brightness/speed, audio-reactive / pick-up-to-wake / sleep timeout, and
+  a **custom keyframe animation editor** (add/remove keyframes, randomize,
+  play/pause). The number of addressable lights is per model — four on the
+  Cyclone 2, two (left/right) on the Kaleid, which shares the Cyclone's lighting
+  engine and so gets the same editor minus the controls it doesn't have (see
+  Tested hardware).
 - **Config editor** — deadzones and anti-deadzones (drag, or type exact values),
   stick trajectory, sensitivity curves (presets **and** a draggable custom-curve
   editor), trigger tuning (hair-trigger + response curve), vibration with
@@ -113,6 +118,34 @@ can't positively identify. Fork it and customize it however you like.
 > Deadband moves the transitional `3537:100a`
 > identity to a configuration one automatically; if the pad is showing
 > `3537:1022` instead, hold **SHARE + MENU (☰)** together — note this also resets the active profile's remaps and the Shift layer.
+>
+> The **Kaleid** is an Xbox-licensed pad, and it is **lighting only**. It does not
+> answer the GameSir hidraw vendor protocol the other models use — that collection
+> is present on it but vestigial — so Deadband reaches it the way its own Windows
+> app does: the same GameSir register protocol tunnelled through **Xbox GIP**.
+> Lighting turned out to be the Cyclone 2's engine, byte for byte: the pad's four
+> stored records hold palettes identical to this project's captured Cyclone
+> presets, matching on keyframe count and speed too. So the Kaleid gets the full
+> keyframe editor, without the slot selector, power block or play/pause, which it
+> doesn't have.
+>
+> It has **three USB identities**, cycled with **M + Xbox**: `3537:1082`
+> (DirectInput), `3537:1086` (XInput) and `3537:1012` (Xbox/GIP). Only `1012` is
+> configurable; in the other two the app names the pad and asks for the chord
+> rather than reporting a protocol error. Two consequences worth knowing: editing
+> lighting **claims the pad**, so it leaves games for the duration (there's a
+> Release button, as on the G7 Pro), and releasing it drops the pad back to
+> `1082`, so press **M + Xbox** again afterwards.
+>
+> Its **profile banks are deliberately not editable**. They read cleanly and
+> decode against the G7 Pro's register map, but no write to them has ever been
+> confirmed on the hardware, and resembling a mapped device isn't evidence about
+> this one. Picking a profile stays an on-pad job (`M` + `Y`/`B`/`A`/`X`) — the
+> vendor's profile-select command turned out to corrupt this pad's
+> profile-to-lighting link, so Deadband refuses to send it.
+>
+> Not the **T4 Kaleid** (`3537:1004`), which is a different, older product; see
+> the note below.
 >
 > The G7 Pro ships in editions that differ only by USB product ID. The
 > **Zenless Zone Zero** edition (`3537:105e`) is recognised but not configured

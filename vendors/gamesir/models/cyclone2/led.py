@@ -20,6 +20,7 @@ frame across the whole record -> static, fully lit, no animation.
 from vendors.gamesir.control import write_reg, send_cmd
 from vendors.gamesir.models.cyclone2.led_factory import FACTORY_START, FACTORY_DATA
 from gs_state import state
+import controller_profile as profiles
 
 LED_BANK = 0x20
 LED_REC = 0x7c
@@ -44,16 +45,44 @@ SLEEP_TIMEOUT = 0x0273    # minutes of inactivity before sleep; 0 = never
 SLEEP_OPTIONS = [('Off', 0x00), ('1 min', 0x01), ('5 min', 0x05),
                  ('10 min', 0x0a), ('20 min', 0x14)]   # the app's choices
 
-# Individually-addressable lights (confirmed via gamesir_led_map.py). Each maps
-# to a position within the 5-triplet render frame; frame position 2 has no
-# visible LED. LIGHTS order must line up with LIGHT_FRAME_POS.
-LIGHTS = [
-    ('Left grip',  (0, 128, 255)),
-    ('Right grip', (0, 128, 255)),
-    ('Profile',    (0, 128, 255)),
-    ('Home',       (0, 128, 255)),
-]
-LIGHT_FRAME_POS = (0, 1, 3, 4)   # frame position for each light above
+# Individually-addressable lights: (name, default colour, the render-frame
+# positions it drives). The Cyclone's own map, confirmed via gamesir_led_map.py --
+# one position per light, and frame position 2 has no visible LED. Another model
+# reaching this module overrides the whole map through its controller profile; the
+# Kaleid does, with two lights that each drive a PAIR of positions.
+CYCLONE_LIGHTS = (
+    ('Left grip',  (0, 128, 255), (0,)),
+    ('Right grip', (0, 128, 255), (1,)),
+    ('Profile',    (0, 128, 255), (3,)),
+    ('Home',       (0, 128, 255), (4,)),
+)
+
+
+def lights():
+    """The active model's light map, as (name, default, positions) per light."""
+    return profiles.active().lighting_lights or CYCLONE_LIGHTS
+
+
+def light_names():
+    return [name for name, _default, _pos in lights()]
+
+
+def light_defaults():
+    return [default for _name, default, _pos in lights()]
+
+
+def _render_frame(colors):
+    """Pack a per-light colour list into one 5-triplet render frame. Each light
+    paints every position it drives; a position no light claims is left = light 0's
+    colour, never zeroed -- a hole breaks the frame (on the Cyclone it drops the
+    Profile LED)."""
+    frame = [colors[0]] * FRAME_TRIPLETS
+    for i, (_name, _default, positions) in enumerate(lights()):
+        if i >= len(colors):
+            break
+        for pos in positions:
+            frame[pos] = colors[i]
+    return frame
 
 
 def _resolve_slot(slot):
@@ -75,12 +104,7 @@ def set_lights(colors, brightness=100, slot=None):
     list of (r,g,b), one per light in index order; brightness 0..100 (0 = off)."""
     slot = _resolve_slot(slot)
     bri = max(0, min(0x64, round(brightness / 100 * 0x64)))
-    # Place each light's color at its frame position; position 2 has no LED but
-    # is kept non-black so the frame stays complete (a broken/zeroed frame drops
-    # the Profile LED).
-    frame = [colors[0]] * FRAME_TRIPLETS
-    for i, pos in enumerate(LIGHT_FRAME_POS):
-        frame[pos] = colors[i]
+    frame = _render_frame(colors)
     palette = (frame * (LED_TRIPLETS // FRAME_TRIPLETS))[:LED_TRIPLETS]
     flat = []
     for r, g, b in palette:
@@ -107,16 +131,11 @@ def set_keyframes(frames, speed=10, brightness=100, slot=None):
     looked like a hang), and an 8-frame loop only played 5. Swapping to count-first
     fixes all counts. We also zero-fill the frames past `count` so a shorter
     animation can never leave a longer one's frames behind to be replayed."""
-    frames = (list(frames) or [[(0, 0, 0)] * len(LIGHTS)])[:NUM_FRAMES]
+    frames = (list(frames) or [[(0, 0, 0)] * len(lights())])[:NUM_FRAMES]
     count = len(frames)
     flat = []
     for cols in frames:
-        # 5-triplet render frame: positions 0,1,3,4 = the 4 lights; position 2 has
-        # no LED but is kept = light 0's color so the frame stays complete.
-        frame = [cols[0]] * FRAME_TRIPLETS
-        for i, pos in enumerate(LIGHT_FRAME_POS):
-            frame[pos] = cols[i]
-        for r, g, b in frame:
+        for r, g, b in _render_frame(cols):
             flat += [r & 0xFF, g & 0xFF, b & 0xFF]
     # Clear the unused frame slots so a previous, longer animation's frames can't
     # linger in the record and get replayed (the firmware reads `count` frames,
@@ -305,6 +324,10 @@ def read_fields(slot):
 # A register read reply carries the bytes inline in a 64-byte report, so a single
 # read tops out around ~58 bytes. The 124-byte slot record is read in chunks and
 # stitched back together by the caller.
+#
+# The exact cap is the TRANSPORT's, so callers that may be talking to another
+# transport pass `chunk` (ControllerProfile.read_chunk): the Kaleid reaches these
+# same records over GIP, whose body carries only 55. See the note on read_chunk.
 READ_CHUNK = 56
 
 
@@ -313,38 +336,44 @@ def record_addr(slot):
     return 0x0001 + slot * LED_REC
 
 
-def record_read_fields(slot):
-    """(bank, addr, len) chunk reads covering slot `slot`'s whole 124-byte record."""
+def record_read_fields(slot, chunk=None):
+    """(bank, addr, len) chunk reads covering slot `slot`'s whole 124-byte record.
+    `chunk` overrides the per-reply cap for a transport that carries less."""
     base = record_addr(slot)
+    size = int(chunk or READ_CHUNK)
     fields = []
     off = 0
     while off < LED_REC:
-        ln = min(READ_CHUNK, LED_REC - off)
+        ln = min(size, LED_REC - off)
         fields.append((LED_BANK, base + off, ln))
         off += ln
     return fields
 
 
-def stitch_record(slot, vals):
+def stitch_record(slot, vals, chunk=None):
     """Reassemble a 124-byte record from the chunk replies in `vals`
     ({addr: [bytes]}, as returned for record_read_fields). Returns None if any
-    chunk is missing."""
-    base = record_addr(slot)
+    chunk is missing OR came back shorter than it was asked for.
+
+    Both the plan and the reassembly come from record_read_fields, so the two can
+    never disagree about where a chunk starts -- they did when this walked its own
+    offsets with the module constant while the caller had requested a different
+    size, which silently SHIFTED the record instead of failing. A short reply is
+    the same fault seen from the other side, so it returns None rather than
+    stitching a plausible-looking record out of misaligned bytes."""
     out = []
-    off = 0
-    while off < LED_REC:
-        chunk = vals.get(base + off)
-        if chunk is None:
+    for _bank, addr, ln in record_read_fields(slot, chunk):
+        part = vals.get(addr)
+        if part is None or len(part) < ln:
             return None
-        out += list(chunk)
-        off += min(READ_CHUNK, LED_REC - off)
+        out += list(part[:ln])
     return out[:LED_REC]
 
 
 def decode_record(record):
     """Decode a 124-byte record into {type, count, speed, brightness, frames},
     the inverse of how set_keyframes packs it. `frames` is NUM_FRAMES frames, each
-    a list of (r,g,b) per light in LIGHTS order (read from LIGHT_FRAME_POS).
+    a list of (r,g,b) per light in the active model's light map order.
 
     Header is [COUNT, 0x05, speed, brightness]: byte 0 is the keyframe loop length
     and byte 1 is the 0x05 palette-engine marker (constant for every animated
@@ -361,7 +390,8 @@ def decode_record(record):
         grp = triplets[f * FRAME_TRIPLETS:(f + 1) * FRAME_TRIPLETS]
         if len(grp) < FRAME_TRIPLETS:
             grp = grp + [(0, 0, 0)] * (FRAME_TRIPLETS - len(grp))
-        frames.append([list(grp[pos]) for pos in LIGHT_FRAME_POS])
+        # a light's colour reads back from the first position it drives
+        frames.append([list(grp[positions[0]]) for _n, _d, positions in lights()])
     if etype == KEYFRAME_TYPE and 1 <= record[0] <= NUM_FRAMES:
         count = record[0]
     else:

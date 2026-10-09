@@ -90,12 +90,18 @@ def _profile_fields():
 def _lighting_requests():
     """(bank, addr, length) lighting reads for the active model: Cyclone keyframe
     records + power, or the 8K's flat bank-0x20 block, or nothing."""
-    style = ctrl.active().lighting_style
+    prof = ctrl.active()
+    style = prof.lighting_style
     if style == 'cyclone_keyframe':
         reqs = [(led.LED_BANK, 0x0000, 1)]                 # active-slot selector
         for slot in LED_SLOTS:
-            reqs += led.record_read_fields(slot)           # full 124-byte records
-        reqs += [(led.LED_BANK, addr, 1) for addr in POWER_ADDRS]
+            # full 124-byte records, in chunks this transport can actually carry
+            reqs += led.record_read_fields(slot, prof.read_chunk)
+        # Only where the power block is known to exist: backing up registers whose
+        # presence is unconfirmed would make a RESTORE write them (the Kaleid reads
+        # all zeros there, which says nothing about what writing them does).
+        if prof.lighting_power:
+            reqs += [(led.LED_BANK, addr, 1) for addr in POWER_ADDRS]
         return reqs
     if style == 'simple_8k':
         return list(led8k.read_fields())                   # (bank, addr, len)
@@ -245,17 +251,21 @@ def _build(vals):
 def _build_lighting(vals):
     """Lighting section for the active model: Cyclone keyframe slots + power, or
     the 8K's flat 'fields' block, or empty."""
-    style = ctrl.active().lighting_style
+    prof = ctrl.active()
+    style = prof.lighting_style
     if style == 'cyclone_keyframe':
         led_vals = {a: vals[(led.LED_BANK, a)] for b, a in vals if b == led.LED_BANK}
-        return {
+        out = {
             'active_slot': _entry(0x0000, vals[(led.LED_BANK, 0x0000)]),
             'slots': {str(slot): _entry(led.record_addr(slot),
-                                        led.stitch_record(slot, led_vals))
+                                        led.stitch_record(slot, led_vals,
+                                                          prof.read_chunk))
                       for slot in LED_SLOTS},
-            'power': {POWER_NAMES[addr]: _entry(addr, vals[(led.LED_BANK, addr)])
-                      for addr in POWER_ADDRS},
         }
+        if prof.lighting_power:
+            out['power'] = {POWER_NAMES[addr]: _entry(addr, vals[(led.LED_BANK, addr)])
+                            for addr in POWER_ADDRS}
+        return out
     if style == 'simple_8k':
         return {'fields': {_LED8K_NAMES.get(addr, f'0x{addr:04x}'):
                            _entry(addr, vals[(led8k.BANK, addr)])

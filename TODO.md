@@ -91,6 +91,25 @@ than mine. *(Full per-device findings in **[RESEARCH.md](RESEARCH.md)**.)*
       gets no input (#14).
 - [ ] **PS4 / Switch-mode input parsing** — the vendor channel is Xbox-only; other
       modes need their own report parser.
+- [ ] **Kaleid: a software profile switch.** The vendor's `0x07` is destructive on
+      this pad (it writes the profile banks' `0x3f`, the profile → lighting-record
+      link) and `0x06` answers with noise, so selecting a profile stays an on-pad
+      chord. Needs a capture of GameSir Nexus against the Windows GIP stack.
+- [ ] **Kaleid: write-verify the profile banks.** They read cleanly and decode
+      against the G7 Pro's map — four vibration strengths at the family default of
+      75, the stride-7 remap table from `0x42` — but nothing there has been written,
+      so rebinds/sticks/triggers/vibration stay off. One read/write round-trip on
+      the hardware is all that's missing.
+- [ ] **Kaleid: the GIP host handshake** (announce → power-on). Not needed for
+      claim/release any more — the pad keeps its `1012` identity across a release
+      (measured: still `1012` 90s later, untouched), so the owner is asked for
+      nothing. Still likely why GIP `STATUS` and `SERIAL_NUMBER` stay silent, and
+      it would let the session read battery and firmware.
+- [ ] **Kaleid: input telemetry.** Telemetry streams on the same channel (sticks
+      rest at `0x80`) but its frame layout is unmapped, so the live view is blank
+      during a session. Also untried: GIP rumble, which the pad should accept.
+      (The lighting zones are mapped: two lights, each driven by a pair of render
+      positions, with a dead position at 3.)
 
 ---
 

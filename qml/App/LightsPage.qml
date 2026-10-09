@@ -9,13 +9,15 @@ import QtQuick.Layouts
 Item {
     id: page
 
-    property int sel: 0                       // selected zone 0..3
-    property var frames: [["#0080FF", "#0080FF", "#0080FF", "#0080FF"]]
+    property int sel: 0                       // selected zone, 0..nZones-1
+    property var frames: [bridge.lightColors.slice()]
+    // Per-model: the Cyclone exposes four lights, the Kaleid two.
+    readonly property int nZones: bridge.lightNames.length
     property int curFrame: 0
     property bool playing: true
     property string sleepSel: "10 min"
 
-    // When the viewport is too short to stack all four control cards on the left,
+    // When the viewport is too short to stack all the control cards on the left,
     // the Power card moves into the slack under the controller (centre) so the
     // empty middle space is used before falling back to scrolling.
     readonly property bool compact: scroller.availableHeight > 0
@@ -51,14 +53,17 @@ Item {
     }
     function randomVivid() { return colorToHex(Qt.hsva(Math.random(), 1, 1, 1)) }
 
-    function selectZone(z) { sel = z; picker.setColor(bridge.lightColors[z]) }
+    function selectZone(z) {
+        sel = Math.max(0, Math.min(page.nZones - 1, z))
+        picker.setColor(bridge.lightColors[sel])
+    }
     function onZoneEdited(c) {
         var hex = colorToHex(c)
         bridge.setLight(sel, hex)
         frames[curFrame][sel] = hex
     }
     function loadFrame(i) {
-        for (var z = 0; z < 4; z++) bridge.setLight(z, frames[i][z])
+        for (var z = 0; z < page.nZones; z++) bridge.setLight(z, frames[i][z])
         picker.setColor(bridge.lightColors[sel])
     }
     function addFrame() {
@@ -74,14 +79,14 @@ Item {
     }
     function randomizeFrame() {
         var f = frames.slice(); var fr = f[curFrame].slice()
-        for (var z = 0; z < 4; z++) fr[z] = randomVivid()
+        for (var z = 0; z < page.nZones; z++) fr[z] = randomVivid()
         f[curFrame] = fr; frames = f; loadFrame(curFrame)
     }
     function applyAnimation() {
         var rgb = []
         for (var i = 0; i < frames.length; i++) {
             var fr = []
-            for (var z = 0; z < 4; z++) fr.push(hexToRgb(frames[i][z]))
+            for (var z = 0; z < page.nZones; z++) fr.push(hexToRgb(frames[i][z]))
             rgb.push(fr)
         }
         bridge.applyKeyframes(rgb)
@@ -132,7 +137,10 @@ Item {
                 title: "Lighting Profile"; Layout.fillWidth: true
                 Text {
                     width: parent.width; wrapMode: Text.WordWrap
-                    text: "Independent of the hardware profile — shared across all four."
+                    text: bridge.lightingSlotSelectable
+                          ? "Independent of the hardware profile — shared across all four."
+                          : "Selected on the controller with M + Y / B / A / X. " +
+                            "Whichever one it shows is the one you're editing."
                     color: Theme.textFaint; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                 }
                 Row {
@@ -144,7 +152,8 @@ Item {
                             label: "" + (index + 1)
                             implicitWidth: 44
                             highlight: bridge.ledSlot === index
-                            onClicked: bridge.selectSlot(index)
+                            // read-only indicator where the pad owns the selection
+                            onClicked: if (bridge.lightingSlotSelectable) bridge.selectSlot(index)
                         }
                     }
                 }
@@ -198,6 +207,7 @@ Item {
 
             Card {
                 title: "Power"; Layout.fillWidth: true
+                visible: bridge.lightingPowerSupported
                 // Lives on the left normally; reparents into the centre column's
                 // slack (under the controller) when the viewport is short.
                 parent: page.compact ? centerColumn : leftCol
@@ -271,15 +281,15 @@ Item {
                                     page.compact ? 200 : 100000)
                     height: width / aspect
                 }
-                // Flow (not Row) so the four zone chips wrap to a 2×2 block when
-                // the center column is too narrow to hold them on one line,
-                // instead of spilling over the neighbouring cards.
+                // Flow (not Row) so the zone chips wrap to a 2×2 block when the
+                // center column is too narrow to hold them on one line, instead of
+                // spilling over the neighbouring cards.
                 Flow {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    width: Math.min(4 * 96 + 3 * 6, centerArea.width)
+                    width: Math.min(page.nZones * 96 + (page.nZones - 1) * 6, centerArea.width)
                     spacing: 6
                     Repeater {
-                        model: 4
+                        model: page.nZones
                         delegate: Rectangle {
                             required property int index
                             width: 96; height: 40; radius: 8
@@ -362,6 +372,7 @@ Item {
                     width: parent.width; spacing: 8
                     TextButton { label: "Randomize"; onClicked: page.randomizeFrame() }
                     TextButton { label: page.playing ? "Pause" : "Play"
+                                 visible: bridge.lightingPlaybackSupported
                                  onClicked: page.togglePlay() }
                 }
                 TextButton {
@@ -376,6 +387,7 @@ Item {
             ConfirmButton {
                 label: "Restore default lighting"
                 confirmLabel: "Restore default lighting?"
+                visible: bridge.lightingRestorable
                 onConfirmed: bridge.restoreLighting()
             }
 
