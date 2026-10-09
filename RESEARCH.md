@@ -17,6 +17,7 @@ re-tread them. This is a hobby RE effort; corrections and additions welcome.
 |---|---|---|---|---|
 | **Cyclone 2** *(GameSir, VID 0x3537)* | `0575` / `100b` / `1053` | ✅ vendor `0x12` | ✅ full | **Fully supported** |
 | **G7 Pro** *(Shadow Ember, Amazon)* | `109b` (wired config) · `109c` (dongle config) · `10ba` / `10bb` (Amazon wired / dongle config) · `100a` (transition) · `1022` (native/GIP) · `1003` / `1004` (White Trimode wired / dock; 1004 shared with the T4 Kaleid) · `105e` (recognised, detect-only) | ✅ evdev or claimed USB telemetry | ✅ four profiles + core/extras | **Writes on 109b/109c/10ba/10bb/1003/1004** — 109b/109c contributed and verified by [@brcly](https://github.com/brcly); 10ba/10bb write round-trip verified on my own pad; 1003/1004 confirmed by an owner (#9) |
+| **Kaleid** *(Xbox-licensed)* | `1012` (Xbox/GIP, configurable) · `1082` (DirectInput) · `1086` (XInput) — cycled with `M + Xbox` | ✅ mainline `xpad` (matches by interface class, no PID quirk) | ✅ lighting only — full keyframe editor; profile banks read-confirmed, not written | **Supported for lighting**, write round-trip verified on my own pad |
 | G7 SE *(not owned)* | `1010` | ✅ mainline `xpad` | n/a | Reference only |
 | **G7 Pro 8K PC** | `10c5`–`10c8` + `1032`/`1033` (Royal2) edition pairs | ✅ vendor `0x12` | ✅ full incl. motion/macros/lights | **Fully supported** |
 | **Tarantula Pro 8K** | `103d` (PC/XBOX mode) · `103c` (auto-detected non-PC mode, no config) | ✅ vendor `0x12` | ✅ rebinds (9 extras), macros, sticks, triggers, motion, poll rate — no lighting yet | **Supported**, write round-trip verified on my own pad |
@@ -325,6 +326,86 @@ GameSir's app picking these targets would answer all three at once.
 
 Deadband shows unknown codes as raw hex (`0x15`) and preserves them on save —
 editing another step does not rewrite them.
+
+---
+
+## GameSir Kaleid — lighting over Xbox GIP (`3537:1012`)
+
+The Kaleid is Xbox-licensed, and it does **not** answer the GameSir hidraw vendor
+protocol every other model here uses. That collection is present on the pad but
+vestigial: it accepts reports and never replies. Deadband reaches it the way the
+vendor's own app does instead — the same GameSir register protocol (`0x0f` out /
+`0x10` in, `0x03` write / `0x04` read / `0x05` reply) tunnelled inside **Xbox GIP**
+vendor messages on interface 0, which is GIP class `ff/47/d0`.
+
+Three USB identities, cycled on the pad with **M + Xbox**, and only one is
+configurable:
+
+| identity | interfaces | use |
+|---|---|---|
+| `3537:1012` | GIP `ff/47/d0` ×2 | the only configurable one |
+| `3537:1086` | `ff/5d/01` | XInput |
+| `3537:1082` | HID ×2 | DirectInput |
+
+Mainline `xpad` matches GameSir pads **by interface class, not product id**, so input
+needs no quirk — but it binds interface 0, and configuration therefore needs the same
+temporary libusb claim with `xpad` detached that the G7 Pro uses. The GIP framing is
+`[0x0f, options, sequence, 0x3c]` then the register command; `options` must be `0x00`
+and the sequence must be 1..255, as GIP reserves 0. Channel `0x3c` is verified for
+both reads and writes. Note the GIP body carries only **55** payload bytes where
+hidraw carries 56, which is what `ControllerProfile.read_chunk` exists for.
+
+Releasing the claim does not change the identity — the pad stays at `1012` and
+`xpad` re-binds, measured still `1012` 90 seconds after a release with the pad
+untouched — so configuring costs the owner nothing. Deliberately not implemented: the
+GIP host handshake (announce → power-on), which is the likely reason GIP `STATUS` and
+`SERIAL_NUMBER` stay silent. Also never sent: GIP command `0x0c` (FIRMWARE).
+
+**Lighting is the Cyclone 2's engine, byte for byte.** Bank `0x20`, same selector at
+`0x0000`, same five 124-byte records at `0x0001 + slot*0x7c`, same
+`[count, 0x05, speed, brightness]` header and 8×5-triplet palette. Proven rather than
+assumed: the pad's own stored records hold palettes **identical** to this project's
+captured Cyclone presets, agreeing on keyframe count and speed too. So
+`lighting_style='cyclone_keyframe'` drives it unchanged, and the whole keyframe editor
+came for free. Confirmed on hardware: colours are plain RGB, the `count` byte is
+honoured (a 1-frame record renders static), and speed is inverted exactly as on the
+Cyclone — device `1` ≈ 4 frames/s, device `20` ≈ one frame per 8 seconds.
+
+**Its light map is not the Cyclone's**, which is why `lighting_lights` is now a
+per-model profile field. Measured one zone at a time with the pad released:
+
+| frame position | 0 | 1 | 2 | 3 | 4 |
+|---|---|---|---|---|---|
+| Cyclone 2 | left grip | right grip | *(no LED)* | profile | home |
+| Kaleid | left | right | left | *(no LED)* | right |
+
+A lit position floods an **entire side** at 90–100% brightness with only a faint
+positional bias, so the Kaleid has two usable lights, each driven by a pair of
+positions, and its dead position is 3 where the Cyclone's is 2. Hence a light that
+owns several positions, and a Lights page that sizes its zone list off the model.
+
+**⚠ The animation idles out on a quiet claimed interface.** While the interface is
+claimed the pad keeps animating only as long as traffic flows; after roughly 15–30
+seconds of silence it stops on whatever frame it reached, and it resumes when the
+claim drops. Writes have nothing to do with it — measured silent/polled × with/without
+a write. The session's once-a-second poll of the active slot is therefore
+**load-bearing** (`kaleid.KEEPALIVE_SECS` against `kaleid.ANIM_IDLE_TIMEOUT`), not
+just how the editor follows the slot, and two tests guard the margin.
+
+**⚠ Vendor command `0x07` is destructive here.** On the Cyclone it selects a profile;
+on the Kaleid it writes profile-bank offset `0x3f`, the profile→lighting link, and
+collapses the `M + Y/B/A/X` chords so several chords select the same profile. Guarded
+centrally by `software_profile_switch=False`, which makes `control.set_profile()` a
+no-op for this pad. Recovering it needs the link byte written back per profile.
+
+**Scope is lighting only, deliberately.** The profile banks read cleanly and decode
+against the G7 Pro's map (four vibration strengths at the family default of 75, a
+stride-7 remap table from `0x42`), but no write to them has ever been confirmed — so
+`profile_banks=()`, no analog/remap/vibration addresses, and those tabs are hidden
+rather than shown writing into the dark. GIP rumble untried. Input telemetry does
+stream on the same channel (sticks rest at `0x80`, so 8-bit axes) but its frame layout
+is unmapped, so it is dropped rather than guessed at and the live view stays blank
+during a configuration session.
 
 ---
 

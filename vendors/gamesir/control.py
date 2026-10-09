@@ -18,6 +18,7 @@ import time
 from gs_common import pad
 import controller_profile as profiles
 from vendors.gamesir.models.g7pro import protocol as g7pro
+from vendors.gamesir.models.kaleid import protocol as kaleid
 
 _write_lock = threading.Lock()   # one COMMAND at a time (send_cmd)
 _wseq_lock = threading.Lock()    # one write SEQUENCE at a time (write_reg) — the
@@ -90,8 +91,24 @@ def send_cmd(*payload, gen=None, probe=False, padded=True):
             return False
 
 
-def set_profile(n):
-    send_cmd(0x0F, 0x07, n)          # device will reply to the periodic get-profile
+def set_profile(n, gen=None):
+    """Make profile `n` active; the device answers the periodic get-profile query.
+
+    ⚠ REFUSED on a controller whose profile declares no software profile switch.
+    Command 0x07 is harmless on the Cyclone family but does not select anything on
+    the Kaleid: it writes offset 0x3f of the PROFILE banks -- the profile ->
+    lighting-record link -- and collapses several of the on-pad chords onto one
+    record. Measured on real hardware, and repaired by writing 0x3f back.
+
+    Guarded here rather than at each call site because this is the only place the
+    app sends 0x07, so the damage cannot be reintroduced by a new caller. Both
+    whole-pad walks (backup export, backup restore, reset-all-profiles) switch
+    profiles through here, and each has an unguarded trailing
+    `set_profile(original)` that would otherwise fire even for a model with no
+    editable banks."""
+    if not profiles.active().software_profile_switch:
+        return False
+    return send_cmd(0x0F, 0x07, n, gen=gen)
 
 
 _gip_seq = 0
@@ -153,10 +170,16 @@ _g7_seq_lock = threading.Lock()
 
 
 def _send_g7(command, *payload, gen=None, probe=False):
-    """Send one sequenced G7 command through the current claimed USB handle."""
+    """Send one sequenced command through the current claimed USB handle.
+
+    Also the Kaleid's sequencer: `0f 00 <seq> <command>` IS a GIP header, so the
+    same envelope serves both. Sequence runs 1..255 on the same grounds `rumble`
+    gives for skipping zero -- one convention per file, and every Kaleid transfer
+    verified on hardware used this range.
+    """
     global _g7_seq
     with _g7_seq_lock:
-        _g7_seq = (_g7_seq + 1) & 0xff
+        _g7_seq = (_g7_seq % 255) + 1
         seq = _g7_seq
     return send_cmd(0x0F, 0x00, seq, command, *payload, gen=gen, probe=probe)
 
@@ -174,6 +197,12 @@ def write_reg(bank, addr, data, write_style=None, gen=None):
     command for whichever controller is active: the Cyclone sends the bare
     `0f 03 …` register write; the G7 wraps the SAME inner command in its
     sequenced envelope `0f 00 <seq> 3c | 03 …` (write_style on the profile).
+
+    The Kaleid's 'gip' style frames writes EXACTLY as the G7 does -- the G7's
+    `0f 00 <seq>` prefix is itself a GIP header, so that envelope transfers
+    unchanged -- but skips `_write_g7_safe`: the long-suffix, dpad-swap and
+    custom-curve quirks in there are G7 firmware behaviour, and the Kaleid's
+    writes landed byte-exact without them (full-bank diff: zero bytes changed).
 
     A multi-register operation (config Apply / backup restore) captures the
     profile's `write_style` ONCE and passes it here, so a controller switch
@@ -194,12 +223,15 @@ def write_reg(bank, addr, data, write_style=None, gen=None):
     macro blocks in 3/3 rounds — stale bytes where dropped chunks never landed —
     while serialized writes were clean in 3/3. The trailing 20ms sleep inside
     the loop also spaces the LAST chunk from the next caller's first."""
-    g7 = (write_style or profiles.active().write_style) == 'g7'
-    chunk_len = 55 if g7 else 48    # inner block caps at 60B (5B header + 55 data)
+    style = write_style or profiles.active().write_style
+    enveloped = style in ('g7', 'gip')
+    # inner block caps at 60B (5B header + 55 data); a bare Cyclone frame spends
+    # 4 more bytes on the report header, leaving 48
+    chunk_len = 55 if enveloped else 48
     with _wseq_lock:
-        if g7:
+        if style == 'g7':
             return _write_g7_safe(bank, addr, list(data), gen)
-        return _write_reg_chunks(bank, addr, data, False, gen, chunk_len)
+        return _write_reg_chunks(bank, addr, data, enveloped, gen, chunk_len)
 
 
 def _g7_addressed(bank, addr, data, gen=None, declared_len=None):
@@ -300,14 +332,14 @@ def _write_g7_safe(bank, addr, data, gen):
     return bool(ok and g7_heartbeat(gen))
 
 
-def _write_reg_chunks(bank, addr, data, g7, gen, chunk_len):
+def _write_reg_chunks(bank, addr, data, enveloped, gen, chunk_len):
     global _g7_seq
     i = 0
     while i < len(data):
         chunk = data[i:i + chunk_len]
         a = addr + i
         inner = (0x03, bank, (a >> 8) & 0xFF, a & 0xFF, len(chunk), *chunk)
-        if g7:
+        if enveloped:
             ok = _send_g7(0x3C, *inner, gen=gen)
         else:
             ok = send_cmd(0x0F, *inner, gen=gen)
@@ -383,7 +415,14 @@ def pump_reads():
             _inflight = {'key': (bank, addr), 'cmd': cmd, 't': now}
     if cmd:
         bank, addr, length = cmd
-        if profiles.active().write_style == 'g7':
+        style = profiles.active().write_style
+        if style == 'gip':
+            # Same envelope as the G7, but on the 0x3c vendor channel: that is the
+            # one verified to answer reads on the Kaleid, where the G7's 0x05 was
+            # never tried. GIP supplies the sequence in its own header.
+            _send_g7(kaleid.VENDOR_CHANNEL, 0x04, bank, (addr >> 8) & 0xff,
+                     addr & 0xff, length, probe=True)
+        elif style == 'g7':
             _send_g7(0x05, 0x04, bank, (addr >> 8) & 0xff, addr & 0xff,
                      length, probe=True)
         else:

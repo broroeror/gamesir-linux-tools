@@ -27,6 +27,7 @@ from typing import Optional
 
 import vendors.gamesir.config as _cy
 from vendors.gamesir.models.g7pro import protocol as _g7
+from vendors.gamesir.models.kaleid import protocol as _kal
 
 
 # --- shared enums / block formats (identical across the vendor family) -------
@@ -87,6 +88,38 @@ class ControllerProfile:
     has_macros: bool = False        # per-paddle macro editor
     supports_hair_thresholds: bool = True
     device_settings_style: str = 'none'
+
+    # Vendor command 0x07 selects a profile across most of the family. The Kaleid
+    # has the command but it corrupts the profile->lighting link instead of
+    # switching (see models/kaleid/protocol.py), so this gates it at
+    # control.set_profile() -- the one place in the app that sends it.
+    software_profile_switch: bool = True
+
+    # Sub-features of 'cyclone_keyframe' lighting. The Kaleid shares the record
+    # format exactly -- its four records ARE the Cyclone's captured factory
+    # presets, byte for byte -- but has none of these three.
+    # Largest data payload one register READ reply can carry. TRANSPORT-dependent,
+    # not model-dependent taste: the Cyclone's hidraw reply fits 56 data bytes, the
+    # Kaleid's GIP body only 55 (a 5-byte header inside a 60-byte payload). Asking
+    # for more than the transport carries fails SILENTLY -- the pad answers short,
+    # and a caller that advances by the requested size shifts every later byte. Hit
+    # for real on the Kaleid, whose 124-byte lighting record came back 2 bytes short
+    # and decoded into a palette that looked plausible and was wrong.
+    read_chunk: int = 56
+
+    lighting_slot_select: bool = True   # writing bank 0x20 0x0000 selects a record
+    lighting_power: bool = True         # the audio-reactive / wake / sleep block
+    lighting_playback: bool = True      # vendor command 0x0d pause/resume
+
+
+    # Override the Cyclone light map in models/cyclone2/led.py: one entry per
+    # addressable light, as (name, default colour, the render-frame positions it
+    # drives). Empty keeps the Cyclone's own four. A light may drive SEVERAL
+    # positions -- the Kaleid floods a whole side from each of a pair of them --
+    # and any position no light claims is a hole the renderer fills rather than
+    # zeroes. Measured per model; guessing it wrong shows up as colours landing on
+    # the wrong half of the pad.
+    lighting_lights: tuple = ()
 
     # vibration
     VIB_L: Optional[int] = None
@@ -599,7 +632,80 @@ TARANTULA_PRO_8K = ControllerProfile(
 )
 
 
-ALL = (CYCLONE, G7_PRO, G7_NATIVE, G7_PRO_OTHER, G7_8K, TARANTULA_PRO_8K)
+# --- GameSir Kaleid : Xbox-licensed pad, configured over GIP ------------------
+# NOT the "T4 Kaleid" (3537:1004) that mainline xpad names and the G7 Pro White
+# Trimode's dock collides with -- a different, older product. This is the Xbox
+# Kaleid, which calls itself "GameSir-K1 Controller for Xbox".
+#
+# Reverse-engineered 2026-10-08 on a firmware-1.65 unit; see
+# models/kaleid/protocol.py for the identities, the wire format and the one
+# command that must never be sent to it.
+#
+# WHY THIS PROFILE IS LIGHTING-ONLY. Two things are separately true:
+#   * LIGHTING is fully confirmed. Bank 0x20 is the Cyclone 2's lighting layout
+#     byte for byte -- selector at 0x0000, five 124-byte records at 0x0001 +
+#     n*0x7c, header [count, 0x05, speed, brightness] then 8 frames x 5 triplets.
+#     Proven past argument by the pad's own contents: all four of its populated
+#     records have palettes IDENTICAL to this project's captured Cyclone presets,
+#     matching on count and speed too (Flow 5/3, Rainbow 8/10, Pulse 2/15,
+#     Standoff 1/10). Writes were verified by a blink test plus a full-bank diff
+#     that came back at zero bytes changed. So lighting_style is the Cyclone's,
+#     and models/cyclone2/led.py drives it unchanged.
+#   * The PROFILE BANKS are read-confirmed only. They decode cleanly against the
+#     G7 Pro's map (four vibration strengths at the family default of 75, the
+#     stride-7 remap table from 0x42), but nothing there has been written on real
+#     hardware, so no banks and no analog/remap/vibration addresses are declared.
+#     Resembling a mapped device is not evidence about this one; enabling any of
+#     it means a read/write round-trip, the bar every other model here cleared.
+#
+# Lighting lives in bank 0x20, which is global rather than per-profile, so
+# lighting is fully editable with profile_banks empty.
+KALEID = ControllerProfile(
+    name='GameSir Kaleid',
+    short='Kaleid',
+    usb_products=_kal.CONFIG_PIDS,          # derived, never hand-listed
+    wired_products=_kal.CONFIG_PIDS,        # wired-only pad
+    write_style='gip',                      # register commands inside GIP messages
+    input_style='gip_usb',
+    transport='usb_vendor',
+    profile_banks=(),                       # read-confirmed only; see above
+    factory_reset=False,                    # no captured Kaleid factory image, and
+                                            # the Cyclone's bytes are another unit's
+    lighting_style='cyclone_keyframe',       # the Cyclone's records, over GIP
+    read_chunk=_kal.READ_CHUNK,             # 55: GIP body, not the Cyclone's 56
+    # Two visible lights, not four: each zone floods an ENTIRE side at 90-100%
+    # with only a faint positional bias, so left = frame positions 0 and 2,
+    # right = 1 and 4, and position 3 drives nothing at all (the Cyclone's hole
+    # is at 2). Measured one zone at a time with the pad released; see §7i.
+    lighting_lights=(('Left', (0, 128, 255), (0, 2)),
+                     ('Right', (0, 128, 255), (1, 4))),
+    software_profile_switch=False,          # ⚠ 0x07 corrupts this pad
+    lighting_slot_select=False,             # 0x0000 is a read-back here: writing it
+                                            # does not switch record (verified). The
+                                            # owner picks one with M + Y/B/A/X.
+    lighting_power=False,                   # the Cyclone's audio/wake/sleep block
+                                            # reads all zeros; presence unknown
+    lighting_playback=False,                # command 0x0d untried on this pad
+)
+
+# The two non-GIP modes. Detection only, so the app can name the pad and say
+# which chord reaches a configurable mode instead of mistaking it for a Cyclone
+# and reporting a protocol error (which is exactly what it used to do: 0x1082
+# matched nothing, detect() returned None, and the Cyclone fallback then found no
+# 0x12 report and blamed the controller's mode).
+KALEID_OTHER = ControllerProfile(
+    name='GameSir Kaleid',
+    short='Kaleid',
+    usb_products=_kal.OTHER_MODE_PIDS,
+    wired_products=_kal.OTHER_MODE_PIDS,
+    write_style='none',
+    input_style='evdev',
+    profile_banks=(),
+)
+
+
+ALL = (CYCLONE, G7_PRO, G7_NATIVE, G7_PRO_OTHER, G7_8K, TARANTULA_PRO_8K,
+       KALEID, KALEID_OTHER)
 DEFAULT = CYCLONE
 
 

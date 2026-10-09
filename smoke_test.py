@@ -89,27 +89,56 @@ def _foreign_pid_claims():
             bad.append(f'3537:{pid:04x}: is_g7_device() rejects a real G7 Pro')
     return bad
 
+def _profile_pid_overlaps():
+    """USB ids claimed by more than one ControllerProfile.
+
+    detect_one() walks ALL in order and returns the first match, so a duplicated
+    id silently resolves to whichever profile is listed earlier -- and the loser
+    gets the winner's register map. The project already carries two ids that are
+    genuinely shared with another product (0575, 1004); both are resolved by a
+    product-string check inside detect_one rather than by listing them twice.
+    Adding a seventh and eighth profile is what makes this worth a check: the
+    Kaleid's three ids sit a few digits from the G7 SE's and the Cyclone's."""
+    try:
+        import controller_profile as profiles
+    except Exception:
+        return []
+    seen = {}
+    bad = []
+    for prof in profiles.ALL:
+        for pid in prof.usb_products:
+            if pid in seen and seen[pid] is not prof:
+                bad.append(f'3537:{pid:04x} is claimed by both '
+                           f'{seen[pid].name} and {prof.name}')
+            seen[pid] = prof
+    return bad
+
+
 def _udev_pid_gaps():
     """Config identities with no udev rule granting raw USB access.
 
-    The G7 Pro's config interfaces are reached through libusb, so each one needs
-    its own rule on the USB device. An id present in CONFIG_PIDS but missing from
-    the rules file fails as "raw USB access: PERMISSION DENIED" in the
-    diagnostics while everything else looks correct -- a confusing failure, and
-    an easy one to create, since adding an edition means editing two files. This
-    is the second table in this project that drifted from its source of truth, so
-    it gets checked rather than remembered."""
+    The G7 Pro's config interfaces and the Kaleid's GIP channel are reached
+    through libusb, so each one needs its own rule on the USB device. An id
+    present in CONFIG_PIDS but missing from the rules file fails as "raw USB
+    access: PERMISSION DENIED" in the diagnostics while everything else looks
+    correct -- a confusing failure, and an easy one to create, since adding a
+    model or edition means editing two files. This is the second table in this
+    project that drifted from its source of truth, so it gets checked rather
+    than remembered."""
     try:
         from vendors.gamesir.models.g7pro import protocol as g7
+        from vendors.gamesir.models.kaleid import protocol as kal
     except Exception:
         return []
     try:
         rules = open(os.path.join(HERE, '70-gamesir.rules')).read().lower()
     except OSError:
         return ['70-gamesir.rules is missing']
-    return [f'3537:{pid:04x} ({g7.edition_name(pid) or "transition"}) has no udev rule'
-            for pid in g7.CONFIG_PIDS + g7.TRANSITION_PIDS
-            if f'"{pid:04x}"' not in rules]
+    needed = [(pid, g7.edition_name(pid) or 'transition')
+              for pid in g7.CONFIG_PIDS + g7.TRANSITION_PIDS]
+    needed += [(pid, 'Kaleid') for pid in kal.CONFIG_PIDS]
+    return [f'3537:{pid:04x} ({name}) has no udev rule'
+            for pid, name in needed if f'"{pid:04x}"' not in rules]
 
 
 def _connection_kind_gaps():
@@ -144,12 +173,13 @@ def _doctor_identity_gaps():
     try:
         import doctor
         from vendors.gamesir.models.g7pro import protocol as g7
+        from vendors.gamesir.models.kaleid import protocol as kal
     except Exception:
         return []
     known = set(g7.CONFIG_PIDS) | set(g7.TRANSITION_PIDS) | set(g7.UNCONFIRMED_PIDS) \
-        | {g7.PID_NATIVE}
-    return [f'3537:{pid:04x} ({g7.edition_name(pid) or "?"}) is invisible to the diagnostics'
-            for pid in sorted(known) if pid not in doctor.G7_IDENTITIES]
+        | {g7.PID_NATIVE} | set(kal.ALL_PIDS)
+    return [f'3537:{pid:04x} is invisible to the diagnostics'
+            for pid in sorted(known) if pid not in doctor.USB_IDENTITIES]
 
 
 def _qml_handler_named_properties():
@@ -243,10 +273,11 @@ def main():
     foreign = _foreign_pid_claims()
     kind_bad = _connection_kind_gaps()
     doc_bad = _doctor_identity_gaps()
+    overlap = _profile_pid_overlaps()
     qml_on = _qml_handler_named_properties()
     qml_missing = _qml_missing_bridge_members()
     ok = (qml_ok and not slot_bad and not udev_bad and not foreign and not kind_bad
-          and not doc_bad and not qml_on and not qml_missing)
+          and not doc_bad and not overlap and not qml_on and not qml_missing)
     print("=== startup smoke test ===")
     print(f"  QML (Main.qml) loaded : {'OK' if qml_ok else 'FAIL — did not load'}")
     print(f"  @Slot signatures      : "
@@ -264,6 +295,10 @@ def main():
     print(f"  diagnostics coverage  : "
           + ('OK' if not doc_bad else f'FAIL — {len(doc_bad)} gap(s)'))
     for m in doc_bad:
+        print(f"      {m}")
+    print(f"  profile PID overlaps  : "
+          + ('OK' if not overlap else f'FAIL — {len(overlap)}'))
+    for m in overlap:
         print(f"      {m}")
     print(f"  QML on[A-Z] properties: "
           + ('OK' if not qml_on else f'FAIL — {len(qml_on)} found'))

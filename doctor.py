@@ -66,6 +66,27 @@ except Exception:                      # partial install -- report what we can
 G7_IDENTITIES.update({pid: f'{name} (not configurable)'
                       for pid, name in G7_UNCONFIRMED.items()})
 
+# The Kaleid, which also configures over raw USB rather than hidraw. Its three
+# identities are all worth naming in a report: a reader who sees only "3537:1082"
+# has no way to know the pad has a configurable mode one chord away.
+try:
+    from vendors.gamesir.models.kaleid import protocol as _kal
+    KALEID_IDENTITIES = {
+        _kal.PID_GIP: 'Kaleid GIP configuration',
+        _kal.PID_HID: 'Kaleid DirectInput mode (not configurable)',
+        _kal.PID_XINPUT: 'Kaleid XInput mode (not configurable)',
+    }
+    KALEID_WRITABLE = tuple(_kal.CONFIG_PIDS)
+except Exception:                      # partial install -- report what we can
+    KALEID_IDENTITIES = {}
+    KALEID_WRITABLE = ()
+
+# Identities Deadband opens over raw USB, so a permission denial on one is a real
+# fault; anything else is never opened and a denial there is the intended state.
+USB_IDENTITIES = dict(G7_IDENTITIES)
+USB_IDENTITIES.update(KALEID_IDENTITIES)
+NEEDS_USB = frozenset(G7_NEEDS_USB) | frozenset(KALEID_WRITABLE)
+
 # A rule can legitimately live in EITHER directory: /etc is for rules an admin
 # installed by hand, /usr/lib is where a package puts its own. Checking only /etc
 # told every AUR user their rule was "NOT INSTALLED" and sent them off to copy a
@@ -506,7 +527,7 @@ def collect():
     try:
         from gs_common import find_controllers
         for dev in find_controllers():
-            if dev.get('pid') not in G7_IDENTITIES:
+            if dev.get('pid') not in USB_IDENTITIES:
                 continue
             # 3537:1004 is shared with the T4 Kaleid (mainline xpad); only report
             # it as a G7 Pro identity when the device names itself one.
@@ -518,7 +539,7 @@ def collect():
             meta = dev.get('usb') or {}
             node = '/dev/bus/usb/%03d/%03d' % (meta.get('bus', 0), meta.get('address', 0))
             rep['usb_devices'].append({
-                'pid': dev['pid'], 'identity': G7_IDENTITIES[dev['pid']],
+                'pid': dev['pid'], 'identity': USB_IDENTITIES[dev['pid']],
                 'product': dev.get('product', ''), 'port': dev['port'],
                 'node': node, 'access': os.access(node, os.R_OK | os.W_OK),
                 'interfaces': _interfaces(meta.get('sysfs') or dev.get('sysfs')),
@@ -660,6 +681,22 @@ def collect():
                 'that combo also resets the active profile\'s remaps and the '
                 'Shift layer, so back them up first if you care about them.')
 
+        kal_ready = [n for n in rep['usb_devices'] if n['pid'] in KALEID_WRITABLE]
+        kal_other = [n for n in rep['usb_devices']
+                     if n['pid'] in KALEID_IDENTITIES and n['pid'] not in KALEID_WRITABLE]
+        if kal_ready:
+            if any(n['access'] for n in kal_ready):
+                rep['verdict'].append('Kaleid lighting configuration access: OK.')
+            else:
+                rep['verdict'].append(
+                    'Kaleid found in Xbox mode, but raw USB access is denied; '
+                    'install the current 70-gamesir.rules and replug it.')
+        elif kal_other:
+            rep['verdict'].append(
+                'Kaleid found, but not in Xbox mode. Press M + Xbox to cycle it '
+                'until it comes up as 3537:1012; its lighting is editable only '
+                'there. Input works in every mode.')
+
     monodes = [n for n in rep['nodes'] if n['vid'] == 0x046D]
     if monodes and all(n['verdict'] == 'no-access' for n in monodes):
         rep['verdict'].append(
@@ -727,7 +764,7 @@ def format_report(rep):
     for n in rep.get('usb_devices', []):
         L.append(f'- {n["node"]}  GameSir {n["pid"]:04x} '
                  f'({n.get("identity", "unknown")})  "{n["product"]}" port {n["port"]}')
-        if n['pid'] not in G7_NEEDS_USB:
+        if n['pid'] not in NEEDS_USB:
             # Deadband only opens the identities it can configure, plus the one
             # it transitions through. Everything else -- a detect-only edition,
             # or 1022, which is transitioned by holding SHARE + MENU on the pad

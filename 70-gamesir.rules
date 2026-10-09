@@ -50,3 +50,10 @@ SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="1004", TAG+="uaccess
 SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="100a", TAG+="uaccess"
 # G7 Pro Wuchang Edition (firmware 5.41): configuration reads/writes verified.
 SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="10a7", TAG+="uaccess"
+
+# The Kaleid configures over raw USB too: its register channel is the GameSir
+# register protocol tunnelled through Xbox GIP, on interface 0 of its GIP
+# identity. Only that identity needs a rule -- the pad's other two modes
+# (1082 DirectInput, 1086 XInput) are never opened over libusb, and their hidraw
+# and input nodes are already covered by the two vendor-wide rules above.
+SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="1012", TAG+="uaccess"

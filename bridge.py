@@ -34,7 +34,6 @@ import kwin
 import vendors.gamesir.models.cyclone2.factory as factory
 import backup
 import register_transaction
-from vendors.gamesir.models.cyclone2.led import LIGHTS
 
 from PySide6.QtCore import QUrl
 
@@ -47,6 +46,17 @@ def _keyframe_lighting():
     8K's bank-0x20 mode/brightness/home-ring) and corrupting it."""
     return (profiles.is_recognized()
             and profiles.active().lighting_style == 'cyclone_keyframe')
+
+
+def _lighting_feature(name):
+    """Whether the active keyframe-lighting model has an optional sub-feature
+    ('lighting_power' / 'lighting_slot_select' / 'lighting_playback').
+
+    The Kaleid shares the Cyclone's lighting RECORD format exactly but has none
+    of the three -- its 0x0000 selector is a read-back, its power block reads all
+    zeros, and the pause command was never tried on it -- so a shared format is
+    not a shared feature set, and each led.* call that drives one has to ask."""
+    return _keyframe_lighting() and getattr(profiles.active(), name)
 
 
 def _led_async(fn, *args):
@@ -166,7 +176,7 @@ class GamesirBridge(QObject):
 
         # Per-zone display colors for the controller render. Driven by the Lights
         # page; seeded from each zone's factory default so the render looks lit.
-        self._light_colors = [_hex(default) for _, default in LIGHTS]
+        self._light_colors = [_hex(d) for d in led.light_defaults()]
         self._brightness = 100      # 0..100 (device byte range is 0..0x64 == 100)
         self._speed = 10            # 1..20 UI (higher = faster)
 
@@ -385,7 +395,8 @@ class GamesirBridge(QObject):
         self._loaded_led_slot = None
         self._led_loading = None
         self._loaded_frames = []
-        self._light_colors = [_hex(default) for _, default in LIGHTS]
+        # re-seeded from the newly bound model: the light COUNT is per model too
+        self._light_colors = [_hex(d) for d in led.light_defaults()]
         self._brightness = 100
         self._speed = 10
         self._audio_reactive = False
@@ -405,37 +416,44 @@ class GamesirBridge(QObject):
             return          # selected unit's vendor session not bound yet (or an
                             # evdev model with no vendor channel): don't read
         slot = state['led_slot']
+        power = _lighting_feature('lighting_power')
         if (slot is not None and 0 <= slot <= 3
                 and slot != self._loaded_led_slot and self._led_loading is None):
             self._loaded_led_slot = slot
-            control.request_regs(led.record_read_fields(slot) + [
-                (led.LED_BANK, led.AUDIO_REACTIVE, 1),
-                (led.LED_BANK, led.PICKUP_WAKE, 1),
-                (led.LED_BANK, led.SLEEP_TIMEOUT, 1),
-            ])
+            reads = led.record_read_fields(slot, self._prof.read_chunk)
+            if power:
+                reads = reads + [
+                    (led.LED_BANK, led.AUDIO_REACTIVE, 1),
+                    (led.LED_BANK, led.PICKUP_WAKE, 1),
+                    (led.LED_BANK, led.SLEEP_TIMEOUT, 1),
+                ]
+            control.request_regs(reads)
             self._led_loading = slot
 
         slot = self._led_loading
         if slot is None:
             return
         recvals = {addr: control.reg_result(bank, addr)
-                   for bank, addr, _ln in led.record_read_fields(slot)}
-        audio = control.reg_result(led.LED_BANK, led.AUDIO_REACTIVE)
-        pickup = control.reg_result(led.LED_BANK, led.PICKUP_WAKE)
-        sleep = control.reg_result(led.LED_BANK, led.SLEEP_TIMEOUT)
-        if (any(v is None for v in recvals.values())
-                or audio is None or pickup is None or sleep is None):
+                   for bank, addr, _ln in led.record_read_fields(
+                       slot, self._prof.read_chunk)}
+        if any(v is None for v in recvals.values()):
             return                              # still waiting on replies
+        if power:
+            audio = control.reg_result(led.LED_BANK, led.AUDIO_REACTIVE)
+            pickup = control.reg_result(led.LED_BANK, led.PICKUP_WAKE)
+            sleep = control.reg_result(led.LED_BANK, led.SLEEP_TIMEOUT)
+            if audio is None or pickup is None or sleep is None:
+                return
+            self._audio_reactive = bool(audio[0])
+            self._pickup_wake = bool(pickup[0])
+            self._sleep_label = led.sleep_label(sleep[0])
 
         self._led_loading = None
-        record = led.stitch_record(slot, recvals)
+        record = led.stitch_record(slot, recvals, self._prof.read_chunk)
         if record is None:
             return
         decoded = led.decode_record(record)
 
-        self._audio_reactive = bool(audio[0])
-        self._pickup_wake = bool(pickup[0])
-        self._sleep_label = led.sleep_label(sleep[0])
         self._speed = decoded['speed']
         self._brightness = decoded['brightness']
         count = max(1, decoded['count'])
@@ -892,6 +910,10 @@ class GamesirBridge(QObject):
         if profiles.active() is profiles.G7_NATIVE:
             return ('Hold SHARE + MENU (☰) to switch the controller to XInput '
                     'mode. Note this also resets the active profile\'s remaps.')
+        if profiles.active() is profiles.KALEID_OTHER:
+            return ('Press M + Xbox to cycle the controller to Xbox mode, where '
+                    'its lighting is editable. The other two modes work in games '
+                    'but expose no configuration channel.')
         return ('Not in Xbox mode. Use the controller\'s Start / pause buttons '
                 'to switch to Xbox/XInput mode so the app can read it.')
 
@@ -1031,6 +1053,47 @@ class GamesirBridge(QObject):
         return profiles.is_recognized() and profiles.active() is profiles.G7_PRO
 
     @Property(bool, notify=controllerChanged)
+    def hasConfigSession(self):
+        """Whether configuring this controller means CLAIMING its USB interface,
+        which takes it away from games for as long as the session is open. True
+        for the G7 Pro and the Kaleid; the hidraw models stream alongside the
+        kernel driver and need no such trade-off. Drives the Configure/Release
+        button and the released-state overlay, which used to be keyed on
+        isG7Pro -- a second claiming model is what separates the two meanings."""
+        return profiles.is_recognized() and profiles.active().transport == 'usb_vendor'
+
+    @Property(bool, notify=controllerChanged)
+    def hasProfileEditor(self):
+        """Whether this controller has editable profile banks, i.e. whether the
+        Rebinds / Sticks / Triggers / Vibration pages have anything to drive.
+
+        False for a model recognised for one subsystem only -- the Kaleid, whose
+        lighting is confirmed while its profile banks are read-confirmed only --
+        so those tabs are hidden rather than showing an editor over values the app
+        cannot write. True when nothing is recognised, so the empty state keeps
+        the layout it has always had."""
+        return bool((self._prof or profiles.DEFAULT).profile_banks)
+
+    @Property(bool, notify=controllerChanged)
+    def lightingSlotSelectable(self):
+        """Whether the lighting slot pills can SET the slot, or only show it."""
+        return bool(_lighting_feature('lighting_slot_select'))
+
+    @Property(bool, notify=controllerChanged)
+    def lightingPowerSupported(self):
+        return bool(_lighting_feature('lighting_power'))
+
+    @Property(bool, notify=controllerChanged)
+    def lightingPlaybackSupported(self):
+        return bool(_lighting_feature('lighting_playback'))
+
+    @Property(bool, notify=controllerChanged)
+    def lightingRestorable(self):
+        """Whether 'Restore presets' has a captured baseline for this model."""
+        return bool(self._is_8k_lighting()
+                    or (_keyframe_lighting() and self._prof.factory_reset))
+
+    @Property(bool, notify=controllerChanged)
     def hasMotion(self):
         return profiles.is_recognized() and profiles.active().has_motion
 
@@ -1104,7 +1167,8 @@ class GamesirBridge(QObject):
     # The raw-USB G7 Pro is excluded from demo for now because its editor reads
     # whole 480-byte semantic blobs; the older synthetic-register demo backend
     # only emulates individual hidraw register reads.
-    _DEMO_MODELS = (profiles.CYCLONE, profiles.G7_8K, profiles.TARANTULA_PRO_8K)
+    _DEMO_MODELS = (profiles.CYCLONE, profiles.G7_8K, profiles.TARANTULA_PRO_8K,
+                    profiles.KALEID)
 
     @staticmethod
     def _demo_id(prof):
@@ -1209,10 +1273,12 @@ class GamesirBridge(QObject):
         self.demoModeChanged.emit()
 
     # ------------------------------------------------------------- lighting view
-    @Property('QVariantList', constant=True)
+    @Property('QVariantList', notify=controllerChanged)
     def lightNames(self):
-        """Zone names in LIGHTS order, for labels/callouts."""
-        return [name for name, _ in LIGHTS]
+        """Addressable light names for labels/callouts. Per model, not constant:
+        the Cyclone has four, the Kaleid two, so QML sizes its zone list off this
+        rather than assuming a count."""
+        return led.light_names()
 
     @Property('QVariantList', notify=lightsChanged)
     def lightColors(self):
@@ -1798,8 +1864,8 @@ class GamesirBridge(QObject):
 
     @Slot('QVariantList')
     def applyKeyframes(self, frames):
-        """`frames` is a list of frames; each frame is a list of 4 [r,g,b] ints in
-        LIGHTS order. Writes them as a custom animation at the current speed/bri."""
+        """`frames` is a list of frames; each frame is one [r,g,b] per light, in
+        lightNames order. Writes them as a custom animation at the current speed/bri."""
         norm = [[[int(c[0]), int(c[1]), int(c[2])] for c in fr] for fr in frames]
         if not norm:
             return
@@ -1809,13 +1875,22 @@ class GamesirBridge(QObject):
 
     @Slot(bool, int)
     def setPlayback(self, playing, frame):
+        if not _lighting_feature('lighting_playback'):
+            return
         _led_async(led.set_playback, playing, frame)
 
     @Slot(int)
     def selectSlot(self, n):
         """Make lighting slot n active (the lighting profiles are independent of
         the hardware button profiles, so this is its own selector). Forces a
-        re-read so the page reflects that slot."""
+        re-read so the page reflects that slot.
+
+        A no-op where the selector is a read-back (the Kaleid): writing it there
+        changes nothing, so claiming otherwise would leave the page showing a slot
+        the pad isn't on. Its owner selects one with the M + Y/B/A/X chords and
+        the session follows."""
+        if not _lighting_feature('lighting_slot_select'):
+            return
         state['led_slot'] = n                  # optimistic; the poll confirms it
         self._loaded_led_slot = None           # force _poll_lighting to reload
         _led_async(led.select_slot, n)
@@ -1826,6 +1901,9 @@ class GamesirBridge(QObject):
         controller has: the Cyclone's keyframe records, or the 8K's bank-0x20
         block (all four quadrants back to yellow). _led_async is keyframe-only, so
         the 8K needs its own path or the button is a no-op."""
+        if not self._is_8k_lighting() and not self._prof.factory_reset:
+            return              # no captured baseline for this model; the
+                                # Cyclone's bytes are a different unit's state
         if self._is_8k_lighting():
             style = self._prof.write_style
             gen = control.generation()
@@ -2600,8 +2678,9 @@ class GamesirBridge(QObject):
 
     @Slot(bool)
     def setConfigClaimed(self, claimed):
-        """Claim/release the selected G7 interface; the reader performs cleanup."""
-        if self._prof is not profiles.G7_PRO:
+        """Claim/release the selected controller's vendor interface; the reader
+        performs cleanup. Both claiming models (G7 Pro, Kaleid) route here."""
+        if not self.hasConfigSession:
             return
         state['config_wanted'] = bool(claimed)
         state['config_status'] = ('Connecting configuration…' if claimed
