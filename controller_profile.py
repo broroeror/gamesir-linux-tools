@@ -431,18 +431,21 @@ G7_8K = ControllerProfile(
     # GameSir's own shorthand often drop the "PC", and there is no Xbox 8K.
     name='GameSir G7 Pro 8K PC',
     short='G7 Pro 8K PC',
-    # EDITIONS get their own consecutive (wired, dongle) PID pair but are the same
-    # controller, same register map — add new pairs here as they turn up.
+    # EDITIONS get their own (wired, dongle) PID pair but are the same controller,
+    # same register map — add new pairs here as they turn up. The pair is USUALLY
+    # consecutive but not always (Championship: 10b7/10b9), so confirm the wired id
+    # with an owner rather than guessing it.
     usb_products=(0x10c7, 0x10c8,           # Nioh edition:    10c7 wired / 10c8 dongle
                   0x10c5, 0x10c6,           # Aimlabs edition: 10c5 wired / 10c6 dongle
                                             #   (reported in issue #5; the wired/dongle
                                             #   split follows the pair convention, not
                                             #   verified here — we own the Nioh edition)
                   0x1032, 0x1033,           # Royal2 edition:  1032 wired / 1033 dongle
-                  0x10b8, 0x10b9),          # Championship edition: 10b8 wired / 10b9
-                                            #   dongle (10b9 owner-verified, issue #23;
-                                            #   10b8 follows the pair convention)
-    wired_products=(0x10c7, 0x10c5, 0x1032, 0x10b8),
+                  0x10b7, 0x10b9),          # Championship edition: 10b7 wired / 10b9
+                                            #   dongle, both owner-verified (issue #23).
+                                            #   NOT a consecutive pair: 10b8 was the
+                                            #   guess, and it was wrong
+    wired_products=(0x10c7, 0x10c5, 0x1032, 0x10b7),
     write_style='cyclone',                  # bare 0f03 writes (NOT the g7 envelope)
     input_style='cyclone_0x12',             # live 0x12 on the vendor hidraw
     profile_banks=(1, 2, 3, 4),             # 4 profiles, confirmed via the app

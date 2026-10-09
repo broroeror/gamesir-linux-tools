@@ -94,8 +94,7 @@ can't positively identify. Fork it and customize it however you like.
 > The **G7 Pro 8K PC** comes in several editions that are the same controller under
 > different USB ids: **Nioh** (`3537:10c7` wired, `3537:10c8` dongle — my own pad),
 > **Royal2** (`1032`/`1033`, added by its owner [@kakxem](https://github.com/kakxem)),
-> **Championship** (`10b9` dongle verified by its owner; wired `10b8` follows the
-> pattern) and **Aimlabs** (`10c5`/`10c6`, recognised from a user report).
+> **Championship** (`10b7` wired, `10b9` dongle, verified by its owner) and **Aimlabs** (`10c5`/`10c6`, recognised from a user report).
 >
 > The **Tarantula Pro 8K** is configured in its PC mode, `3537:103d`: rebinds for all
 > nine extra buttons (L4, R4, C1–C4, T1–T3), macros, sticks, triggers, gyro and
