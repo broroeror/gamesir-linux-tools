@@ -16,7 +16,7 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
   engine byte for byte — the pad's four stored records hold palettes identical to
   this project's captured Cyclone presets, matching on keyframe count and speed —
   so it gets the full keyframe editor, minus the slot selector, power block and
-  play/pause it doesn't have. Write round-trip verified on my own pad.
+  play/pause it doesn't have. Write round-trip verified by [@bloodrizer](https://github.com/bloodrizer) on their pad.
 - **The light map is per model now.** A controller profile can override which
   render-frame positions each addressable light drives (`lighting_lights`), and one
   light may drive several. The Cyclone's four lights sit one per position with a

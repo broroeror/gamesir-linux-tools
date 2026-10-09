@@ -132,10 +132,10 @@ can't positively identify. Fork it and customize it however you like.
 > It has **three USB identities**, cycled with **M + Xbox**: `3537:1082`
 > (DirectInput), `3537:1086` (XInput) and `3537:1012` (Xbox/GIP). Only `1012` is
 > configurable; in the other two the app names the pad and asks for the chord
-> rather than reporting a protocol error. Two consequences worth knowing: editing
+> rather than reporting a protocol error. One thing worth knowing: editing
 > lighting **claims the pad**, so it leaves games for the duration (there's a
-> Release button, as on the G7 Pro), and releasing it drops the pad back to
-> `1082`, so press **M + Xbox** again afterwards.
+> Release button, as on the G7 Pro). Releasing hands it straight back to games;
+> it stays in its Xbox mode.
 >
 > Its **profile banks are deliberately not editable**. They read cleanly and
 > decode against the G7 Pro's register map, but no write to them has ever been

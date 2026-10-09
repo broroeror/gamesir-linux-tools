@@ -28,12 +28,11 @@ xpad on a current kernel matches this vendor by INTERFACE CLASS, not product id
 (`usb:v3537p*...icFFisc47ipD0`), so both 1086 and 1012 bind for input with no PID
 quirk; nothing here is needed to make the pad work in games.
 
-⚠ GIP MODE IS NOT STICKY. After interface 0 is claimed and released, the pad
-re-enumerates back to 1082. Its own host handshake (announce / power-on) is not
-implemented here, which is the likely cause and also why GIP STATUS and
-SERIAL_NUMBER stay silent. The consequence for a session is benign but visible:
-configuration holds the claim for as long as it is open, and the owner cycles
-back to Xbox mode with `M + Xbox` afterwards.
+GIP MODE IS STICKY. Releasing interface 0 does not change the identity: the pad
+stays at 1012 and xpad re-binds (an earlier note here said it fell back to 1082;
+re-measured, it was still 1012 90 s after a release). Only `M + Xbox` moves it.
+The GIP host handshake (announce / power-on) is not implemented here, which is
+why GIP STATUS and SERIAL_NUMBER stay silent.
 """
 
 from __future__ import annotations
@@ -124,7 +123,7 @@ PROFILE_LIGHT_LINK = 0x003F
 # or without a write first. So a session that wants the animation to keep playing
 # while the owner edits has to keep talking to the pad.
 ANIM_IDLE_TIMEOUT = 15.0        # conservative end of the measured range
-KEEPALIVE_SECS = 1.0            # how often the session polls; must stay well under it     # profile bank -> lighting record (identity 0..3)
+KEEPALIVE_SECS = 1.0            # how often the session polls; must stay well under it
 
 
 def open_device(bus: int, address: int, sysfs: str):

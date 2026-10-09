@@ -1071,8 +1071,12 @@ class GamesirBridge(QObject):
         lighting is confirmed while its profile banks are read-confirmed only --
         so those tabs are hidden rather than showing an editor over values the app
         cannot write. True when nothing is recognised, so the empty state keeps
-        the layout it has always had."""
-        return bool((self._prof or profiles.DEFAULT).profile_banks)
+        the layout it has always had. Also True for a model with no banks AND no
+        lighting (the G7 Pro's input-only and detect-only identities): hiding the
+        editor there would leave it with no tabs at all, where its pages show the
+        live view and explain why remapping is unavailable."""
+        prof = self._prof or profiles.DEFAULT
+        return bool(prof.profile_banks) or prof.lighting_style == 'none'
 
     @Property(bool, notify=controllerChanged)
     def lightingSlotSelectable(self):
@@ -1362,14 +1366,20 @@ class GamesirBridge(QObject):
 
     @Slot(bool)
     def setAudioReactive(self, on):
+        if not _lighting_feature('lighting_power'):
+            return              # the power block isn't mapped on every model
         _led_retry(led.set_audio_reactive, bool(on))
 
     @Slot(bool)
     def setPickupWake(self, on):
+        if not _lighting_feature('lighting_power'):
+            return              # the power block isn't mapped on every model
         _led_retry(led.set_pickup_wake, bool(on))
 
     @Slot(str)
     def setSleepTimeout(self, label):
+        if not _lighting_feature('lighting_power'):
+            return              # the power block isn't mapped on every model
         _led_retry(led.set_sleep_timeout, led.sleep_raw(label))
 
     # ---------------------------------------------------- 8K simple lighting view
@@ -2400,7 +2410,10 @@ class GamesirBridge(QObject):
         def select(bank):
             check_session()
             if bank in prof.profile_banks and state.get('profile') != bank:
-                control.send_cmd(0x0F, 0x07, bank, gen=gen)
+                # through set_profile, never a raw 0x07: it refuses models where
+                # 0x07 is destructive (the Kaleid) -- see control.set_profile
+                if not control.set_profile(bank, gen=gen):
+                    raise OSError('could not switch to the edited profile')
                 deadline = time.monotonic() + 2.5
                 while time.monotonic() < deadline:
                     check_session()
@@ -2465,7 +2478,7 @@ class GamesirBridge(QObject):
                 if (original_profile in prof.profile_banks and gen == control.generation()
                         and self._prof is prof and profiles.active() is prof
                         and self._driving == state.get('driving') == state.get('selected')):
-                    control.send_cmd(0x0F, 0x07, original_profile, gen=gen)
+                    control.set_profile(original_profile, gen=gen)
                 self._backup_busy = False
                 self.backupBusyChanged.emit()
         threading.Thread(target=run, daemon=True).start()
