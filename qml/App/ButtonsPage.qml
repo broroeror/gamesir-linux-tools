@@ -226,9 +226,11 @@ Item {
                         }
                     }
                     Text { text: "Keyboard & mouse"; color: Theme.textDim; topPadding: 6
+                           visible: bridge.hasKeyboardMouseRemap
                            font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                     Flow {
                         width: parent.width; spacing: 6
+                        visible: bridge.hasKeyboardMouseRemap
                         PillButton { label: "⌨ Keyboard"; onClicked: rebindPicker.open("keyboard") }
                         PillButton { label: "🖱 Mouse";    onClicked: rebindPicker.open("mouse") }
                     }

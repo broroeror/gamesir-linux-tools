@@ -93,14 +93,21 @@ Item {
         // real read lands; ignore those so we keep showing the last good values
         // and re-apply once the real config arrives.
         if (!bridge.profile || c[side + "_dz_min"] === undefined) return
-        dz.lo = c[side + "_dz_min"]; dz.hi = c[side + "_dz_max"]
-        adz.lo = c[side + "_adz_min"]; adz.hi = c[side + "_adz_max"]
+        dz.lo = c[side + "_dz_min"]
+        if (c[side + "_dz_max"] !== undefined) dz.hi = c[side + "_dz_max"]
+        dzBegin.value = dz.lo
+        // A model may lack anti-deadzone / curves / trajectory (the Super Nova
+        // has begin deadzones only): keep the neutral values the live preview
+        // needs rather than assigning undefined.
+        adz.lo = c[side + "_adz_min"] !== undefined ? c[side + "_adz_min"] : 0
+        adz.hi = c[side + "_adz_max"] !== undefined ? c[side + "_adz_max"] : 100
         var cv = c[side + "_curve"]
         curveType = cv ? cv.type : 0
         intensity = (cv && cv.intensity !== undefined) ? cv.intensity : 100
         intenSlider.value = intensity
         curve.setPoints(cv && cv.points ? cv.points : [[40, 41], [128, 128], [215, 214]])
-        typeIdx = isStick ? c[side + "_traj"] : c[side + "_hair"]
+        var t = isStick ? c[side + "_traj"] : c[side + "_hair"]
+        typeIdx = t !== undefined ? t : 0
         if (isStick && bridge.isG7Pro) {
             g7Resolution = c[side + "_resolution"]
             g7Sensitivity = c[side + "_sensitivity"]
@@ -132,6 +139,7 @@ Item {
     function resetDefaults() {
         var dzMin = 5, dzMax = isStick ? 100 : 95
         dz.lo = dzMin; dz.hi = dzMax; adz.lo = 0; adz.hi = 100
+        dzBegin.value = dzMin
         bridge.setScalar(side + "_dz_min", dzMin); bridge.setScalar(side + "_dz_max", dzMax)
         bridge.setScalar(side + "_adz_min", 0); bridge.setScalar(side + "_adz_max", 100)
         curveType = 0; curve.setPoints(bridge.curvePresets["Linear"])
@@ -173,17 +181,32 @@ Item {
 
             Card {
                 title: "Deadzone"; Layout.fillWidth: true
-                headerValue: root.fmtDz(dz.lo) + "–" + root.fmtDz(dz.hi); spacing: 8
+                headerValue: bridge.hasDeadzoneMax
+                             ? root.fmtDz(dz.lo) + "–" + root.fmtDz(dz.hi)
+                             : root.fmtDz(dz.lo) + "%"
+                spacing: 8
+                // `dz` stays alive even when hidden: the live preview reads its
+                // lo/hi. A model that only has a begin deadzone gets the single
+                // slider below instead, which drives dz.lo.
                 RangeSlider {
                     id: dz; width: parent.width; from: 0; to: 100; lo: 0; hi: 100
+                    visible: bridge.hasDeadzoneMax
                     step: bridge.deadzoneStep
                     onMoved: { bridge.setScalar(root.side + "_dz_min", lo)
                                bridge.setScalar(root.side + "_dz_max", hi) }
+                }
+                AccentSlider {
+                    id: dzBegin
+                    visible: !bridge.hasDeadzoneMax
+                    width: parent.width; from: 0; to: Math.max(1, dz.hi - 1); value: 0
+                    onMoved: { dz.lo = Math.round(value)
+                               bridge.setScalar(root.side + "_dz_min", dz.lo) }
                 }
             }
 
             Card {
                 title: "Anti-Deadzone"; Layout.fillWidth: true
+                visible: bridge.hasAntiDeadzone
                 headerValue: root.fmtDz(adz.lo) + "–" + root.fmtDz(adz.hi); spacing: 8
                 RangeSlider {
                     id: adz; width: parent.width; from: 0; to: 100; lo: 0; hi: 100
@@ -195,6 +218,7 @@ Item {
 
             Card {
                 title: "Curve Adjustment"; Layout.fillWidth: true
+                visible: bridge.hasCurves
                 Flow {
                     width: parent.width; spacing: 8
                     Repeater {
@@ -239,6 +263,7 @@ Item {
             Card {
                 title: root.isStick ? "Stick Trajectory" : "Hair Trigger Mode"
                 Layout.fillWidth: true
+                visible: root.isStick ? bridge.hasTrajectory : bridge.hasHairTrigger
                 Flow {
                     width: parent.width; spacing: 8
                     Repeater {
@@ -349,6 +374,9 @@ Item {
             Card {
                 id: graphCard
                 title: "Response Curve"; Layout.fillWidth: true
+                // Hidden, the CurveEditor inside still exists, so respMag keeps
+                // sampling it (linear for a model without curves).
+                visible: bridge.hasCurves
                 Row {
                     width: parent.width; spacing: 6
                     // Y axis label — "Output" runs vertically up the left edge.

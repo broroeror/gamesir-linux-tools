@@ -8,6 +8,53 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
 ## [Unreleased]
 
 ### Added
+- **Super Nova vibration test**: a "Test this strength" button under each
+  vibration slider plays the pad's own short test pulse at that slider's value,
+  before you apply it. The pulse always uses both motors (that's how the pad's
+  test works), and it changes no settings.
+- **Super Nova battery level** in the status bar: the percentage, or "⚡ Charging"
+  while it's on a charger (the pad reports no percentage then). Read from the
+  pad's device info when it connects and refreshed once a minute; never while
+  settings are being applied.
+- **AppImage build** (`packaging/appimage/build-appimage.sh`): one file bundling
+  Python, PySide6, hidapi built with the hidraw backend, and libusb. The udev
+  rule is still a one-time manual step; the README shows how to extract it from
+  the AppImage. libusb can now be named explicitly with `DEADBAND_LIBUSB`,
+  which the AppImage uses for its bundled copy.
+  The build runs in the `manylinux_2_34` container, so the AppImage needs
+  glibc 2.34 or newer (Ubuntu 22.04+, Debian 12+, RHEL 9+) and refuses to pack
+  anything that needs more.
+- **GameSir Super Nova — configurable in the app** (dongle, `3537:103e`, PC
+  mode): button remaps, vibration, and stick/trigger deadzones, the four
+  settings whose writes round-tripped on a real pad from Linux. The Sticks and
+  Triggers pages show only the controls a model maps, so the Super Nova gets a
+  single begin-deadzone slider; the Rebinds page offers gamepad targets only;
+  the vibration test, Backup & Restore and the profile pills are hidden for it.
+  Apply is all-or-nothing: whole blocks written, read back, rolled back on any
+  mismatch, then saved once. The wired `100e` stays input-only.
+  Unlike GameSir's own app, deadzone changes don't slowly bend the response
+  curve: a factory curve is always rescaled from the factory points, so setting
+  a deadzone back restores the original curve exactly. Mapping a button back to
+  Default restores it byte for byte too, factory turbo byte included. Both
+  verified on a real pad from Linux: stick and trigger deadzones out and back,
+  and remaps to another button and back, each with a zero diff.
+- **Input-only profiles can no longer reach the register writer.** `write_reg`
+  used to treat any unknown write style as the Cyclone's; it now refuses
+  anything but `cyclone`/`g7`/`gip`.
+- **GameSir Super Nova — recognised.** Its 2.4 GHz dongle (`3537:103e`) is now
+  named in the controller picker and the diagnostics instead of showing as an
+  unknown device, with an input-only status. No configuration yet: nothing is
+  written until its register protocol is confirmed on real hardware.
+- **Super Nova protocol and `supernova_tool.py`.** Its configuration protocol
+  (a different family from every other pad here) is decoded from GameSir
+  Connect's DLL and confirmed against USB captures of the official app; the new
+  tool backs the pad up, diffs and restores it, and makes single read-back-
+  verified writes from Linux. The app itself still leaves the pad alone.
+- **Super Nova — write round-trip verified from Linux.** On a real pad behind its
+  `3537:103e` dongle, `supernova_tool.py` read the device (type 3), backed up all
+  61 config blocks with a zero diff, remapped A to B (confirmed in `evtest`: A
+  reported `BTN_EAST`), and restored the backup with a zero diff. The app still
+  doesn't write to the pad; the wired `100e` identity remains untested.
 - **GameSir Kaleid — lighting support.** The Xbox-licensed Kaleid doesn't answer
   the GameSir hidraw vendor protocol every other model here uses; that collection
   is present on the pad but vestigial. Deadband now reaches it the way the vendor's
@@ -31,6 +78,12 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
   resolve to whichever is listed first — and hand the loser the winner's map.
 
 ### Fixed
+- **Controllers without a battery reading showed "0%".** The status bar now
+  leaves the battery out when the model doesn't report one (the Kaleid).
+- **Super Nova live view froze for good after a replug.** If the dongle went
+  away while the app was checking the pad, the error killed the input reader;
+  the app now lets go and finds the dongle again when it's back. Only in the
+  new Super Nova support, so no released model was affected.
 - **Lighting records could be read back misaligned on a transport with a smaller
   reply.** The 124-byte record was always read in 56-byte chunks, which is the
   Cyclone's hidraw limit; GIP carries 55, and the pad answers short rather than

@@ -7,7 +7,8 @@
 A Linux GUI for gaming input devices, driven over each device's vendor (hidraw)
 interface (or vendor-class USB for the G7 Pro and the Kaleid). Currently supports
 the **GameSir Cyclone 2**, **G7 Pro**, **G7 Pro 8K PC** and **Tarantula Pro 8K**
-controllers, the **GameSir Kaleid** (lighting only) and the
+controllers, the **GameSir Super Nova** (remaps, vibration, deadzones and
+battery, over its 2.4 GHz dongle), the **GameSir Kaleid** (lighting only) and the
 **Logitech G502 X LIGHTSPEED** mouse (see Tested hardware); the protocol modules are per-vendor
 (`vendors/gamesir`, `vendors/logitech`), so other manufacturers can be added
 alongside. It covers:
@@ -35,6 +36,11 @@ alongside. It covers:
 - **Motion / gyro** (G7 Pro, G7 Pro 8K PC, Cyclone 2, Tarantula Pro 8K) —
   activation, axis setup, deadzones, output routing and response curves;
   controls adapt to each model's register layout.
+- **Super Nova** — button remaps, vibration strength (with a test pulse to feel
+  it before applying), stick and trigger deadzones, and its battery level (or
+  "⚡ Charging") over the 2.4 GHz dongle.
+  It has its own protocol, so it has its own command-line companion too:
+  `supernova_tool.py` backs the pad up, diffs it and restores it.
 - **Backup / Restore** — snapshot all 4 profiles + lighting to a JSON file and
   write it back later.
 - **Mouse-mode toggle** — turn KDE/KWin's gamepad-drives-the-cursor behaviour
@@ -68,9 +74,9 @@ theme; click it (or the caption link) to step through them one at a time:
 </p>
 
 **Version:** `0.5.0-dev` — Deadband: multi-device (Cyclone 2 + G7 Pro +
-G7 Pro 8K PC + Tarantula Pro 8K controllers, G502 X mouse), the full Qt/QML app (lighting + keyframe editor,
+G7 Pro 8K PC + Tarantula Pro 8K + Super Nova controllers, G502 X mouse), the full Qt/QML app (lighting + keyframe editor,
 config editor, remaps, macros, backup/restore), built-in diagnostics,
-one-command install, an [AUR package](https://aur.archlinux.org/packages/deadband-git),
+one-command install, an AppImage, an [AUR package](https://aur.archlinux.org/packages/deadband-git),
 and a [community NixOS flake](https://codeberg.org/Epaphroditus/gamesir-linux-tools-nix).
 Tracks `main` (the AUR `-git` package builds from the latest commit); last tagged
 snapshot is `v0.4.0`.
@@ -146,6 +152,31 @@ can't positively identify. Fork it and customize it however you like.
 > Not the **T4 Kaleid** (`3537:1004`), which is a different, older product; see
 > the note below.
 >
+> **Super Nova** support was contributed by
+> [@Reckless5040](https://github.com/Reckless5040) and verified on
+> their pad. The **Super Nova** is configurable over its **2.4 GHz dongle** (`3537:103e`):
+> **button remaps** (gamepad button to gamepad button), **vibration** strength,
+> and **stick and trigger deadzones**. Those four are exactly the writes that
+> have round-tripped on a real pad from Linux; its curves, anti-deadzone, hair
+> trigger, lighting, gyro and macros aren't exposed. It speaks a different
+> protocol from every model above (decoded from GameSir Connect and confirmed
+> with USB captures; see `vendors/gamesir/models/supernova/`). Configuring it
+> doesn't take it away from games. Every Apply writes whole settings blocks,
+> reads them back, undoes everything on any mismatch, and only then saves. The
+> status bar shows its battery level, or "⚡ Charging" while it's on a charger.
+>
+> Its dongle must be in **PC mode**: in its other modes it enumerates as a
+> Switch Pro Controller (`057e:2009`) or a DualShock 4 (`054c:09cc`), and the
+> configuration channel isn't there at all. The `103e` id is shared with the
+> T3 Pro's dongle, so the app checks the pad's device type before touching it.
+> **Over the USB-C cable it's input-only.** Plugged in from off, it always
+> comes up as a DualShock 4 (`054c:09cc`), and View + Menu won't change that
+> once it's plugged in. It only appears as the Xbox-mode `3537:100e` if it was
+> already on in Xbox mode over the dongle when the cable went in, and even then
+> it exposes no configuration channel the app uses. Configure it over the dongle. `supernova_tool.py` is the command-line companion:
+> `backup`, `diff`, `restore`, and single verified writes, each preceded by an
+> automatic backup. The settings panel's Backup & Restore is hidden for this pad.
+>
 > The G7 Pro ships in editions that differ only by USB product ID. The
 > **Zenless Zone Zero** edition (`3537:105e`) is recognised but not configured
 > yet; input works and the app says so rather than failing silently.
@@ -208,6 +239,31 @@ with the hidraw backend. To try it without installing:
 ```sh
 nix run codeberg:Epaphroditus/gamesir-linux-tools-nix
 ```
+
+### Any distro (AppImage)
+
+One file with Python, PySide6, hidapi (hidraw backend) and libusb bundled; it
+runs on x86_64 distros with glibc 2.34 or newer (Ubuntu 22.04+, Debian 12+,
+Fedora 35+, RHEL 9+):
+
+```sh
+chmod +x Deadband-x86_64.AppImage && ./Deadband-x86_64.AppImage
+```
+
+It can't install the **udev rule** (that needs root on your system). Do it
+once, pulling the rule out of the AppImage:
+
+```sh
+./Deadband-x86_64.AppImage --appimage-extract usr/share/deadband/70-gamesir.rules
+sudo cp squashfs-root/usr/share/deadband/70-gamesir.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+Then unplug and replug the controller. To build the AppImage yourself, run
+`packaging/appimage/build-appimage.sh`; it needs podman or docker. It builds
+inside the `manylinux_2_34` container, so the result also runs on distros older
+than the build machine, and it refuses to pack anything that needs a newer glibc
+than 2.34.
 
 ### Any distro (installer script)
 
@@ -329,6 +385,8 @@ everything it does is **reversible** and stays **on your machine**. The specific
   the current values in a recovery file, then writes, reads every change back, and
   puts the old values back automatically if any write fails. (Macros and lighting
   are the exceptions: they're written as you edit them, and the pages say so.)
+  On the Super Nova, **Apply** writes whole settings blocks, reads each one back,
+  undoes all of them on any mismatch, and only then saves.
 - **Back up before you experiment.** **Backup / Restore → Export** snapshots all
   four profiles + lighting to a JSON file; **Restore** writes it back. Take one
   before you start changing things and you can always return to a known-good state.
@@ -342,7 +400,8 @@ everything it does is **reversible** and stays **on your machine**. The specific
 - **Xbox / XInput mode only.** The vendor protocol is inert in PS4/DS4 and Switch
   modes — there the app can't reach the controller, so it can't change anything.
   Use the Start / pause buttons for Xbox mode (the header warns you when you're not in
-  it).
+  it). The Super Nova's dongle needs **PC mode**; in its other modes it isn't even
+  the same USB device.
 - **No network.** No telemetry, no account, no phone-home — it's all local USB. Even
   the firmware *version* is read straight from the USB descriptor, not fetched
   online.
@@ -354,8 +413,9 @@ everything it does is **reversible** and stays **on your machine**. The specific
   Ember (`109b`/`109c`, [@brcly](https://github.com/brcly)), Wuchang (`10a7`,
   [@sinchrotron](https://github.com/sinchrotron)) and White Trimode (`1003`/`1004`).
   The G7 Pro 8K PC Royal2 and Championship editions were added by their owners.
-  Zenless Zone Zero (`105e`) is recognised but not configured. Treat anything not
-  listed as unproven and use it at your own risk.
+  The Super Nova (dongle `3537:103e`) was verified by its contributor; over its
+  USB-C cable it's input-only. Zenless Zone Zero (`105e`) is recognised but not
+  configured. Treat anything not listed as unproven and use it at your own risk.
 
 ## How it works
 
@@ -368,6 +428,14 @@ live sticks, triggers, buttons and battery alongside chunked configuration repli
 The hidraw controllers use their enhanced report `0x12`. Firmware information is
 read locally from either the USB descriptor or the G7's documented device-info
 query — never from the network.
+
+The **Super Nova** speaks a different, request/reply protocol on its dongle's
+HID interface 1 (vendor page `0xffa0`): 32-byte requests on report `0x07`,
+64-byte replies on report `0x06`. Settings are read and written as whole blocks,
+and every write is followed by a save command. Its battery level comes from the
+same device-info reply the app uses to check that the pad really is a Super Nova
+(the dongle id is shared with the T3 Pro). Input still comes from the kernel's
+`xpad` driver, so configuring the pad never takes it away from games.
 
 For what each control reports to Linux as a normal gamepad, see
 **[CONTROLLER_MAP.md](CONTROLLER_MAP.md)**. The full command set, the lighting/keyframe
@@ -397,6 +465,17 @@ write-verify-retry; only the active profile + lighting are guaranteed (banks
 **Tarantula Pro 8K:** rebinds for all nine programmable buttons, macros,
 sticks, triggers, gyro and poll rate up to 8000 Hz, in its PC mode (`3537:103d`).
 Decoded from USB captures and verified on my own pad. Lighting isn't supported yet.
+
+**Super Nova:** button remaps, vibration, stick and trigger deadzones, and
+battery level (percentage, or "⚡ Charging" on a charger), over the dongle in PC
+mode (`3537:103e`). Every write was round-tripped on a real pad from Linux, both
+through `supernova_tool.py` and through the app: set, checked from outside the
+app (`evtest` / `fftest`), then restored to a byte-identical backup. A deadzone
+change rescales the curve from GameSir's factory points, so repeated changes
+don't drift and setting the default back restores the factory curve exactly;
+setting a button back to Default restores its factory bytes too. Curves,
+anti-deadzone, hair trigger, lighting, gyro and macros aren't exposed. Over the
+USB-C cable it's input-only (see Tested hardware).
 
 **G7 Pro:** contributed by [@brcly](https://github.com/brcly), with the Wuchang
 edition and gyro support from [@sinchrotron](https://github.com/sinchrotron), and
@@ -470,6 +549,18 @@ see [Troubleshooting](MANUAL.md#troubleshooting--recovery) for the full picture.
 and the **open items** — verifying the RT block, some remap target codes,
 profile-switch sync, PS4/Switch input parsing — live in
 **[RESEARCH.md](RESEARCH.md)** and **[TODO.md](TODO.md)**.
+
+## AI assistance
+
+The Super Nova support, its battery readout, and the AppImage build were
+developed with substantial help from an AI coding assistant (Anthropic's
+Claude, via Claude Code). That covers decoding the protocol from GameSir
+Connect and USB captures, the code, the tests, and the documentation. The
+hardware testing was done by a person: every write to the controller was
+confirmed by them before it was sent, its effect checked by hand (`evtest`,
+`fftest`, in-game), and the pad restored to a byte-identical backup afterwards.
+Treat the AI-written parts with the same care as any other contribution; if you
+spot something wrong, please open an issue.
 
 ## License & disclaimer
 

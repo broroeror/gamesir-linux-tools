@@ -174,10 +174,11 @@ def _doctor_identity_gaps():
         import doctor
         from vendors.gamesir.models.g7pro import protocol as g7
         from vendors.gamesir.models.kaleid import protocol as kal
+        from vendors.gamesir.models.supernova import protocol as sn
     except Exception:
         return []
     known = set(g7.CONFIG_PIDS) | set(g7.TRANSITION_PIDS) | set(g7.UNCONFIRMED_PIDS) \
-        | {g7.PID_NATIVE} | set(kal.ALL_PIDS)
+        | {g7.PID_NATIVE} | set(kal.ALL_PIDS) | set(sn.ALL_PIDS)
     return [f'3537:{pid:04x} is invisible to the diagnostics'
             for pid in sorted(known) if pid not in doctor.USB_IDENTITIES]
 

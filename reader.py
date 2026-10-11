@@ -26,6 +26,7 @@ import vendors.gamesir.control as control
 import controller_profile as profiles
 from vendors.gamesir.models.g7pro import protocol as g7pro
 from vendors.gamesir.models.kaleid import protocol as kaleid
+from vendors.gamesir.models.supernova import protocol as supernova
 
 
 _active_usb_handle = None
@@ -170,7 +171,8 @@ def _pick_selected(controllers):
     # initial selection away from a controller this app can configure.
     return next((c for c in live
                  if profiles.detect_one(c['pid'], c.get('product'))
-                 not in (None, profiles.G7_NATIVE, profiles.G7_PRO_OTHER)),
+                 not in (None, profiles.G7_NATIVE, profiles.G7_PRO_OTHER,
+                         profiles.SUPER_NOVA_OTHER)),
                 (live or controllers)[0])
 
 
@@ -270,6 +272,12 @@ def read_controller():
             control.pump_demo_reads()
             time.sleep(0.05)
             continue
+        # Every pass starts with no battery reading (-1 = unknown, hidden): a
+        # session fills it in from its own source, and a model without one
+        # (Kaleid, a Super Nova that hasn't answered yet) never shows a stale or
+        # made-up 0 %.
+        state['battery'] = -1
+        state['charging'] = False
         controllers = _rescan()
         if not controllers:
             if state.get('demo'):       # demo flipped on during the scan: the
@@ -336,6 +344,19 @@ def read_controller():
             time.sleep(0.3)
             continue
 
+        # A Super Nova behind its dongle. Configuring never takes it from games
+        # (hidraw on interface 1 leaves xpad on interface 0 bound), so there is
+        # no claim/release: the session runs whenever the pad is selected.
+        if prof is profiles.SUPER_NOVA:
+            state['connected'] = True
+            read_session_supernova(sel)
+            if state.get('demo'):
+                continue
+            state['connected'] = False
+            state['mode_ok'] = False
+            time.sleep(0.3)
+            continue
+
         # A Kaleid in one of its two non-GIP modes. Input works (xpad or usbhid
         # binds it); only configuration needs the other identity, and the chord is
         # the only way to get there.
@@ -370,6 +391,21 @@ def read_controller():
                 f'G7 Pro ({edition}) — config isn\'t supported for this edition '
                 f'yet; input works. An issue naming {g7pro.VID:04x}:'
                 f'{sel["pid"]:04x} would help get it added.')
+            read_session_evdev(sel['id'], force_wrong_mode=True)
+            state['connected'] = False
+            time.sleep(0.3)
+            continue
+
+        # A Super Nova identity with no verified write path (the wired 100e):
+        # named, input-only, nothing opened for configuration.
+        if prof is profiles.SUPER_NOVA_OTHER:
+            kind = supernova.identity_name(sel['pid']) or 'unrecognised identity'
+            state['connected'] = True
+            state['mode_ok'] = False
+            state['config_status'] = (
+                f'Super Nova ({kind}) — config isn\'t supported yet; input works. '
+                f'An issue with `lsusb -v -d {supernova.VID:04x}:{sel["pid"]:04x}` '
+                'output would help get it added.')
             read_session_evdev(sel['id'], force_wrong_mode=True)
             state['connected'] = False
             time.sleep(0.3)
@@ -837,6 +873,87 @@ def read_session_g7usb(ctrl):
         state.update(gyro=None, accel=None, imu_time=0.0)
         if not state.get('config_wanted') and not telemetry_error and not session_error:
             state['config_status'] = 'Released to games'
+
+
+def read_session_supernova(ctrl):
+    """Open a Super Nova's config channel, publish it, and run the live view.
+
+    The config channel is the hidraw node of the dongle's HID interface 1 (the
+    one declaring vendor page 0xffa0). It is opened here, on the reader thread,
+    checked to really be a Super Nova -- 3537:103e is shared with the T3 Pro --
+    and published through control.set_supernova_link; bridge workers then send
+    whole-block reads/writes through control.supernova_request. Input for the
+    live view comes from evdev (xpad, interface 0) exactly as for any evdev pad,
+    and reading it here is what keeps this session alive until the pad is
+    unplugged or another one selected.
+
+    Failure modes, each with its own message:
+      * no 0xffa0 node: the dongle is not in PC mode (in its Switch/PS modes it
+        is a different USB device altogether) -> input-only;
+      * open refused: udev rule missing -> input-only, with the access banner;
+      * no reply: the pad is off or asleep behind the dongle -> retry shortly;
+      * the write fails (OSError): the dongle was unplugged or switched modes
+        mid-check -> return, and read_controller finds it again;
+      * another device type: a T3 Pro on the shared dongle -> input-only."""
+    from vendors.gamesir.models.supernova import config as sn_config
+    from vendors.gamesir.models.supernova import transport as sn_transport
+
+    def input_only(status):
+        state['config_status'] = status
+        state['driving'] = None
+        read_session_evdev(ctrl['id'], force_wrong_mode=True)
+
+    node = sn_transport.config_node(ctrl['nodes'])
+    if node is None:
+        input_only('Super Nova: no configuration channel found. Put the dongle '
+                   'in PC mode; input works.')
+        return
+    try:
+        link = sn_transport.SuperNovaLink(node)
+    except OSError:
+        try:
+            from doctor import classify_open_failure
+            state['access'] = classify_open_failure(node)
+        except Exception:
+            state['access'] = None
+        input_only(f'Super Nova: cannot open {node}; input works.')
+        return
+    try:
+        info = sn_config.check_is_super_nova(link)
+    except TimeoutError:
+        link.close()
+        state['mode_ok'] = False
+        state['config_status'] = 'Super Nova: the pad is not answering. Switch it on.'
+        time.sleep(2.0)
+        return
+    except OSError:
+        # The dongle went away under the check (EPROTO/ENODEV on a replug or a
+        # mode switch). Uncaught, this killed the reader thread and froze the
+        # live view for good; returning lets read_controller find it again.
+        link.close()
+        state['mode_ok'] = False
+        return
+    except sn_config.PadError as e:
+        link.close()
+        input_only(f'{e}. Input works; configuration is for the Super Nova only.')
+        return
+
+    state['access'] = 'ok'
+    pct, charging = supernova.battery_from_info(info)   # same reply, no extra read;
+    state['battery'] = -1 if pct is None else pct       # the bridge refreshes it
+    state['charging'] = charging
+    state['config_status'] = ''
+    state['config_claimed'] = False      # nothing is claimed: games keep the pad
+    state['profile'] = 1                 # its single configuration page
+    state['edit_profile'] = 1
+    state['driving'] = ctrl['id']
+    control.set_supernova_link(link)
+    try:
+        read_session_evdev(ctrl['id'])
+    finally:
+        control.clear_supernova_link()
+        link.close()
+        state['driving'] = None
 
 
 def read_session_kaleid(ctrl):

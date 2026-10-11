@@ -303,7 +303,9 @@ Window {
                 // + 20 left margin + 68 gear reserve = 1299, so 1200 overflowed by ~99px
                 // and the status text ran under the gear. 1320 leaves headroom for the
                 // widest live content.
-                ProfileBar { compact: win.width < 1320; visible: win.activeDevice === "controller" }
+                // One page (the Super Nova) or none (the Kaleid): nothing to pick.
+                ProfileBar { compact: win.width < 1320
+                             visible: win.activeDevice === "controller" && bridge.profileCount > 1 }
 
                 // The G7 Pro's config session toggle. It reports a STATE (while it's
                 // claimed, games can't see the controller), so it carries a warn dot
@@ -1074,8 +1076,8 @@ Window {
                         }
 
                         Divider {}
-                        SectionHeader { text: "Backup & Restore" }
-                        BackupPanel { width: parent.width }
+                        SectionHeader { text: "Backup & Restore"; visible: bridge.backupSupported }
+                        BackupPanel { width: parent.width; visible: bridge.backupSupported }
 
 
                         Divider {}

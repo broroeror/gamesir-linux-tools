@@ -83,7 +83,11 @@ Item {
                 }
                 PillButton {
                     objectName: "testLeftGrip"
-                    label: "Test left grip (heavy motor)"
+                    visible: bridge.rumbleTestSupported
+                    // The Super Nova's test pulse runs both motors whichever side
+                    // it's sent for, so there it previews this slider's strength.
+                    label: bridge.rumbleTestPerMotor ? "Test left grip (heavy motor)"
+                                                     : "Test this strength"
                     enabled: !page.testRunning && vibL.value > 0
                              && (!bridge.isG7Pro || bridge.configClaimed)
                     onClicked: page.testMotor("left", vibL.value)
@@ -102,7 +106,9 @@ Item {
                 }
                 PillButton {
                     objectName: "testRightGrip"
-                    label: "Test right grip (light motor)"
+                    visible: bridge.rumbleTestSupported
+                    label: bridge.rumbleTestPerMotor ? "Test right grip (light motor)"
+                                                     : "Test this strength"
                     enabled: !page.testRunning && vibR.value > 0
                              && (!bridge.isG7Pro || bridge.configClaimed)
                     onClicked: page.testMotor("right", vibR.value)
@@ -117,6 +123,7 @@ Item {
                     color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                 }
                 PillButton {
+                    visible: bridge.rumbleTestSupported && bridge.rumbleTestPerMotor
                     label: "Test both grip motors"
                     enabled: !page.testRunning && (!bridge.isG7Pro || bridge.configClaimed)
                     onClicked: {

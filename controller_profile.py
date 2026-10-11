@@ -20,6 +20,8 @@ Profiles include:
                source of truth for the Cyclone and nothing changes for it.
   * G7 Pro   - wired (3537:109b) or dongle (3537:109c), via claimed raw USB.
   * G7 Pro 8K PC - its separate hidraw register map and feature set.
+  * Super Nova - 103e dongle: remaps, vibration, stick/trigger deadzones over
+                 its own command protocol; 100e wired: recognised only.
 """
 
 from dataclasses import dataclass, field
@@ -28,6 +30,7 @@ from typing import Optional
 import vendors.gamesir.config as _cy
 from vendors.gamesir.models.g7pro import protocol as _g7
 from vendors.gamesir.models.kaleid import protocol as _kal
+from vendors.gamesir.models.supernova import protocol as _sn
 
 
 # --- shared enums / block formats (identical across the vendor family) -------
@@ -707,8 +710,58 @@ KALEID_OTHER = ControllerProfile(
 )
 
 
+# --- GameSir Super Nova : the 2.4 GHz dongle, four verified features ----------
+# A different protocol family from every model above: request/reply commands
+# over the hidraw node of HID interface 1 (models/supernova/), whole blocks per
+# setting, no register map. The fields below are therefore VIRTUAL addresses
+# (protocol.VADDR_*) that only models/supernova/editor.py decodes; bridge.py
+# stages edits under them and hands them to the editor on Apply.
+#
+# Exactly the four features whose writes round-tripped on a real pad from Linux
+# (see CHANGELOG.md): remaps, vibration, stick and trigger begin
+# deadzones. Everything else stays None and its UI hidden. Configuring does not
+# take the pad from games: hidraw on interface 1 leaves xpad on interface 0 bound.
+#
+# 3537:103e is shared with the T3 Pro's dongle; the reader session confirms
+# device type 3 before publishing the link, else falls back to input-only.
+SUPER_NOVA = ControllerProfile(
+    name='GameSir Super Nova',
+    short='Super Nova',
+    usb_products=_sn.CONFIG_PIDS,           # derived, never hand-listed
+    wired_products=(),                      # the dongle only
+    write_style='supernova',
+    input_style='evdev',                    # xpad on interface 0
+    transport='hidraw_cmd',
+    profile_banks=(1,),                     # one configuration page
+    software_profile_switch=False,          # no 0x07 profile command on this pad
+    diagram='cyclone',                      # standard layout; L4/R4 = its back buttons
+    lighting_style='none',
+    POLL_RATES=(),
+    VIB_L=_sn.VADDR_VIB + _sn.VIB_LEFT, VIB_R=_sn.VADDR_VIB + _sn.VIB_RIGHT,
+    LT_DZ_MIN=_sn.VADDR_TRIG_DZ, RT_OFFSET=1,
+    ST_DZ_MIN=_sn.VADDR_STICK_DZ, RS_OFFSET=1,
+    REMAP_SLOTS=tuple((n, _sn.VADDR_KEY | c) for n, c in _sn.REMAP_SOURCES),
+    REMAP_TARGETS=_sn.REMAP_TARGETS,
+)
+
+
+# --- GameSir Super Nova : recognised, not yet configurable -------------------
+# Detection only, like G7_PRO_OTHER: input works through the kernel's driver and
+# the app names the pad, but there is no write style, no banks and no addresses.
+# Only the wired identity (100e) lands here now: it has never been seen on a
+# real pad, so it gets no write path until it is verified like the dongle was.
+SUPER_NOVA_OTHER = ControllerProfile(
+    name='GameSir Super Nova',
+    short='Super Nova',
+    usb_products=_sn.INPUT_ONLY_PIDS,
+    write_style='none',
+    input_style='evdev',
+    profile_banks=(),
+)
+
+
 ALL = (CYCLONE, G7_PRO, G7_NATIVE, G7_PRO_OTHER, G7_8K, TARANTULA_PRO_8K,
-       KALEID, KALEID_OTHER)
+       KALEID, KALEID_OTHER, SUPER_NOVA, SUPER_NOVA_OTHER)
 DEFAULT = CYCLONE
 
 

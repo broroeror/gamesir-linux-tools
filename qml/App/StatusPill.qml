@@ -24,11 +24,14 @@ Row {
         }
     }
 
-    // Battery
+    // Battery. -1 = no reading (a model without a battery source): hidden rather
+    // than "0%". Charging with no percentage (the Super Nova gives none while on
+    // a charger) reads "⚡ Charging".
     Text {
-        visible: bridge.connected
+        visible: bridge.connected && (bridge.battery >= 0 || bridge.charging)
         anchors.verticalCenter: parent.verticalCenter
-        text: (bridge.charging ? "⚡ " : "") + bridge.battery + "%"
+        text: bridge.battery >= 0 ? (bridge.charging ? "⚡ " : "") + bridge.battery + "%"
+                                  : "⚡ Charging"
         color: bridge.battery <= 15 && !bridge.charging ? Theme.accent : Theme.textDim
         font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
     }

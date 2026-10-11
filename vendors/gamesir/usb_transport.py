@@ -162,7 +162,10 @@ def _library():
     global _lib
     with _lib_lock:
         if _lib is None:
-            name = ctypes.util.find_library('usb-1.0')
+            # A bundle (the AppImage) ships its own copy and names it here:
+            # find_library only consults the system linker cache, so it would
+            # never see a library inside the bundle.
+            name = os.environ.get('DEADBAND_LIBUSB') or ctypes.util.find_library('usb-1.0')
             if not name:
                 raise UsbTransportError(
                     'libusb-1.0 is not installed (the system runtime is required)')

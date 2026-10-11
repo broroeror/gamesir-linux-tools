@@ -28,6 +28,8 @@ import vendors.gamesir.motion as motion
 import vendors.gamesir.macro as macro
 import vendors.gamesir.config as cfg
 from vendors.gamesir.models.g7pro import protocol as g7pro
+from vendors.gamesir.models.supernova import editor as sn_editor
+from vendors.gamesir.models.supernova import protocol as supernova
 import controller_profile as profiles
 import kf_cache
 import kwin
@@ -238,6 +240,15 @@ class GamesirBridge(QObject):
         # once the reader has actually rebound, not when the picker changes.
         self._controller = None
         self._driving = None
+        # Super Nova config arrives from a worker thread as (gen, config, error);
+        # the config poll picks it up on the GUI thread.
+        self._sn_loaded = None
+        # Super Nova battery refresh (_poll_supernova_battery): one get_device_info
+        # at a time, never while an Apply is writing.
+        self._sn_applying = False
+        self._sn_battery_busy = False
+        self._sn_battery_at = 0.0       # monotonic time of the last refresh
+        self._sn_battery_for = None     # unit it counts for; a new one restarts it
         self._apply_profile(profiles.active())
 
         self._input_timer = QTimer(self)
@@ -253,6 +264,7 @@ class GamesirBridge(QObject):
         self._status_timer = QTimer(self)
         self._status_timer.setInterval(250)      # 4 Hz
         self._status_timer.timeout.connect(self._poll_status)
+        self._status_timer.timeout.connect(self._poll_supernova_battery)
         self._status_timer.start()
 
         self._light_timer = QTimer(self)
@@ -336,6 +348,44 @@ class GamesirBridge(QObject):
         if csig != self._controllers_sig:
             self._controllers_sig = csig
             self.controllersChanged.emit()
+
+    SN_BATTERY_INTERVAL = 60.0          # s; each read blocks on the pad's reply
+
+    def _poll_supernova_battery(self):
+        """Refresh a Super Nova's battery from get_device_info once a minute.
+        The reader sets the first value from its session check; this keeps it
+        current. Read-only, on a worker thread (the request blocks on the pad),
+        pinned to the session generation, skipped while an Apply or a config
+        load is talking to the pad. A failed read keeps the last value."""
+        if (state.get('demo') or self._prof is None
+                or self._prof.write_style != 'supernova'
+                or not state.get('driving') or state['driving'] != state['selected']
+                or self._sn_applying or self._sn_battery_busy
+                or self._config_loading is not None):
+            return
+        now = time.monotonic()
+        if state['driving'] != self._sn_battery_for:
+            # A fresh session: the reader just read it from its own check.
+            self._sn_battery_for, self._sn_battery_at = state['driving'], now
+            return
+        if now - self._sn_battery_at < self.SN_BATTERY_INTERVAL:
+            return
+        self._sn_battery_at = now
+        self._sn_battery_busy = True
+        gen, driving = control.generation(), state['driving']
+
+        def run():
+            try:
+                info = control.supernova_request('get_device_info', gen=gen)
+                pct, charging = supernova.battery_from_info(info)
+                if gen == control.generation() and state.get('driving') == driving:
+                    state['battery'] = -1 if pct is None else pct
+                    state['charging'] = charging
+            except Exception:
+                pass                    # keep the last value; next tick retries
+            finally:
+                self._sn_battery_busy = False
+        threading.Thread(target=run, daemon=True).start()
 
     def _poll_sensors(self):
         gyro, accel = state.get('gyro'), state.get('accel')
@@ -682,6 +732,23 @@ class GamesirBridge(QObject):
             if self._pending:
                 self._pending = {}
                 self.pendingChanged.emit()
+            if self._prof.write_style == 'supernova':
+                # No register reads on this pad: whole blocks, read and decoded
+                # by its editor on a worker thread (each request blocks on the
+                # pad's reply), pinned to this session's generation.
+                gen = control.generation()
+                self._config_loading_gen = gen
+                self._config_loading = bank
+                self._sn_loaded = None
+
+                def load():
+                    try:
+                        config, _blocks = sn_editor.read_config(control.SuperNovaSession(gen))
+                        self._sn_loaded = (gen, config, None)
+                    except Exception as e:
+                        self._sn_loaded = (gen, None, str(e))
+                threading.Thread(target=load, daemon=True).start()
+                return
             if self._prof is profiles.G7_PRO:
                 reqs = g7pro.blob_requests(bank)
                 if self._g7_dock is None and not self._g7_dock_loading:
@@ -702,6 +769,20 @@ class GamesirBridge(QObject):
             self._config_loading = None
             self._config_generation = None
             self._config = {}
+            self.configLoaded.emit()
+            return
+        if self._prof.write_style == 'supernova':
+            got = self._sn_loaded
+            if got is None or got[0] != self._config_loading_gen:
+                return
+            self._config_loading = None
+            if got[1] is None:
+                # Not retried automatically (each attempt blocks on timeouts);
+                # a reconnect or controller switch reloads it.
+                self._set_apply_status(f'⚠ Could not read the Super Nova: {got[2]}')
+                return
+            self._config = got[1]
+            self._config_generation = got[0]
             self.configLoaded.emit()
             return
         if self._prof is profiles.G7_PRO:
@@ -857,7 +938,8 @@ class GamesirBridge(QObject):
 
     @Property(int, notify=statusChanged)
     def battery(self):
-        return int(state['battery'] or 0)
+        b = state['battery']
+        return -1 if b is None else int(b)     # -1 = no reading; the pill hides it
 
     @Property(bool, notify=statusChanged)
     def charging(self):
@@ -914,6 +996,11 @@ class GamesirBridge(QObject):
             return ('Press M + Xbox to cycle the controller to Xbox mode, where '
                     'its lighting is editable. The other two modes work in games '
                     'but expose no configuration channel.')
+        if profiles.active() in (profiles.SUPER_NOVA, profiles.SUPER_NOVA_OTHER):
+            # The reader says exactly why (no PC mode, pad off, a T3 Pro on the
+            # shared dongle, the unverified wired identity); "not in Xbox mode"
+            # would be wrong for every one of those.
+            return state.get('config_status') or 'Super Nova: input only.'
         return ('Not in Xbox mode. Use the controller\'s Start / pause buttons '
                 'to switch to Xbox/XInput mode so the app can read it.')
 
@@ -1114,6 +1201,57 @@ class GamesirBridge(QObject):
         whose profile leaves VIB_L unset -- the Vibration tab is hidden for them.
         True when nothing is recognised, so the default layout is unchanged."""
         return profiles.active().VIB_L is not None
+
+    # --- per-control capabilities ----------------------------------------------
+    # Derived from which fields the active profile maps, so a model that has only
+    # some of a page's controls (the Super Nova: begin deadzones, no curves) shows
+    # just those. True for every older model, whose layouts are unchanged.
+    def _maps(self, *fields):
+        prof = self._prof or profiles.DEFAULT
+        return any(getattr(prof, f) is not None for f in fields)
+
+    @Property(bool, notify=controllerChanged)
+    def hasDeadzoneMax(self):
+        return self._maps('ST_DZ_MAX', 'LT_DZ_MAX')
+
+    @Property(bool, notify=controllerChanged)
+    def hasAntiDeadzone(self):
+        return self._maps('ST_ADZ_MIN', 'LT_ADZ_MIN')
+
+    @Property(bool, notify=controllerChanged)
+    def hasCurves(self):
+        return self._maps('ST_CURVE', 'LT_CURVE')
+
+    @Property(bool, notify=controllerChanged)
+    def hasTrajectory(self):
+        return self._maps('ST_TRAJ')
+
+    @Property(bool, notify=controllerChanged)
+    def hasHairTrigger(self):
+        return self._maps('LT_HAIR')
+
+    @Property(bool, notify=controllerChanged)
+    def hasKeyboardMouseRemap(self):
+        """The Super Nova's verified remap write is gamepad -> gamepad only."""
+        return (self._prof or profiles.DEFAULT).write_style != 'supernova'
+
+    @Property(bool, notify=controllerChanged)
+    def rumbleTestSupported(self):
+        """Cyclone/G7: control.rumble's motor commands. Super Nova: the pad's own
+        test pulse (control.supernova_vibrate_test)."""
+        return (self._prof or profiles.DEFAULT).write_style in ('cyclone', 'g7', 'supernova')
+
+    @Property(bool, notify=controllerChanged)
+    def rumbleTestPerMotor(self):
+        """Whether a test drives one motor. The Super Nova's test pulse runs both
+        whichever side it's sent for, so its page tests a strength instead."""
+        return (self._prof or profiles.DEFAULT).write_style in ('cyclone', 'g7')
+
+    @Property(bool, notify=controllerChanged)
+    def backupSupported(self):
+        """Settings-panel backup is register-based; the Super Nova's lives in
+        supernova_tool.py (backup / diff / restore)."""
+        return (self._prof or profiles.DEFAULT).write_style != 'supernova'
 
     @Property(bool, notify=controllerChanged)
     def hasMacros(self):
@@ -1810,6 +1948,9 @@ class GamesirBridge(QObject):
                      + list(g7pro.NUMPAD_TARGETS) + list(g7pro.MOUSE_TARGETS))
             return dict((c, n) for n, c in items).get(code, '0x%02x' % code)
         own = dict((c, n) for n, c in self._prof.REMAP_TARGETS)
+        if self._prof.write_style == 'supernova':
+            # Its codes are GameSir's own; the Cyclone table would misname them.
+            return own.get(code, 'Set in GameSir app')
         return own[code] if code in own else cfg.target_label(code)
 
     @Property('QVariantList', constant=True)
@@ -2321,6 +2462,9 @@ class GamesirBridge(QObject):
         if self._prof.write_style == 'cyclone':
             self._apply_transactional()
             return
+        if self._prof.write_style == 'supernova':
+            self._apply_supernova()
+            return
         edit = state.get('edit_profile') or state.get('profile')
         default_bank = self._prof.profile_bank(edit)
         if default_bank is None:
@@ -2481,6 +2625,39 @@ class GamesirBridge(QObject):
                     control.set_profile(original_profile, gen=gen)
                 self._backup_busy = False
                 self.backupBusyChanged.emit()
+        threading.Thread(target=run, daemon=True).start()
+
+    def _apply_supernova(self):
+        """Apply staged Super Nova edits through its editor: per block, the read
+        bytes with only the edited field changed, written, read back, rolled
+        back across blocks on any failure, then saved once (editor.apply_edits).
+        Afterwards the config is re-read, so the pages show what the pad holds."""
+        if self._backup_busy or not self._pending:
+            return
+        if (profiles.active() is not self._prof or not profiles.is_recognized()
+                or self._driving != state.get('driving')
+                or state.get('driving') != state.get('selected')):
+            self._set_apply_status('Apply refused: controller selection changed; reload its settings')
+            return
+        edits = {r['addr']: bytes(r['data']) for r in self._pending.values()}
+        gen = control.generation()           # pin to the live device session
+        self._pending = {}
+        self.pendingChanged.emit()
+        self._set_apply_status('Applying…')
+        self._sn_applying = True              # the battery poll stays off the pad
+
+        def run():
+            try:
+                written = sn_editor.apply_edits(control.SuperNovaSession(gen), edits)
+            except Exception as e:
+                self._set_apply_status(f'⚠ Nothing saved: {e}')
+            else:
+                self._set_apply_status(
+                    'Applied ✓  %d block(s) written, read back and saved' % len(written)
+                    if written else 'No changes to apply')
+            finally:
+                self._sn_applying = False
+            self._loaded_profile = None       # re-read what the pad now holds
         threading.Thread(target=run, daemon=True).start()
 
     def _set_apply_status(self, msg):
@@ -2702,6 +2879,10 @@ class GamesirBridge(QObject):
 
     @Slot()
     def rumbleTest(self):
+        if self._prof is not None and self._prof.write_style == 'supernova':
+            # Its test pulse always runs both motors; the per-slider tests cover it.
+            self.rumbleTestStatus.emit(False, 'Use the test under each strength slider.')
+            return
         control.rumble_test(on_done=self.rumbleTestStatus.emit)
 
     @Slot(str, int)
@@ -2714,5 +2895,11 @@ class GamesirBridge(QObject):
             self.rumbleTestStatus.emit(False, 'Trigger tests require a supported G7 Pro.')
             return
         percent = max(0, min(100, int(strength)))
+        if self._prof is not None and self._prof.write_style == 'supernova':
+            if self._sn_applying:
+                self.rumbleTestStatus.emit(False, 'Wait for Apply to finish, then test.')
+                return
+            control.supernova_vibrate_test(motor, percent, on_done=self.rumbleTestStatus.emit)
+            return
         amplitude = (percent * 255 + 50) // 100
         control.rumble_test(on_done=self.rumbleTestStatus.emit, motor=motor, strength=amplitude)

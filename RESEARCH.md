@@ -21,6 +21,7 @@ re-tread them. This is a hobby RE effort; corrections and additions welcome.
 | G7 SE *(not owned)* | `1010` | ✅ mainline `xpad` | n/a | Reference only |
 | **G7 Pro 8K PC** | `10c5`–`10c8` + `1032`/`1033` (Royal2) edition pairs | ✅ vendor `0x12` | ✅ full incl. motion/macros/lights | **Fully supported** |
 | **Tarantula Pro 8K** | `103d` (PC/XBOX mode) · `103c` (auto-detected non-PC mode, no config) | ✅ vendor `0x12` | ✅ rebinds (9 extras), macros, sticks, triggers, motion, poll rate — no lighting yet | **Supported**, write round-trip verified on my own pad |
+| **Super Nova** | `103e` (2.4 GHz dongle, PC mode; shared with the T3 Pro) · `100e` (wired, unseen) | ✅ mainline `xpad` + hidraw | 🧪 `supernova_tool.py` only — report `07`/`06` on vendor page `0xffa0`, its own protocol family | **Write round-trip verified on a real pad (dongle)**; not yet wired into the app |
 | **G502 X LIGHTSPEED** *(Logitech, VID 0x046d)* | `c098` (wired) · `409f` / `c547` (receiver) | ✅ standard HID | ✅ full — profiles, G-Shift, DPI, macros | **Fully supported** |
 | 8BitDo *(future)* | — | — | — | Not started |
 

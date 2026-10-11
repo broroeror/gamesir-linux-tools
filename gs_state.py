@@ -17,7 +17,7 @@ state = {
     'ls': False, 'rs': False,
     'l4': False, 'l5': False, 'r4': False, 'r5': False,
     'm': False, 'home': False, 'share': False,
-    'battery': 0, 'charging': False,
+    'battery': -1, 'charging': False,   # battery %, -1 = no reading (hidden)
     'profile': None,     # current profile 1-4 (from get-profile 0x0B -> 0x10 reply)
     'edit_profile': None, # profile bank shown by the editor (G7 can differ)
     'led_slot': None,    # active lighting slot (from read-reg 0x20/0x0000 -> 0x10 0x05)

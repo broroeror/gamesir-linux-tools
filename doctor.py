@@ -81,10 +81,26 @@ except Exception:                      # partial install -- report what we can
     KALEID_IDENTITIES = {}
     KALEID_WRITABLE = ()
 
+# The Super Nova: recognised, never opened for configuration. Named so a report
+# says "Super Nova dongle" rather than an unknown 3537 id.
+try:
+    from vendors.gamesir.models.supernova import protocol as _sn
+    SUPER_NOVA_IDENTITIES = {
+        pid: f'Super Nova {_sn.identity_name(pid)}'
+             + (' (configurable in PC mode)' if pid in _sn.CONFIG_PIDS
+                else ' (not configurable yet)')
+        for pid in _sn.ALL_PIDS
+    }
+    _SN_WIRED_DS4 = _sn.PID_WIRED_DS4
+except Exception:                      # partial install -- report what we can
+    SUPER_NOVA_IDENTITIES = {}
+    _SN_WIRED_DS4 = (0x054C, 0x09CC)
+
 # Identities Deadband opens over raw USB, so a permission denial on one is a real
 # fault; anything else is never opened and a denial there is the intended state.
 USB_IDENTITIES = dict(G7_IDENTITIES)
 USB_IDENTITIES.update(KALEID_IDENTITIES)
+USB_IDENTITIES.update(SUPER_NOVA_IDENTITIES)
 NEEDS_USB = frozenset(G7_NEEDS_USB) | frozenset(KALEID_WRITABLE)
 
 # A rule can legitimately live in EITHER directory: /etc is for rules an admin
@@ -570,6 +586,13 @@ def collect():
                 'when you switch platform mode, so if you just used a button '
                 'combo it may have moved to Switch/PS mode rather than into '
                 'configuration mode. Put it back in Xbox/XInput mode and re-check.')
+            if any((o['vid'], o['pid']) == _SN_WIRED_DS4 for o in others):
+                rep['verdict'].append(
+                    'A 054c:09cc "Wireless Controller" may be a GameSir Super '
+                    'Nova on its USB-C cable: plugged in from off, it always '
+                    'comes up as a DualShock 4, and the mode combo does not '
+                    'change it once plugged in. Input works. To configure it, '
+                    'use its 2.4 GHz dongle in PC mode.')
         else:
             rep['verdict'].append(
                 'No GameSir device is enumerated. If one is plugged in, check '
@@ -642,6 +665,20 @@ def collect():
         ready = [n for n in rep['usb_devices'] if n['pid'] in G7_WRITABLE]
         transition = [n for n in rep['usb_devices'] if n['pid'] == 0x100A]
         native = [n for n in rep['usb_devices'] if n['pid'] == 0x1022]
+        nova = [n for n in rep['usb_devices'] if n['pid'] in SUPER_NOVA_IDENTITIES]
+        if any(n['pid'] in _sn.CONFIG_PIDS for n in nova):
+            rep['verdict'].append(
+                'GameSir Super Nova dongle found (3537:103e). Remaps, vibration '
+                'and stick/trigger deadzones are configurable through its HID '
+                'configuration channel, which needs the dongle in PC mode and '
+                'hidraw access (the GameSir udev rule). The id is shared with the '
+                'T3 Pro; the app checks the pad\'s device type before writing.')
+        if any(n['pid'] not in _sn.CONFIG_PIDS for n in nova):
+            rep['verdict'].append(
+                'GameSir Super Nova (wired, 3537:100e) found. Input works; the '
+                'app does not configure it over the cable (it only comes up as '
+                '100e when plugged in while already on in Xbox mode, and that '
+                'channel was never verified). Use the 2.4 GHz dongle to configure it.')
         other_ed = [n for n in rep['usb_devices'] if n['pid'] in G7_UNCONFIRMED]
         if other_ed:
             names = ', '.join(sorted({G7_UNCONFIRMED[n['pid']] for n in other_ed}))

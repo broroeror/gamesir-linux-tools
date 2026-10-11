@@ -58,6 +58,63 @@ def generation():
     return _generation
 
 
+# --- Super Nova: command/reply protocol over its own hidraw link ------------
+# Not the register channel above: the pad answers request/reply commands on
+# the hidraw node of its HID interface 1 (vendors/gamesir/models/supernova).
+# The reader thread opens the link and publishes it here; bridge worker
+# threads send through supernova_request(), one request at a time, refused
+# after a rebind exactly like send_cmd's `gen` rule. Nothing else reads the fd.
+_sn_link = None
+_sn_lock = threading.Lock()
+
+
+def set_supernova_link(link):
+    """Publish an opened SuperNovaLink (reader thread). Advances the session
+    generation like set_device, so staged work for another unit refuses."""
+    global _sn_link, _generation
+    with _sn_lock:
+        with _write_lock:
+            _sn_link = link
+            _generation += 1
+    _reset_reads()
+
+
+def clear_supernova_link():
+    global _sn_link
+    with _sn_lock:
+        _sn_link = None
+    _reset_reads()
+
+
+def supernova_request(name, payload=b'', gen=None):
+    """Send one Super Nova command and return its reply body.
+
+    Raises RuntimeError when there is no link, the session was rebound under
+    the caller (`gen`), or the active profile is not a recognized controller --
+    raising rather than returning False because the callers are multi-step
+    (editor.apply_edits) and must stop, not carry on with a missing reply.
+    TimeoutError and protocol refusals propagate from the link."""
+    with _sn_lock:
+        if _sn_link is None:
+            raise RuntimeError('Super Nova is not connected')
+        if gen is not None and gen != _generation:
+            raise RuntimeError('controller changed during the operation')
+        if not profiles.is_recognized():
+            raise RuntimeError('controller not recognized')
+        return _sn_link.request(name, payload)
+
+
+class SuperNovaSession:
+    """`link` for editor/config (request(name, payload) -> body), pinned to the
+    session generation captured at construction."""
+
+    def __init__(self, gen=None):
+        self.gen = generation() if gen is None else gen
+
+    def request(self, name, payload=b''):
+        return supernova_request(name, payload, gen=self.gen)
+
+
 def send_cmd(*payload, gen=None, probe=False, padded=True):
     """Thread-safe padded command write to the current device.
 
@@ -165,6 +222,41 @@ def rumble_test(on_done=None, motor='grips', strength=0xC0):
     return thread
 
 
+SUPERNOVA_TEST_PULSE = 0.4     # s the test button stays busy (the pulse is shorter)
+
+
+def supernova_vibrate_test(side, percent, on_done=None):
+    """Play the Super Nova's own vibration test pulse at `percent` (0..100).
+
+    `set_vibrate_test` (0a 04) as GameSir's app frames it, <left> <right> 0 0,
+    with the slider's value in its own side's byte. Tried on a real pad from
+    Linux (2026-10-10): one short pulse that stops by itself, its strength
+    following the value (0a weak, 64 strong); either byte drives BOTH motors,
+    so it previews a strength, not a single motor; all zeros does nothing.
+    Nothing is stored (a backup diffed identical afterwards) and nothing is
+    saved. Runs on a worker thread: the request blocks on the pad's reply."""
+    gen = generation()
+    percent = max(0, min(100, int(percent)))
+    payload = bytes((percent, 0, 0, 0) if side == 'left' else (0, percent, 0, 0))
+
+    def run():
+        try:
+            body = supernova_request('set_vibrate_test', payload, gen=gen)
+        except Exception as e:
+            ok, msg = False, f'Could not send the test: {e}'
+        else:
+            ok = len(body) == 1 and body[0] == 0
+            msg = '' if ok else f'The pad refused the test (status {body.hex()}).'
+        if ok:
+            time.sleep(SUPERNOVA_TEST_PULSE)   # one pulse at a time
+        if on_done:
+            on_done(ok, msg)
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    return thread
+
+
 _g7_seq = 0            # rolling sequence for the G7's enveloped writes
 _g7_seq_lock = threading.Lock()
 
@@ -224,6 +316,10 @@ def write_reg(bank, addr, data, write_style=None, gen=None):
     while serialized writes were clean in 3/3. The trailing 20ms sleep inside
     the loop also spaces the LAST chunk from the next caller's first."""
     style = write_style or profiles.active().write_style
+    if style not in ('cyclone', 'g7', 'gip'):
+        # 'supernova' writes whole blocks through supernova_request (its editor),
+        # 'none' writes nothing; neither may fall through to Cyclone framing.
+        return False
     enveloped = style in ('g7', 'gip')
     # inner block caps at 60B (5B header + 55 data); a bare Cyclone frame spends
     # 4 more bytes on the report header, leaving 48
@@ -402,6 +498,8 @@ def pump_reads():
     register read in flight, resending if a reply is dropped (the controller
     drops back-to-back commands)."""
     global _inflight
+    if profiles.active().write_style == 'supernova':
+        return          # no register reads exist on this pad; nothing to frame
     now = time.time()
     cmd = None
     with _read_lock:
