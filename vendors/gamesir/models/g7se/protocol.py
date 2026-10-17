@@ -116,7 +116,7 @@ def open_device(bus, address, sysfs):
     if not CONFIGURATION_VERIFIED:
         raise UsbTransportError('G7 SE configuration disabled: cold-start replies unverified')
     root = Path(sysfs).resolve()
-    if (root / 'bcdDevice').read_text().strip() != '0630':
+    if (root / 'bcdDevice').read_text().strip() != f'{TESTED_DESCRIPTOR:04x}':
         raise UsbTransportError('G7 SE remapping is tested only on firmware descriptor 6.30')
     return InterruptHandle.open(VID, (PID,), bus, address, sysfs, 0, 2, 0x82)
 

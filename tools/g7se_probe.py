@@ -1226,13 +1226,13 @@ def main():
     try:
         roots = [Path(args.sysfs)] if args.sysfs else [p for p in Path('/sys/bus/usb/devices').glob('*')
             if (p / 'idVendor').exists() and (p / 'idVendor').read_text().strip() == '3537'
-            and (p / 'idProduct').read_text().strip() == '1010']
+            and (p / 'idProduct').read_text().strip() == f'{se.PID:04x}']
         if len(roots) != 1:
             raise UsbTransportError('Select exactly one G7 SE with --sysfs')
         report['before'] = topology(roots[0])
         if (report['before']['idVendor'], report['before']['idProduct'],
-                report['before']['bcdDevice']) != ('3537', '1010', '0630'):
-            raise UsbTransportError('Probe is limited to 3537:1010 descriptor 6.30')
+                report['before']['bcdDevice']) != (f'{se.VID:04x}', f'{se.PID:04x}', f'{se.TESTED_DESCRIPTOR:04x}'):
+            raise UsbTransportError(f'Probe is limited to 3537:{se.PID:04x} descriptor {se.TESTED_DESCRIPTOR:04x}')
         if args.rate_roundtrip or args.verify_rate_reconnect or args.restore_rate_originals:
             from tools.g7se_rates import run
             success = run(roots[0], args.output,
