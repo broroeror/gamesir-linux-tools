@@ -281,7 +281,6 @@ class GamesirBridge(QObject):
         self._se_rates = {}
         self._se_rate_scope = None
         self._se_rate_deadline = None
-        self._se_view_deadline = None
         g = lambda a: getattr(prof, a)
         self._scalars = {k: (g(a), lbl) for k, (a, lbl) in _SCALAR_FIELDS.items()
                          if g(a) is not None}
@@ -387,7 +386,6 @@ class GamesirBridge(QObject):
         self._se_rates = {}
         self._se_rate_scope = None
         self._se_rate_deadline = None
-        self._se_view_deadline = None
         self._loaded_profile = None
         self._config_loading = None
         self._config_loading_gen = None
@@ -852,14 +850,14 @@ class GamesirBridge(QObject):
                     reqs += g7pro.blob_requests(0x20, g7pro.DOCK_BLOB_SIZE)
                     self._g7_dock_loading = True
             else:
-                reqs = [(bank, addr, ln) for addr, ln in self._prof.read_fields()
-                        if self._prof is not profiles.G7_SE or addr != g7se.POLL_RATE]
+                # G7 SE 6.64: the profile fields are sliced out of one whole-bank read.
+                reqs = [] if self._se_full_view() else [
+                    (bank, addr, ln) for addr, ln in self._prof.read_fields()
+                    if self._prof is not profiles.G7_SE or addr != g7se.POLL_RATE]
                 reqs += [(bank, addr, g7se.REMAP_LEN if self._prof is profiles.G7_SE else 2)
                          for _n, addr in self._prof.REMAP_SLOTS]
                 if self._se_full_view():
-                    # Whole bank for the read-only Sticks/Triggers/Vibration view.
                     reqs += g7se.view_requests(bank)
-                    self._se_view_deadline = time.monotonic() + 4
             self._config_loading_gen = control.generation()
             control.request_regs(reqs)
             self._config_loading = bank
@@ -894,18 +892,21 @@ class GamesirBridge(QObject):
             self._config_generation = self._config_loading_gen
             self.configLoaded.emit()
             return
-        vals = {addr: control.reg_result(bank, addr)
-                for addr, _ln in self._prof.read_fields()
-                if self._prof is not profiles.G7_SE or addr != g7se.POLL_RATE}
+        view = None
+        if self._se_full_view():
+            view = g7se.stitch_view(bank, control.reg_result)
+            if view is None:
+                return
+            vals = {addr: list(view[addr:addr + ln]) for addr, ln in self._prof.read_fields()
+                    if addr != g7se.POLL_RATE}
+        else:
+            vals = {addr: control.reg_result(bank, addr)
+                    for addr, _ln in self._prof.read_fields()
+                    if self._prof is not profiles.G7_SE or addr != g7se.POLL_RATE}
         vals.update({addr: control.reg_result(bank, addr)
                      for _n, addr in self._prof.REMAP_SLOTS})
         if any(v is None for v in vals.values()):
             return
-        view = None
-        if self._se_full_view():
-            view = g7se.stitch_view(bank, control.reg_result)
-            if view is None and time.monotonic() < (self._se_view_deadline or 0):
-                return      # the view is optional: give up on it after the deadline
         self._config_loading = None
         try:
             cand = self._build_config(vals)
@@ -916,11 +917,10 @@ class GamesirBridge(QObject):
             self.configLoaded.emit()
             return
         if view is not None:
+            # G7 SE extras share the G7 Pro encoding (sensitivity, invert X/Y).
             shown = g7pro.decode_profile(view.ljust(g7pro.PROFILE_BLOB_SIZE, b'\0'))
-            for key in ('remap', 'motion', 'poll', 'dpad_swap', 'dpad_lock'):
-                shown.pop(key, None)
-            for key, value in shown.items():
-                cand.setdefault(key, value)
+            for key in self._SE_EXTRAS:
+                cand[key] = shown[key]
         # Guard against a transient/garbage read overwriting a good config (the
         # "triggers 0–0 after a page switch" bug): a deadzone MAX of 0 fully
         # deadzones the axis, which no real profile does — so it signals the
@@ -2625,27 +2625,35 @@ class GamesirBridge(QObject):
         label = cfg.REMAP_NONE if code < 0 else self.targetLabel(code)
         self._queue(addr, data, 'Rebind ' + source, label)
 
+    _SE_EXTRAS = ('st_sensitivity', 'rs_sensitivity', 'st_invert_x', 'st_invert_y',
+                  'rs_invert_x', 'rs_invert_y')
+
     @Slot(str, int)
     def setG7Extra(self, name, value):
         """Stage one approved G7-only setting using its documented encoding."""
-        if self._prof is not profiles.G7_PRO:
+        if self._prof is profiles.G7_SE:
+            if not self._se_full_view() or name not in self._SE_EXTRAS:
+                return
+        elif self._prof is not profiles.G7_PRO:
             return
         x = self._prof.extras
         profile = self._prof.profile_bank(state.get('edit_profile') or state.get('profile'))
-        simple = {
-            'vib_trigger_l': (x['VIB_TRIG_L'], max(0, min(100, value))),
-            'vib_trigger_r': (x['VIB_TRIG_R'], max(0, min(100, value))),
-            'st_sensitivity': (x['ST_SENS'], max(0, min(100, value))),
-            'rs_sensitivity': (x['RS_SENS'], max(0, min(100, value))),
-            'st_resolution': (x['ST_RESOLUTION'], 12 - max(8, min(12, value))),
-            'rs_resolution': (x['RS_RESOLUTION'], 12 - max(8, min(12, value))),
-            'st_invert_x': (x['ST_INVERT_X'], 1 if value else 0),
-            'st_invert_y': (x['ST_INVERT_Y'], 1 if value else 0),
-            'rs_invert_x': (x['RS_INVERT_X'], 1 if value else 0),
-            'rs_invert_y': (x['RS_INVERT_Y'], 1 if value else 0),
-            'dpad_swap': (x['DPAD_SWAP'], 1 if value else 0),
-            'dpad_lock': (x['DPAD_LOCK'], 1 if value else 0),
+        enc = {
+            'vib_trigger_l': ('VIB_TRIG_L', lambda v: max(0, min(100, v))),
+            'vib_trigger_r': ('VIB_TRIG_R', lambda v: max(0, min(100, v))),
+            'st_sensitivity': ('ST_SENS', lambda v: max(0, min(100, v))),
+            'rs_sensitivity': ('RS_SENS', lambda v: max(0, min(100, v))),
+            'st_resolution': ('ST_RESOLUTION', lambda v: 12 - max(8, min(12, v))),
+            'rs_resolution': ('RS_RESOLUTION', lambda v: 12 - max(8, min(12, v))),
+            'st_invert_x': ('ST_INVERT_X', lambda v: 1 if v else 0),
+            'st_invert_y': ('ST_INVERT_Y', lambda v: 1 if v else 0),
+            'rs_invert_x': ('RS_INVERT_X', lambda v: 1 if v else 0),
+            'rs_invert_y': ('RS_INVERT_Y', lambda v: 1 if v else 0),
+            'dpad_swap': ('DPAD_SWAP', lambda v: 1 if v else 0),
+            'dpad_lock': ('DPAD_LOCK', lambda v: 1 if v else 0),
         }
+        # only the registers this model has (the G7 SE maps a subset)
+        simple = {k: (x[reg], f(value)) for k, (reg, f) in enc.items() if reg in x}
         if name in simple:
             addr, encoded = simple[name]
             self._config[name] = value
@@ -2823,7 +2831,7 @@ class GamesirBridge(QObject):
                             raise ValueError('G7 SE report-rate values must be reloaded')
                         g7se.rate_write(1, r['bank'], r['data'])
                     else:
-                        g7se.remap_write(1, r['bank'], r['addr'], r['data'])
+                        g7se.settings_write(1, r['bank'], r['addr'], r['data'])
                 if r.get('kind') == 'continuous_trigger':
                     edit = state.get('edit_profile') or state.get('profile')
                     if (r.get('generation') != control.generation()

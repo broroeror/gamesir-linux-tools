@@ -29,6 +29,36 @@ PROFILE_SIZE = 421
 PROFILE_BANKS = (1, 2, 3)  # Nexus exposes three editable profiles.
 POLL_RATES = ('250 Hz', '500 Hz', '1000 Hz')
 
+def _percent(data):
+    return len(data) == 1 and data[0] <= 100
+
+
+def _flag(data):
+    return len(data) == 1 and data[0] in (0, 1)
+
+
+def _curve(data):
+    # [type 0-3, intensity 0-100, 0, 0, x0 y0 x1 y1 x2 y2] (G7 Pro curve block)
+    return len(data) == 10 and data[0] <= 3 and data[1] <= 100 and data[2:4] == b'\0\0'
+
+
+# 6.64 profile settings with a verified plain write: on bank 3, each one changed
+# exactly its own bytes and restored byte-exact (write_test_664.py, 2026-10-17).
+# address -> (length, validator). Stick fields repeat at +0x20 (right stick),
+# trigger fields at +0x1c (right trigger), as on the G7 Pro.
+SETTINGS_664 = {
+    0x0020: (1, _percent), 0x0021: (1, _percent),            # grip vibration L/R
+    **{a + o: (1, _percent) for o in (0, 0x1c)                 # trigger dz / anti-dz
+       for a in (0x00cf, 0x00d0, 0x00d1, 0x00d2)},
+    **{a + o: (1, _percent) for o in (0, 0x20)                 # stick dz / anti-dz
+       for a in (0x013f, 0x0140, 0x0141, 0x0142)},
+    0x0153: (1, _percent), 0x0173: (1, _percent),            # stick sensitivity
+    0x0151: (1, _flag), 0x0152: (1, _flag),                  # left stick invert X/Y
+    0x0171: (1, _flag), 0x0172: (1, _flag),                  # right stick invert X/Y
+    0x00dc: (10, _curve), 0x00f8: (10, _curve),              # trigger curves
+    0x0144: (10, _curve), 0x0164: (10, _curve),              # stick curves
+}
+
 # Per-firmware register layout.
 #   6.30: 8-byte rear records (04 00 00 00 00 00 01 target, zeros = default);
 #         one controller-wide rate byte that Nexus writes to all four banks.
@@ -40,7 +70,7 @@ LAYOUTS = {
     0x0630: dict(
         PID=0x1010, RATE_BANKS=(1, 2, 3, 4), RATE_PER_PROFILE=False, POLL_RATE=0x0036,
         REMAP_LEN=8, REMAP_SLOTS=(('L4', 0x00ab), ('R4', 0x00c7)), REMAP_DEFAULTS={},
-        FULL_VIEW=False,
+        FULL_VIEW=False, SETTINGS={},
         GAMEPAD_TARGETS=(('Dpad Up', 1), ('Dpad Down', 2), ('Dpad Left', 3),
                          ('Dpad Right', 4), ('LB', 5), ('RB', 6), ('LS', 7), ('RS', 8),
                          ('A', 15), ('B', 16), ('X', 17), ('Y', 18), ('View', 22),
@@ -52,7 +82,7 @@ LAYOUTS = {
         # The 6.64 bank follows the G7 Pro register map (vibration 0x20.., trigger
         # blocks 0xcf/0xeb, stick blocks 0x13c/0x15c), so the whole bank is read
         # and shown read-only. Writes stay limited to the captured L4/R4/rate.
-        FULL_VIEW=True,
+        FULL_VIEW=True, SETTINGS=SETTINGS_664,
         GAMEPAD_TARGETS=(('Dpad Up', 1), ('Dpad Down', 2), ('Dpad Left', 3),
                          ('Dpad Right', 4), ('LB', 5), ('RB', 6), ('LS', 7), ('RS', 8),
                          ('A', 9), ('B', 10), ('X', 11), ('Y', 12), ('View', 14),
@@ -62,7 +92,7 @@ SUPPORTED_DESCRIPTORS = tuple(LAYOUTS)
 CONFIG_PIDS = tuple(layout['PID'] for layout in LAYOUTS.values())
 LAYOUT_PIDS = {layout['PID']: descriptor for descriptor, layout in LAYOUTS.items()}
 RATE_BANKS = RATE_PER_PROFILE = POLL_RATE = None
-REMAP_LEN = REMAP_SLOTS = REMAP_DEFAULTS = GAMEPAD_TARGETS = FULL_VIEW = None
+REMAP_LEN = REMAP_SLOTS = REMAP_DEFAULTS = GAMEPAD_TARGETS = FULL_VIEW = SETTINGS = None
 READ_CHUNK = 0x37  # bytes per register read reply on this channel
 
 
@@ -167,9 +197,22 @@ def rate_write(sequence, bank, data):
     return bytes((15, 0, sequence, 60)) + body.ljust(60, b'\0')
 
 
+def setting_write(sequence, bank, address, data):
+    """Plain write of one verified profile setting (6.64 SETTINGS table)."""
+    data = bytes(data)
+    length, valid = SETTINGS[address]
+    if (not 0 <= sequence <= 255 or bank not in PROFILE_BANKS
+            or len(data) != length or not valid(data)):
+        raise ValueError(f'Unsupported G7 SE value at 0x{address:04x}; editing refused')
+    body = bytes((3, bank)) + address.to_bytes(2, 'big') + bytes((length,)) + data
+    return bytes((15, 0, sequence, 60)) + body.ljust(60, b'\0')
+
+
 def settings_write(sequence, bank, address, data):
     if address == POLL_RATE:
         return rate_write(sequence, bank, data)
+    if SETTINGS and address in SETTINGS:
+        return setting_write(sequence, bank, address, data)
     return remap_write(sequence, bank, address, data)
 
 
@@ -192,6 +235,8 @@ def stitch_view(bank, result):
 
 def allowed_setting_read(bank, address, length):
     if FULL_VIEW and bank in PROFILE_BANKS and (bank, address, length) in view_requests(bank):
+        return True
+    if SETTINGS and bank in PROFILE_BANKS and SETTINGS.get(address, (None,))[0] == length:
         return True
     return ((bank in RATE_BANKS and address == POLL_RATE and length == 1)
             or (bank in PROFILE_BANKS and address in dict(REMAP_SLOTS).values()

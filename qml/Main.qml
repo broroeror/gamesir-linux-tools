@@ -626,7 +626,6 @@ Window {
             VibrationPage {
                 anchors.fill: parent
                 visible: win.tabs[win.currentTab] === "Vibration"
-                enabled: !bridge.seFullView      // G7 SE: read-only view
             }
 
             // Sticks tab.
@@ -635,7 +634,6 @@ Window {
                 visible: win.tabs[win.currentTab] === "Sticks"
                 isStick: true
                 sideKeys: [["Left Stick", "st"], ["Right Stick", "rs"]]
-                enabled: !bridge.seFullView
             }
 
             // Triggers tab.
@@ -644,25 +642,6 @@ Window {
                 visible: win.tabs[win.currentTab] === "Triggers"
                 isStick: false
                 sideKeys: [["Left Trigger", "lt"], ["Right Trigger", "rt"]]
-                enabled: !bridge.seFullView
-            }
-
-            // G7 SE: these pages show the controller's stored values, but only
-            // L4/R4 and the report rate have a captured, verified write path.
-            Rectangle {
-                visible: bridge.seFullView
-                         && ["Sticks", "Triggers", "Vibration"].indexOf(win.tabs[win.currentTab]) >= 0
-                anchors.bottom: parent.bottom; anchors.bottomMargin: 10
-                anchors.horizontalCenter: parent.horizontalCenter
-                z: 50; radius: 6; color: Theme.card
-                border.color: Theme.warn; border.width: 1
-                width: roText.implicitWidth + 24; height: roText.implicitHeight + 12
-                Text {
-                    id: roText
-                    anchors.centerIn: parent
-                    text: "Read-only on the G7 SE: values read from the controller. Editing is not verified yet."
-                    color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
-                }
             }
 
             // Lights tab. Only the Cyclone's keyframe/palette RGB is wired up; other

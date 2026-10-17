@@ -104,14 +104,40 @@ class FullView664Tests(unittest.TestCase):
         self.assertFalse(se.allowed_setting_read(4, 0, se.READ_CHUNK))      # not a profile
         self.assertFalse(se.allowed_setting_read(1, 1, se.READ_CHUNK))      # off-grid
 
-    def test_view_is_read_only(self):
-        # Widening reads must not widen writes: a deadzone write is still refused.
-        self.assertFalse(se.allowed_app_request(
-            bytes.fromhex('0f00053c0301013f0105').ljust(64, b'\0')))
+    def test_only_verified_settings_are_writable(self):
+        w = lambda hexstr: bytes.fromhex(hexstr).ljust(64, b'\0')
+        self.assertTrue(se.allowed_app_request(w('0f00053c0303013f0114')))      # LS dz min 20
+        self.assertTrue(se.allowed_app_request(w('0f00053c0301015f0105')))      # RS dz min 5
+        self.assertTrue(se.allowed_app_request(w('0f00053c030200eb010f')))      # RT dz min 15
+        self.assertTrue(se.allowed_app_request(w('0f00053c03010152 0101'.replace(' ', ''))))
+        self.assertFalse(se.allowed_app_request(w('0f00053c0301013f0165')))     # 101 %
+        self.assertFalse(se.allowed_app_request(w('0f00053c03010152 0102'.replace(' ', ''))))
+        self.assertFalse(se.allowed_app_request(w('0f00053c0301013d0101')))     # trajectory
+        self.assertFalse(se.allowed_app_request(w('0f00053c030100d80181')))     # hair trigger
+        self.assertFalse(se.allowed_app_request(w('0f00053c0304013f0114')))     # bank 4
+        self.assertFalse(se.allowed_app_request(w('0f00053c0301013f021414')))   # wrong length
+        self.assertTrue(se.allowed_app_request(w('0f00053c030101440a' + '00640000394080' + '80c6bf')))
+        self.assertFalse(se.allowed_app_request(w('0f00053c030101440a' + '04640000394080' + '80c6bf')))
+
+    def test_settings_write_matches_the_tested_packets(self):
+        # write_test_664.py sent exactly these and read each one back byte-exact.
+        self.assertEqual(se.settings_write(7, 3, 0x013f, b'\x14'),
+                         bytes.fromhex('0f00073c0303013f0114').ljust(64, b'\0'))
+        self.assertEqual(se.settings_write(7, 3, 0x0020, b'\x32'),
+                         bytes.fromhex('0f00073c030300200132').ljust(64, b'\0'))
+        for bank, address, length in [(1, 0x0144, 10), (2, 0x0153, 1), (3, 0x00dc, 10)]:
+            self.assertTrue(se.allowed_setting_read(bank, address, length))
+        self.assertFalse(se.allowed_setting_read(1, 0x0144, 4))
+
+    def test_bank_values_pass_their_own_validators(self):
+        # Reading back a factory or Nexus-written bank must never be refused.
+        for address, (length, valid) in se.SETTINGS.items():
+            self.assertTrue(valid(self.BANK1[address:address + length]), hex(address))
 
     def test_630_has_no_full_view(self):
         se.select(0x0630)
         self.assertFalse(se.FULL_VIEW)
+        self.assertEqual(se.SETTINGS, {})
         self.assertFalse(se.allowed_setting_read(1, 0, se.READ_CHUNK))
 
     def test_stitch_and_decode_with_the_g7_pro_map(self):

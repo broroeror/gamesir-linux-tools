@@ -238,6 +238,7 @@ Item {
 
             Card {
                 title: root.isStick ? "Stick Trajectory" : "Hair Trigger Mode"
+                visible: !bridge.seFullView     // not mapped on the G7 SE
                 Layout.fillWidth: true
                 Flow {
                     width: parent.width; spacing: 8
@@ -286,8 +287,10 @@ Item {
             Card {
                 visible: root.isStick && bridge.g7Layout
                 title: "Stick hardware"; Layout.fillWidth: true
-                Text { text: "Resolution"; color: Theme.textDim; font.family: Theme.fontFamily }
+                Text { text: "Resolution"; color: Theme.textDim; font.family: Theme.fontFamily
+                       visible: !bridge.seFullView }
                 Flow {
+                    visible: !bridge.seFullView
                     width: parent.width; spacing: 6
                     Repeater {
                         model: [8, 9, 10, 11, 12]

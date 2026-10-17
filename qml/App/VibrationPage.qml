@@ -82,6 +82,7 @@ Item {
                     onMoved: bridge.setScalar("vib_l", value)
                 }
                 PillButton {
+                    visible: !bridge.seFullView     // no G7 SE rumble path here
                     objectName: "testLeftGrip"
                     label: "Test left grip (heavy motor)"
                     enabled: !page.testRunning && vibL.value > 0
@@ -101,6 +102,7 @@ Item {
                     onMoved: bridge.setScalar("vib_r", value)
                 }
                 PillButton {
+                    visible: !bridge.seFullView
                     objectName: "testRightGrip"
                     label: "Test right grip (light motor)"
                     enabled: !page.testRunning && vibR.value > 0
@@ -117,6 +119,7 @@ Item {
                     color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                 }
                 PillButton {
+                    visible: !bridge.seFullView
                     label: "Test both grip motors"
                     enabled: !page.testRunning && (!bridge.g7Layout || bridge.configClaimed)
                     onClicked: {
@@ -127,7 +130,7 @@ Item {
             }
 
             Card {
-                visible: bridge.g7Layout; title: "Trigger motors"; Layout.fillWidth: true
+                visible: bridge.g7Layout && !bridge.seFullView; title: "Trigger motors"; Layout.fillWidth: true
                 // GameSir doesn't document what Force and Sync do, so say only what
                 // was observed: with Force on, a trigger's test stays silent
                 // (Amazon edition, 2026-10-06) -- it read as a broken test.
