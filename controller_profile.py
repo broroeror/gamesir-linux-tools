@@ -408,19 +408,29 @@ G7_PRO_OTHER = ControllerProfile(
 # G7 SE: verified rear-button records and controller-wide report rate.
 # Configuration is gated by the tested firmware descriptor.
 G7_SE = ControllerProfile(
-    name='GameSir G7 SE', short='G7 SE', usb_products=(0x1010,),
-    wired_products=(0x1010,), write_style='g7se', input_style='evdev', transport='usb_vendor',
+    name='GameSir G7 SE', short='G7 SE', usb_products=_se.CONFIG_PIDS,
+    wired_products=_se.CONFIG_PIDS, write_style='g7se', input_style='evdev', transport='usb_vendor',
     software_profile_switch=False,
     POLL_RATE=_se.POLL_RATE, POLL_RATES=_se.POLL_RATES,
     profile_banks=_se.PROFILE_BANKS, REMAP_TARGETS=_se.GAMEPAD_TARGETS,
     REMAP_SLOTS=_se.REMAP_SLOTS, supports_hair_thresholds=False,
 )
 
-# G7 SE firmware 6.64 identities (GIP 1069, XInput 10a0, and the DirectInput
+
+
+def apply_g7se_layout():
+    """Refresh G7_SE's register fields after protocol.select() switched firmware."""
+    G7_SE.POLL_RATE = _se.POLL_RATE
+    G7_SE.profile_banks = _se.PROFILE_BANKS
+    G7_SE.REMAP_TARGETS = _se.GAMEPAD_TARGETS
+    G7_SE.REMAP_SLOTS = _se.REMAP_SLOTS
+
+
+# G7 SE firmware 6.64 fallback identities (XInput 10a0, and the DirectInput
 # 1082 it shares with the Kaleid). Detection only: input over evdev, no writes.
 G7_SE_OTHER = ControllerProfile(
-    name='GameSir G7 SE', short='G7 SE', usb_products=_se.OTHER_PIDS,
-    wired_products=_se.OTHER_PIDS + (_se.PID_HID_664,),
+    name='GameSir G7 SE', short='G7 SE', usb_products=(_se.PID_XINPUT_664,),
+    wired_products=(_se.PID_XINPUT_664, _se.PID_HID_664),
     write_style='none', input_style='evdev', profile_banks=(),
 )
 

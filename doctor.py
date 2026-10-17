@@ -90,7 +90,6 @@ USB_IDENTITIES.update(KALEID_IDENTITIES)
 try:
     from vendors.gamesir.models.g7se import protocol as _se
     USB_IDENTITIES.update({
-        _se.PID_GIP_664: 'G7 SE 6.64 Xbox/GIP mode (input only)',
         _se.PID_XINPUT_664: 'G7 SE 6.64 XInput mode (input only)',
     })
 except Exception:                      # partial install -- report what we can
@@ -538,7 +537,7 @@ def collect():
     try:
         from gs_common import find_controllers
         for dev in find_controllers():
-            if dev.get('pid') == 0x1010:
+            if _se and dev.get('pid') in _se.LAYOUT_PIDS:
                 meta = dev.get('usb') or {}
                 node = '/dev/bus/usb/%03d/%03d' % (meta.get('bus', 0), meta.get('address', 0))
                 rep['g7se_devices'].append({
@@ -548,14 +547,17 @@ def collect():
                     'access': os.access(node, os.R_OK | os.W_OK),
                     'interfaces': _interfaces(meta.get('sysfs')),
                 })
-                supported = dev.get('bcd') == 0x0630
+                tested = _se.LAYOUT_PIDS[dev['pid']]
+                supported = dev.get('bcd') == tested
                 rep['verdict'].append(
-                    'G7 SE (3537:1010) found. ' + (
-                    'L4/R4 remapping and 250/500/1000 Hz rate settings are verified on descriptor 6.30. '
+                    f'G7 SE (3537:{dev["pid"]:04x}) found. ' + (
+                    'L4/R4 remapping and 250/500/1000 Hz rate settings are verified on '
+                    f'descriptor {_se.descriptor_name(tested)}. '
                     'Configuration uses native USB with a fresh Xbox authentication '
                     'exchange when needed (requires OpenSSL). Release to games afterward.'
-                    if supported else 'This firmware is input-only; configuration was '
-                    'verified only on descriptor 6.30.') + ('' if os.access(node, os.R_OK | os.W_OK)
+                    if supported else 'This firmware is input-only; configuration on this '
+                    f'identity was verified only on descriptor {_se.descriptor_name(tested)}.')
+                    + ('' if os.access(node, os.R_OK | os.W_OK)
                         else ' USB access is missing; install the G7 SE udev rule and reconnect.'))
                 continue
             if dev.get('pid') not in USB_IDENTITIES:
@@ -807,7 +809,7 @@ def format_report(rep):
     for n in rep.get('usb_devices', []) + rep.get('g7se_devices', []):
         L.append(f'- {n["node"]}  GameSir {n["pid"]:04x} '
                  f'({n.get("identity", "unknown")})  "{n["product"]}" port {n["port"]}')
-        if n['pid'] == 0x1010:
+        if _se and n['pid'] in _se.LAYOUT_PIDS:
             L.append('    diagnostic USB access: ' + ('OK' if n['access'] else 'PERMISSION DENIED'))
         elif n['pid'] not in NEEDS_USB:
             # Deadband only opens the identities it can configure, plus the one

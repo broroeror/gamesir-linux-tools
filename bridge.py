@@ -776,6 +776,9 @@ class GamesirBridge(QObject):
                 and self._loaded_profile == edit and self._config_loading is None
                 and self._config_generation == control.generation())
 
+    def _se_rate_banks(self):
+        return g7se.rate_banks(state.get('edit_profile') or state.get('profile'))
+
     def _poll_se_rates(self):
         # Independent of remap loading: a missing rate reply must not block L4/R4.
         if self._prof is not profiles.G7_SE or self._backup_busy:
@@ -795,10 +798,10 @@ class GamesirBridge(QObject):
         if self._se_rate_scope is None:
             self._se_rate_scope = scope
             self._se_rate_deadline = time.monotonic() + 3
-            control.request_regs([(bank, g7se.POLL_RATE, 1) for bank in g7se.RATE_BANKS])
+            control.request_regs([(bank, g7se.POLL_RATE, 1) for bank in self._se_rate_banks()])
         if self._se_rate_deadline is None:
             return
-        values = {bank: control.reg_result(bank, g7se.POLL_RATE) for bank in g7se.RATE_BANKS}
+        values = {bank: control.reg_result(bank, g7se.POLL_RATE) for bank in self._se_rate_banks()}
         if any(value is None for value in values.values()):
             if time.monotonic() >= self._se_rate_deadline:
                 control.cancel_se_rate_reads()
@@ -849,7 +852,7 @@ class GamesirBridge(QObject):
             else:
                 reqs = [(bank, addr, ln) for addr, ln in self._prof.read_fields()
                         if self._prof is not profiles.G7_SE or addr != g7se.POLL_RATE]
-                reqs += [(bank, addr, 8 if self._prof is profiles.G7_SE else 2)
+                reqs += [(bank, addr, g7se.REMAP_LEN if self._prof is profiles.G7_SE else 2)
                          for _n, addr in self._prof.REMAP_SLOTS]
             self._config_loading_gen = control.generation()
             control.request_regs(reqs)
@@ -970,7 +973,7 @@ class GamesirBridge(QObject):
             rec = vals[addr]
             # store the raw target CODE (or -1 = unmapped) so keyboard/mouse
             # rebinds share one path; the UI resolves the label via targetLabel().
-            remap[name] = (g7se.decode_remap(rec) if p is profiles.G7_SE else
+            remap[name] = (g7se.decode_remap(rec, addr) if p is profiles.G7_SE else
                            (rec[1] if len(rec) > 1 else 0) if rec[0] else -1)
         out['remap'] = remap
         if p.CONTINUOUS_TRIGGER_SLOTS:
@@ -1096,7 +1099,9 @@ class GamesirBridge(QObject):
             if not g7se.CONFIGURATION_VERIFIED:
                 return 'G7 SE configuration is disabled: cold-start configuration replies are unverified.'
             if not self._se_configuration_supported():
-                return 'G7 SE remapping is tested only on firmware descriptor 6.30; input remains available.'
+                return ('G7 SE remapping is tested only on firmware '
+                        + ' and '.join(map(g7se.descriptor_name, g7se.SUPPORTED_DESCRIPTORS))
+                        + '; input remains available.')
             return 'Edit L4/R4 or Poll rate, then Save and Release to games.'
         if profiles.active() is profiles.G7_NATIVE:
             return ('Hold SHARE + MENU (☰) to switch the controller to XInput '
@@ -2320,7 +2325,7 @@ class GamesirBridge(QObject):
         if self._prof is profiles.G7_SE:
             return (self._se_editable_session()
                     and self._se_rate_scope == self._se_settings_scope()
-                    and set(self._se_rates) == set(g7se.RATE_BANKS))
+                    and set(self._se_rates) == set(self._se_rate_banks()))
         return bool(self.pollRates and 'poll' in self._config and not self._backup_busy)
 
     @Property(int, notify=pollRateStateChanged)
@@ -2497,7 +2502,8 @@ class GamesirBridge(QObject):
                 self._pending.pop(key, None)
                 self.pendingChanged.emit()
                 return
-            self._queue(g7se.POLL_RATE, [index], 'Poll rate (all profiles)',
+            self._queue(g7se.POLL_RATE, [index],
+                        'Poll rate' if g7se.RATE_PER_PROFILE else 'Poll rate (all profiles)',
                         g7se.POLL_RATES[index], key=key, kind='se_rate')
             self._pending[key]['generation'] = control.generation()
             return
@@ -2575,7 +2581,7 @@ class GamesirBridge(QObject):
                     or source not in self._config.get('remap', {})):
                 return
             try:
-                data = g7se.remap_record(code)
+                data = g7se.remap_record(code, addr)
             except ValueError:
                 return
             self._queue(addr, data, 'Rebind ' + source,
@@ -2693,7 +2699,7 @@ class GamesirBridge(QObject):
             self._config['poll'] = data[0]
         elif addr in self._addr_to_remap:
             rec = self._config.setdefault('remap', {})
-            rec[self._addr_to_remap[addr]] = (g7se.decode_remap(data) if self._prof is profiles.G7_SE
+            rec[self._addr_to_remap[addr]] = (g7se.decode_remap(data, addr) if self._prof is profiles.G7_SE
                 else (data[1] if len(data) > 1 else 0) if data[0] else -1)
         elif addr in self._addr_to_continuous:
             self._config.setdefault('continuous_trigger', {})[
@@ -2804,7 +2810,7 @@ class GamesirBridge(QObject):
             for r in snapshot_pending.values():
                 if r.get('kind') == 'se_rate':
                     changes.extend((bank, g7se.POLL_RATE, list(r['data']))
-                                   for bank in g7se.RATE_BANKS)
+                                   for bank in g7se.rate_banks(r['bank']))
         prof, gen = self._prof, control.generation()
         edit_profile = state.get('edit_profile') or state.get('profile')
         original_profile = control.expected_profile()

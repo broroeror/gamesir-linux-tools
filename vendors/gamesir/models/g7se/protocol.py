@@ -1,8 +1,10 @@
 """G7 SE rear-button remapping and report-rate protocol.
 
 Record semantics verified on descriptor 6.30 with Nexus captures and Linux
-roundtrips. Cold connections require a fresh verified GIP v1 handshake.
+roundtrips, and on 6.64 with Nexus 2.5.8 captures (one change per capture).
+Cold connections require a fresh verified GIP v1 handshake.
 Writes allow only complete L4/R4 records and the captured report-rate byte.
+The module constants describe the selected firmware; select() switches them.
 """
 
 VID = 0x3537
@@ -13,11 +15,10 @@ CONFIGURATION_VERIFIED = True  # Firmware 0630: authenticated reads and remap ro
 # plugged on Linux it offers 10a0 (XInput), drops off the bus ~2-4 ms after the
 # config descriptor is read and comes back as 1082 (DirectInput, the id the
 # Kaleid also uses). Plugged in across a cold boot it settles on 1069 (Xbox GIP)
-# and xpad binds it. Input only: no configuration reply has been verified there.
+# and xpad binds it; only that identity is configurable.
 PID_GIP_664 = 0x1069
 PID_XINPUT_664 = 0x10a0
 PID_HID_664 = 0x1082
-OTHER_PIDS = (PID_GIP_664, PID_XINPUT_664)
 
 
 def is_g7se_product(product):
@@ -26,16 +27,70 @@ def is_g7se_product(product):
 
 PROFILE_SIZE = 421
 PROFILE_BANKS = (1, 2, 3)  # Nexus exposes three editable profiles.
-RATE_BANKS = (1, 2, 3, 4)  # Nexus applies its controller-wide rate to all banks.
-POLL_RATE = 0x0036
 POLL_RATES = ('250 Hz', '500 Hz', '1000 Hz')
-REMAP_SLOTS = (('L4', 0x00ab), ('R4', 0x00c7))
-GAMEPAD_TARGETS = (('Dpad Up', 1), ('Dpad Down', 2), ('Dpad Left', 3),
-                  ('Dpad Right', 4), ('LB', 5), ('RB', 6), ('LS', 7), ('RS', 8),
-                  ('A', 15), ('B', 16), ('X', 17), ('Y', 18), ('View', 22), ('Menu', 23))
+
+# Per-firmware register layout.
+#   6.30: 8-byte rear records (04 00 00 00 00 00 01 target, zeros = default);
+#         one controller-wide rate byte that Nexus writes to all four banks.
+#   6.64: a 1-byte target code at the end of each 7-byte button record, where
+#         the default is the button's own code (L4 11, R4 12); the rate byte is
+#         per profile (Nexus 2.5.8 wrote only the edited bank). Rate code 00 is
+#         assumed to be 250 Hz like 6.30; 01 and 02 were captured.
+LAYOUTS = {
+    0x0630: dict(
+        PID=0x1010, RATE_BANKS=(1, 2, 3, 4), RATE_PER_PROFILE=False, POLL_RATE=0x0036,
+        REMAP_LEN=8, REMAP_SLOTS=(('L4', 0x00ab), ('R4', 0x00c7)), REMAP_DEFAULTS={},
+        GAMEPAD_TARGETS=(('Dpad Up', 1), ('Dpad Down', 2), ('Dpad Left', 3),
+                         ('Dpad Right', 4), ('LB', 5), ('RB', 6), ('LS', 7), ('RS', 8),
+                         ('A', 15), ('B', 16), ('X', 17), ('Y', 18), ('View', 22),
+                         ('Menu', 23))),
+    0x0664: dict(
+        PID=PID_GIP_664, RATE_BANKS=PROFILE_BANKS, RATE_PER_PROFILE=True, POLL_RATE=0x0030,
+        REMAP_LEN=1, REMAP_SLOTS=(('L4', 0x00b3), ('R4', 0x00c1)),
+        REMAP_DEFAULTS={0x00b3: 0x11, 0x00c1: 0x12},
+        GAMEPAD_TARGETS=(('Dpad Up', 1), ('Dpad Down', 2), ('Dpad Left', 3),
+                         ('Dpad Right', 4), ('LB', 5), ('RB', 6), ('LS', 7), ('RS', 8),
+                         ('A', 9), ('B', 10), ('X', 11), ('Y', 12), ('View', 14),
+                         ('Menu', 15))),
+}
+SUPPORTED_DESCRIPTORS = tuple(LAYOUTS)
+CONFIG_PIDS = tuple(layout['PID'] for layout in LAYOUTS.values())
+LAYOUT_PIDS = {layout['PID']: descriptor for descriptor, layout in LAYOUTS.items()}
+RATE_BANKS = RATE_PER_PROFILE = POLL_RATE = None
+REMAP_LEN = REMAP_SLOTS = REMAP_DEFAULTS = GAMEPAD_TARGETS = None
 
 
-def remap_record(code):
+def select(descriptor):
+    """Switch the module to a firmware layout. False (and no change) if unknown."""
+    layout = LAYOUTS.get(descriptor)
+    if layout is None:
+        return False
+    globals().update(layout, TESTED_DESCRIPTOR=descriptor)
+    return True
+
+
+select(TESTED_DESCRIPTOR)
+
+
+def descriptor_name(descriptor=None):
+    descriptor = TESTED_DESCRIPTOR if descriptor is None else descriptor
+    return f'{descriptor >> 8}.{descriptor & 0xff:02x}'
+
+
+def rate_banks(profile):
+    """Banks one rate edit is written to."""
+    return (profile,) if RATE_PER_PROFILE else RATE_BANKS
+
+
+def remap_record(code, address=None):
+    if REMAP_LEN == 1:
+        if address not in REMAP_DEFAULTS:
+            raise ValueError('Unsupported G7 SE remap source')
+        if code == -1:
+            return bytes((REMAP_DEFAULTS[address],))
+        if code not in dict((c, n) for n, c in GAMEPAD_TARGETS):
+            raise ValueError('Unsupported G7 SE gamepad target')
+        return bytes((code,))
     if code == -1:
         return bytes(8)
     if code not in dict((c, n) for n, c in GAMEPAD_TARGETS):
@@ -43,8 +98,15 @@ def remap_record(code):
     return b'\x04\x00\x00\x00\x00\x00\x01' + bytes((code,))
 
 
-def decode_remap(record):
+def decode_remap(record, address=None):
     record = bytes(record)
+    if REMAP_LEN == 1:
+        if len(record) == 1 and address in REMAP_DEFAULTS:
+            if record[0] == REMAP_DEFAULTS[address]:
+                return -1
+            if record[0] in dict((c, n) for n, c in GAMEPAD_TARGETS):
+                return record[0]
+        raise ValueError('Unknown G7 SE rear-button record; editing refused')
     if record == bytes(8):
         return -1
     if len(record) != 8 or record != remap_record(record[-1]):
@@ -58,8 +120,8 @@ def remap_write(sequence, profile, address, record):
             or address not in dict(REMAP_SLOTS).values()):
         raise ValueError('Unsupported G7 SE remap source/profile')
     record = bytes(record)
-    decode_remap(record)
-    body = bytes((3, profile)) + address.to_bytes(2, 'big') + bytes((8,)) + record
+    decode_remap(record, address)
+    body = bytes((3, profile)) + address.to_bytes(2, 'big') + bytes((REMAP_LEN,)) + record
     return bytes((15, 0, sequence, 60)) + body.ljust(60, b'\0')
 
 
@@ -95,7 +157,7 @@ def rate_write(sequence, bank, data):
     decode_rate(data)
     if not 0 <= sequence <= 255 or bank not in RATE_BANKS:
         raise ValueError('Unsupported G7 SE report-rate bank/sequence')
-    body = bytes((3, bank, 0, POLL_RATE, 1)) + data
+    body = bytes((3, bank)) + POLL_RATE.to_bytes(2, 'big') + b'\x01' + data
     return bytes((15, 0, sequence, 60)) + body.ljust(60, b'\0')
 
 
@@ -107,7 +169,8 @@ def settings_write(sequence, bank, address, data):
 
 def allowed_setting_read(bank, address, length):
     return ((bank in RATE_BANKS and address == POLL_RATE and length == 1)
-            or (bank in PROFILE_BANKS and address in dict(REMAP_SLOTS).values() and length == 8))
+            or (bank in PROFILE_BANKS and address in dict(REMAP_SLOTS).values()
+                and length == REMAP_LEN))
 
 
 def open_device(bus, address, sysfs):
@@ -117,7 +180,7 @@ def open_device(bus, address, sysfs):
         raise UsbTransportError('G7 SE configuration disabled: cold-start replies unverified')
     root = Path(sysfs).resolve()
     if (root / 'bcdDevice').read_text().strip() != f'{TESTED_DESCRIPTOR:04x}':
-        raise UsbTransportError('G7 SE remapping is tested only on firmware descriptor 6.30')
+        raise UsbTransportError('G7 SE firmware changed since its layout was selected')
     return InterruptHandle.open(VID, (PID,), bus, address, sysfs, 0, 2, 0x82)
 
 

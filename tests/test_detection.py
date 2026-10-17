@@ -33,9 +33,10 @@ class DetectionTests(unittest.TestCase):
         self.assertNotIn(0x10a8, g7.CONFIG_PIDS)
         self.assertEqual(profiles.G7_PRO_OTHER.write_style, 'none')
 
-    def test_g7se_664_identities_are_input_only_and_1082_follows_the_product(self):
+    def test_g7se_664_gip_configures_and_fallbacks_follow_the_product(self):
         product = 'GameSir-G7 SE Controller for Xbox'
-        for pid in (0x1069, 0x10a0, 0x1082):
+        self.assertIs(profiles.detect_one(0x1069, product), profiles.G7_SE)
+        for pid in (0x10a0, 0x1082):
             self.assertIs(profiles.detect_one(pid, product), profiles.G7_SE_OTHER)
         self.assertEqual(profiles.G7_SE_OTHER.write_style, 'none')
         self.assertIs(profiles.detect_one(0x1082, 'GameSir-K1 Controller for Xbox'),

@@ -489,7 +489,7 @@ def store_se_reply(report):
     if len(report) < 9:
         return False
     with _read_lock:
-        if _inflight is None or _inflight.get('sequence') != report[2]:
+        if _inflight is None or not g7se.reply_sequence_ok(report, _inflight.get('sequence')):
             return False
         bank, addr, length = _inflight['cmd']
         data = g7se.match_read(report, bank, addr, length)
