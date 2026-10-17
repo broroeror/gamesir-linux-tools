@@ -1057,9 +1057,9 @@ Window {
                             }
                         }
 
-                        Divider { visible: !bridge.remapOnly }   // else two stack
-                        SectionHeader { visible: !bridge.remapOnly; text: "Backup & Restore" }
-                        BackupPanel { visible: !bridge.remapOnly; width: parent.width }
+                        Divider { visible: !bridge.remapOnly || bridge.seFullView }   // else two stack
+                        SectionHeader { visible: !bridge.remapOnly || bridge.seFullView; text: "Backup & Restore" }
+                        BackupPanel { visible: !bridge.remapOnly || bridge.seFullView; width: parent.width }
 
 
                         Divider {}

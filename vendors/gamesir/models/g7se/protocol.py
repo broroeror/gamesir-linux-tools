@@ -37,6 +37,12 @@ def _flag(data):
     return len(data) == 1 and data[0] in (0, 1)
 
 
+def _hair(data):
+    # 00 off, 81 adaptive, 82 fixed (G7 Pro codes); factory banks hold 01, which
+    # is shown as off and only ever written back as-is (restore/rollback).
+    return len(data) == 1 and data[0] in (0x00, 0x01, 0x81, 0x82)
+
+
 def _curve(data):
     # [type 0-3, intensity 0-100, 0, 0, x0 y0 x1 y1 x2 y2] (G7 Pro curve block)
     return len(data) == 10 and data[0] <= 3 and data[1] <= 100 and data[2:4] == b'\0\0'
@@ -58,6 +64,8 @@ SETTINGS_664 = {
     0x0171: (1, _flag), 0x0172: (1, _flag),                  # right stick invert X/Y
     0x00dc: (10, _curve), 0x00f8: (10, _curve),              # trigger curves
     0x0144: (10, _curve), 0x0164: (10, _curve),              # stick curves
+    0x013d: (1, _flag), 0x015d: (1, _flag),                  # trajectory circle/raw
+    0x00d8: (1, _hair), 0x00f4: (1, _hair),                  # hair trigger mode
 }
 
 # Per-firmware register layout.
@@ -85,7 +93,8 @@ LAYOUTS = {
             ('Dpad Up', 0x0042), ('Dpad Down', 0x0049), ('Dpad Left', 0x0050),
             ('Dpad Right', 0x0057), ('LB', 0x005e), ('RB', 0x0065), ('LS', 0x006c),
             ('RS', 0x0073), ('A', 0x007a), ('B', 0x0081), ('X', 0x0088), ('Y', 0x008f),
-            ('View', 0x009d), ('Menu', 0x00a4), ('L4', 0x00b3), ('R4', 0x00c1)),
+            ('View', 0x009d), ('Menu', 0x00a4), ('LT', 0x00d3), ('RT', 0x00ef),
+            ('L4', 0x00b3), ('R4', 0x00c1)),
         REMAP_DEFAULTS={0x00b3: 0x11, 0x00c1: 0x12},
         # The 6.64 bank follows the G7 Pro register map (vibration 0x20.., trigger
         # blocks 0xcf/0xeb, stick blocks 0x13c/0x15c), so the whole bank is read
@@ -94,7 +103,7 @@ LAYOUTS = {
         GAMEPAD_TARGETS=(('Dpad Up', 1), ('Dpad Down', 2), ('Dpad Left', 3),
                          ('Dpad Right', 4), ('LB', 5), ('RB', 6), ('LS', 7), ('RS', 8),
                          ('A', 9), ('B', 10), ('X', 11), ('Y', 12), ('View', 14),
-                         ('Menu', 15))),
+                         ('Menu', 15), ('LT', 0x13), ('RT', 0x14))),
 }
 SUPPORTED_DESCRIPTORS = tuple(LAYOUTS)
 CONFIG_PIDS = tuple(layout['PID'] for layout in LAYOUTS.values())

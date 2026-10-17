@@ -105,6 +105,41 @@ class Layout664Tests(unittest.TestCase):
         se.select(0x0630)
         self.assertFalse(se.allowed_app_request(se.rumble_packet(5, 192, 0)))
 
+    def test_trigger_remaps_trajectory_and_hair(self):
+        # tools/g7se_write_test_664.py on bank 3: each changed only its own bytes.
+        self.assertEqual(dict(se.REMAP_SLOTS)['LT'], 0x00d3)
+        self.assertEqual(se.remap_record(0x09, 0x00d3), b'\x01\x09')        # LT -> A
+        self.assertEqual(se.remap_record(0x13, 0x007a), b'\x01\x13')        # A -> LT
+        self.assertTrue(se.allowed_app_request(self.write('0f00053c0301013d0101')))
+        self.assertTrue(se.allowed_app_request(self.write('0f00053c030100d80181')))
+        self.assertTrue(se.allowed_app_request(self.write('0f00053c030100f40182')))
+        self.assertTrue(se.allowed_app_request(self.write('0f00053c030100d80101')))  # factory
+        self.assertFalse(se.allowed_app_request(self.write('0f00053c030100d80183')))
+
+    def test_backup_restore_plan(self):
+        import backup, controller_profile as ctrl
+        from gs_state import state
+        ctrl.apply_g7se_layout()
+        image = FullView664Tests.BANK1.hex()
+        data = {'schema': 3, 'format': backup.SE_FORMAT, 'device': ctrl.G7_SE.name,
+                'descriptor': '6.64', 'profiles': {'1': {'image': image}}, 'lighting': {}}
+        with patch.object(ctrl, 'active', return_value=ctrl.G7_SE):
+            plan = backup._se_restore_plan(data)
+            fields = dict(plan[1])
+            self.assertEqual(fields[0x013f], b'\x0a')                       # LS dz min
+            self.assertEqual(fields[0x00b3], b'\x11')                       # L4 default
+            self.assertEqual(len(fields[0x0144]), 10)
+            self.assertNotIn(0x0032, fields)                                # unverified
+            bad = dict(data, descriptor='6.30')
+            with self.assertRaises(ValueError):
+                backup._se_restore_plan(bad)
+            broken = bytearray(FullView664Tests.BANK1); broken[0x013f] = 200
+            with self.assertRaises(ValueError):
+                backup._se_restore_plan(dict(data, profiles={'1': {'image': broken.hex()}}))
+        se.select(0x0630)
+        ctrl.apply_g7se_layout()
+        se.select(0x0664)
+
     def test_630_layout_is_unchanged(self):
         se.select(0x0630)
         self.assertEqual((se.PID, se.POLL_RATE, se.REMAP_LEN), (0x1010, 0x0036, 8))
@@ -145,8 +180,8 @@ class FullView664Tests(unittest.TestCase):
         self.assertTrue(se.allowed_app_request(w('0f00053c03010152 0101'.replace(' ', ''))))
         self.assertFalse(se.allowed_app_request(w('0f00053c0301013f0165')))     # 101 %
         self.assertFalse(se.allowed_app_request(w('0f00053c03010152 0102'.replace(' ', ''))))
-        self.assertFalse(se.allowed_app_request(w('0f00053c0301013d0101')))     # trajectory
-        self.assertFalse(se.allowed_app_request(w('0f00053c030100d80181')))     # hair trigger
+        self.assertFalse(se.allowed_app_request(w('0f00053c030100320101')))     # resolution
+        self.assertFalse(se.allowed_app_request(w('0f00053c030100240101')))     # Force/Sync
         self.assertFalse(se.allowed_app_request(w('0f00053c0304013f0114')))     # bank 4
         self.assertFalse(se.allowed_app_request(w('0f00053c0301013f021414')))   # wrong length
         self.assertTrue(se.allowed_app_request(w('0f00053c030101440a' + '00640000394080' + '80c6bf')))

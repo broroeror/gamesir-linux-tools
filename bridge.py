@@ -2302,7 +2302,7 @@ class GamesirBridge(QObject):
 
     @Slot(str)
     def exportBackup(self, url):
-        if self._backup_busy or self._prof is profiles.G7_SE:
+        if self._backup_busy or (self._prof is profiles.G7_SE and not self._se_full_view()):
             return
         self._backup_busy = True
         self.backupBusyChanged.emit()
@@ -2312,7 +2312,7 @@ class GamesirBridge(QObject):
 
     @Slot(str)
     def importBackup(self, url):
-        if self._backup_busy or self._prof is profiles.G7_SE:
+        if self._backup_busy or (self._prof is profiles.G7_SE and not self._se_full_view()):
             return
         try:
             data = backup.load(self._to_path(url))
@@ -2495,8 +2495,8 @@ class GamesirBridge(QObject):
         if side not in self._hair_addr:
             return
         name, data = cfg.HAIR_MODES[index]
-        if self._prof is profiles.G7_PRO:
-            data = [data[0]]
+        if self._prof in (profiles.G7_PRO, profiles.G7_SE):
+            data = [data[0]]                 # mode byte only on the G7 family
         self._queue(self._hair_addr[side], list(data), side.upper() + ' hair-trigger', name)
 
     @Slot(str, int)

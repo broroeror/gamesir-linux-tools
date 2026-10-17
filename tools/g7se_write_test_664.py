@@ -31,6 +31,13 @@ TESTS = [  # name, address, new bytes (the original is read from the pad)
     ('remap_menu_to_a', 0x00a4, [1, 0x09]),
     ('vib_trigger_left', 0x0022, [40]),
     ('vib_trigger_right', 0x0023, [40]),
+    ('remap_lt_to_a', 0x00d3, [1, 0x09]),          # G7 Pro trigger slots
+    ('remap_rt_to_b', 0x00ef, [1, 0x0a]),
+    ('remap_a_to_lt', 0x007a, [1, 0x13]),          # LT/RT as targets
+    ('ls_trajectory_raw', 0x013d, [1]),
+    ('rs_trajectory_raw', 0x015d, [1]),
+    ('lt_hair_adaptive', 0x00d8, [0x81]),
+    ('rt_hair_fixed', 0x00f4, [0x82]),
 ]
 
 

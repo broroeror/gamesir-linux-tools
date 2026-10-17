@@ -238,7 +238,6 @@ Item {
 
             Card {
                 title: root.isStick ? "Stick Trajectory" : "Hair Trigger Mode"
-                visible: !bridge.seFullView     // not mapped on the G7 SE
                 Layout.fillWidth: true
                 Flow {
                     width: parent.width; spacing: 8
