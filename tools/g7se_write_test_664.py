@@ -6,12 +6,12 @@ Each test, on bank 3 only: snapshot the whole bank -> one plain write
 write the original bytes back -> re-read and compare with the snapshot.
 The snapshot is saved to the --output JSON before anything is written.
 Deadband must be closed (it claims the same interface).
-Usage: python3 -I write_test_664.py --output FILE [--only NAME]
+Usage: python3 -I tools/g7se_write_test_664.py --output FILE [--only NAME]
 """
 import argparse, json, sys, time
 from pathlib import Path
 
-REPO = '/home/herbert/src/gamesir-linux-tools'
+REPO = str(Path(__file__).resolve().parents[1])
 sys.path.insert(0, REPO)
 from vendors.gamesir.models.g7se import protocol as se  # noqa: E402
 se.select(0x0664)
