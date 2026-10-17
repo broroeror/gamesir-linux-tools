@@ -840,7 +840,8 @@ def read_session_seusb(ctrl):
             if len(report) >= 9 and report[:2] == b'\x10\x00' and report[3:5] == b'\x3c\x05':
                 control.store_se_reply(report)
             elif (len(report) == 64 and report[:2] == b'\x10\x00'
-                    and report[2] == query_sequence and report[3:5] == b'\x3c\x0c'
+                    and g7se.reply_sequence_ok(report, query_sequence)
+                    and report[3:5] == b'\x3c\x0c'
                     and report[5] in g7se.PROFILE_BANKS):
                 state['profile'] = report[5]
                 state['profile_seq'] = state.get('profile_seq', 0) + 1

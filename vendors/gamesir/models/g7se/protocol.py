@@ -143,6 +143,17 @@ def nexus_request(sequence, command, payload):
     return bytes((0x0f, 0, sequence, command)) + payload
 
 
+# 6.30 echoes the request's sequence byte in its replies; 6.64 stamps replies
+# with its own counter instead (seen on 1069: request 0b answered as 0a). The
+# bank/offset/length echo in match_read still binds a reply to its request.
+SEQUENCE_ECHO = {0x0630: True, 0x0664: False}
+
+
+def reply_sequence_ok(reply, sequence):
+    return not SEQUENCE_ECHO.get(TESTED_DESCRIPTOR, True) or (
+        len(reply) > 2 and reply[2] == sequence)
+
+
 def match_read(reply, profile, offset, length):
     """Accept only complete replies echoing the entire read tuple."""
     reply = bytes(reply)

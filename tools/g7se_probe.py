@@ -365,8 +365,8 @@ class Session:
                       + bytes((length,)), log, short=True)
             sequence = self.sequence
             value = self.receive(handle, log, lambda r:
-                se.match_read(r, profile, offset, length) if len(r) > 2
-                and r[2] == sequence else None, heartbeat=keepalive)
+                se.match_read(r, profile, offset, length) if se.reply_sequence_ok(r, sequence)
+                else None, heartbeat=keepalive)
             reads.append({'profile': profile, 'offset': offset, 'length': length,
                           'sequence': sequence, 'data': None if value is None else value.hex()})
             time.sleep(0.05)
@@ -412,7 +412,7 @@ class Session:
             self.send(handle, 1, b'\x0b', log, short=True)
             sequence = self.sequence
             value = self.receive(handle, log, lambda r: r[5:] if len(r) >= 7
-                and r[:2] == b'\x10\x00' and r[2] == sequence
+                and r[:2] == b'\x10\x00' and se.reply_sequence_ok(r, sequence)
                 and r[3:5] == b'\x3c\x0c' else None, heartbeat=keepalive)
             evidence['active_profile_payload'] = None if value is None else value.hex()
             # The captured cold reconnect starts at profile offset zero.
@@ -481,7 +481,7 @@ class Session:
                       + bytes((length,)), log, short=True)
             sequence = self.sequence
             value = self.receive(handle, log, lambda r: se.match_read(r, bank, address, length)
-                if len(r) > 2 and r[2] == sequence else None, heartbeat=heartbeat)
+                if se.reply_sequence_ok(r, sequence) else None, heartbeat=heartbeat)
             if value is None:
                 raise UsbTransportError('Remap readback timed out')
             return value
@@ -577,7 +577,7 @@ class Session:
                       + bytes((length,)), log, short=True)
             sequence = self.sequence
             value = self.receive(handle, log, lambda r: se.match_read(r, bank, address, length)
-                if len(r) > 2 and r[2] == sequence else None, heartbeat=heartbeat)
+                if se.reply_sequence_ok(r, sequence) else None, heartbeat=heartbeat)
             if value is None:
                 raise UsbTransportError('Restore readback timed out')
             return value
@@ -662,7 +662,7 @@ class Session:
                 self.send(handle, 5, bytes((4, bank)) + address.to_bytes(2, 'big') + bytes((8,)), log, short=True)
                 read_sequence = self.sequence
                 readback = self.receive(handle, log, lambda r: se.match_read(r, bank, address, 8)
-                    if len(r) > 2 and r[2] == read_sequence else None)
+                    if se.reply_sequence_ok(r, read_sequence) else None)
                 item['readback_verified'] = readback == record
         finally:
             if handle is not None:
