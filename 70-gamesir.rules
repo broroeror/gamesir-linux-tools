@@ -60,3 +60,7 @@ SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="1012", TAG+="uaccess
 
 # G7 SE descriptor 6.30: native USB authentication and rear-button remapping.
 SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="1010", TAG+="uaccess"
+
+# G7 SE descriptor 6.64: its configurable identity is 1069 (Xbox GIP), reached when
+# the pad is plugged in across a cold boot. 10a0/1082 are never opened over libusb.
+SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="1069", TAG+="uaccess"

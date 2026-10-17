@@ -210,13 +210,14 @@ _gip_seq_lock = threading.Lock()
 
 def rumble(left, right, gen=None, write_style=None, trigger_left=0, trigger_right=0):
     style = write_style or profiles.active().write_style
-    if style not in ('g7', 'cyclone'):
+    if style not in ('g7', 'g7se', 'cyclone'):
         return False
-    if style == 'g7':
+    if style in ('g7', 'g7se'):
         global _gip_seq
         with _gip_seq_lock:
             _gip_seq = (_gip_seq % 255) + 1  # GIP reserves sequence zero
-            packet = g7pro.rumble_packet(_gip_seq, left, right, trigger_left, trigger_right)
+            make = g7se.rumble_packet if style == 'g7se' else g7pro.rumble_packet
+            packet = make(_gip_seq, left, right, trigger_left, trigger_right)
             return send_cmd(*packet, gen=gen, padded=False)
     if trigger_left or trigger_right:
         return False
@@ -236,7 +237,7 @@ def rumble_test(on_done=None, motor='grips', strength=0xC0):
             'left_trigger': (0, 0, strength_value, 0),
             'right_trigger': (0, 0, 0, strength_value),
         }
-        if motor not in motors or (motor.endswith('_trigger') and style != 'g7'):
+        if motor not in motors or (motor.endswith('_trigger') and style not in ('g7', 'g7se')):
             if on_done:
                 on_done(False, 'This motor test is not supported for the selected controller.')
             return
@@ -489,7 +490,7 @@ def store_se_reply(report):
     if len(report) < 9:
         return False
     with _read_lock:
-        if _inflight is None or _inflight.get('sequence') != report[2]:
+        if _inflight is None or not g7se.reply_sequence_ok(report, _inflight.get('sequence')):
             return False
         bank, addr, length = _inflight['cmd']
         data = g7se.match_read(report, bank, addr, length)

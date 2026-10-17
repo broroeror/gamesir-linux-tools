@@ -27,6 +27,7 @@ the older schema 1-3 formats used by the hidraw controllers.
 """
 
 import json
+import os
 import threading
 import time
 from datetime import datetime
@@ -40,6 +41,8 @@ import vendors.gamesir.models.g7_8k.led as led8k
 import vendors.gamesir.motion as motion
 import vendors.gamesir.macro as macro
 from vendors.gamesir.models.g7pro import protocol as g7pro
+from vendors.gamesir.models.g7se import protocol as g7se
+import register_transaction
 
 SCHEMA = 4          # 4 adds semantic G7 Pro profiles + global dock settings
 RAW_SCHEMA = 3      # what every OTHER controller's export is: raw register entries
@@ -140,6 +143,8 @@ def export_async(path, on_progress=None, on_done=None):
     replies arrive; on_done(ok, message) fires once at the end."""
     if ctrl.active() is ctrl.G7_PRO:
         return _export_g7_async(path, on_progress, on_done)
+    if ctrl.active() is ctrl.G7_SE:
+        return _export_se_async(path, on_progress, on_done)
     reqs = _all_requests()
     keys = [(bank, addr) for bank, addr, _ln in reqs]
     total = len(keys)
@@ -564,6 +569,8 @@ def apply_backup(data, on_progress=None, on_done=None):
 
     Raises ValueError (before spawning the worker) on a backup whose write plan
     escapes the controller's known register map -- see _validate_writes."""
+    if data.get('format') == SE_FORMAT:
+        return _apply_se_backup(data, on_progress, on_done)
     if _is_g7_semantic(data):
         if ctrl.active() is not ctrl.G7_PRO:
             raise ValueError('schema-4 backup requires a connected G7 Pro')
@@ -706,4 +713,153 @@ def _apply_g7_backup(data, writes, on_progress=None, on_done=None):
             else:
                 on_done(True, 'Restored and verified all four G7 Pro profiles and dock settings.')
 
+    threading.Thread(target=run, daemon=True).start()
+
+
+# --------------------------------------------------------------- G7 SE (6.64)
+# The SE's raw-entry backup above would read 2-byte records at its 1-byte L4/R4
+# slots and miss the stick extras, so it gets its own: export the complete bank
+# images (exact, nothing interpreted), restore only the fields with a verified
+# write path (protocol.SETTINGS, the remap slots, the rate), each validated by
+# the same encoder the USB guard uses, through the transactional writer.
+SE_FORMAT = 'g7se-banks'
+SE_READ_TIMEOUT = 15.0
+
+
+def _se_writable():
+    """(addr, length) of every G7 SE field a restore may write."""
+    fields = [(addr, ln) for addr, (ln, _valid) in g7se.SETTINGS.items()]
+    fields += [(addr, g7se.remap_len(addr)) for _n, addr in g7se.REMAP_SLOTS]
+    fields.append((g7se.POLL_RATE, 1))
+    return sorted(fields)
+
+
+def _se_supported():
+    return (ctrl.active() is ctrl.G7_SE and g7se.FULL_VIEW
+            and state.get('usb_bcd') == g7se.TESTED_DESCRIPTOR and state.get('config_claimed'))
+
+
+def _se_read_banks(gen, on_progress=None):
+    """{bank: 421-byte image} for every profile bank, or raise OSError."""
+    reqs = [r for bank in g7se.PROFILE_BANKS for r in g7se.view_requests(bank)]
+    control.request_regs(reqs)
+    deadline = time.time() + SE_READ_TIMEOUT
+    while True:
+        if gen != control.generation():
+            raise OSError('controller changed during the backup')
+        got = sum(control.reg_result(b, a) is not None for b, a, _ln in reqs)
+        if on_progress:
+            on_progress(got, len(reqs))
+        if got == len(reqs):
+            break
+        if time.time() > deadline:
+            raise OSError(f'only {got}/{len(reqs)} register blocks answered')
+        time.sleep(0.1)
+    images = {bank: g7se.stitch_view(bank, control.reg_result) for bank in g7se.PROFILE_BANKS}
+    if any(img is None for img in images.values()):
+        raise OSError('incomplete profile read')
+    return images
+
+
+def _export_se_async(path, on_progress=None, on_done=None):
+    def run():
+        try:
+            if not _se_supported():
+                raise OSError('select the G7 SE (firmware 6.64) and choose Configure first')
+            images = _se_read_banks(control.generation(), on_progress)
+            profiles = {}
+            for bank, img in images.items():
+                shown = g7pro.decode_profile(img.ljust(g7pro.PROFILE_BLOB_SIZE, b'\0'))
+                shown.pop('motion', None)
+                shown['remap'] = {n: g7se.decode_remap(img[a:a + g7se.remap_len(a)], a)
+                                  for n, a in g7se.REMAP_SLOTS}
+                profiles[str(bank)] = {'image': img.hex(), 'settings': shown}
+            data = {'schema': RAW_SCHEMA, 'format': SE_FORMAT, 'device': ctrl.G7_SE.name,
+                    'descriptor': g7se.descriptor_name(),
+                    'exported': datetime.now().isoformat(timespec='seconds'),
+                    'note': 'image = whole bank as read; settings = decoded, for reading only',
+                    'profiles': profiles, 'lighting': {}}
+            tmp = path + '.pending'
+            with open(tmp, 'w') as fh:
+                json.dump(data, fh, indent=2)
+            os.replace(tmp, path)
+        except (OSError, ValueError) as e:
+            if on_done:
+                on_done(False, f'Backup failed: {e}')
+            return
+        if on_done:
+            on_done(True, f'Saved profiles {", ".join(map(str, images))} to {os.path.basename(path)}.')
+    threading.Thread(target=run, daemon=True).start()
+
+
+def _se_restore_plan(data):
+    """{bank: [(addr, bytes)]} from a G7 SE backup; raises ValueError if unusable."""
+    if data.get('device') != ctrl.G7_SE.name or ctrl.active() is not ctrl.G7_SE:
+        raise ValueError('this backup is for a GameSir G7 SE; connect that controller')
+    if not g7se.FULL_VIEW or data.get('descriptor') != g7se.descriptor_name():
+        raise ValueError(f'backup is from firmware {data.get("descriptor")}; '
+                         f'the controller runs {g7se.descriptor_name()}')
+    plan = {}
+    for bank_s, entry in data['profiles'].items():
+        bank = int(bank_s)
+        img = bytes.fromhex(entry['image'])
+        if bank not in g7se.PROFILE_BANKS or len(img) != g7se.PROFILE_SIZE:
+            raise ValueError(f'profile {bank_s} in the backup is not a full G7 SE bank')
+        plan[bank] = []
+        for addr, ln in _se_writable():
+            want = img[addr:addr + ln]
+            g7se.settings_write(1, bank, addr, want)     # raises on an invalid value
+            plan[bank].append((addr, want))
+    return plan
+
+
+def _apply_se_backup(data, on_progress=None, on_done=None):
+    plan = _se_restore_plan(data)                  # synchronous: refuse before any write
+    if not _se_supported():
+        raise ValueError('select the G7 SE and choose Configure first')
+    prof = ctrl.active()
+
+    def run():
+        gen = control.generation()
+        try:
+            current = _se_read_banks(gen)
+            changes = [(bank, addr, list(want)) for bank, fields in plan.items()
+                       for addr, want in fields
+                       if current[bank][addr:addr + len(want)] != want]
+
+            def check():
+                if gen != control.generation() or ctrl.active() is not prof:
+                    raise OSError('controller changed during the restore')
+
+            def read(bank, addr, length):
+                check()
+                control.request_regs([(bank, addr, length)])
+                deadline = time.time() + 3
+                while time.time() < deadline:
+                    raw = control.reg_result(bank, addr)
+                    if raw is not None:
+                        return list(raw)[:length]
+                    time.sleep(0.03)
+                raise OSError(f'no reply at 0x{addr:04x}')
+
+            def write(bank, addr, byts):
+                check()
+                ok = control.write_reg(bank, addr, byts, write_style='g7se', gen=gen)
+                time.sleep(0.03)
+                return ok
+
+            base = os.environ.get('XDG_DATA_HOME') or os.path.expanduser('~/.local/share')
+            ok, message = register_transaction.apply(
+                changes, read, write, os.path.join(base, 'deadband', 'controller-backups'),
+                prof.name)
+            if on_progress:
+                on_progress(len(changes), len(changes))
+            if on_done:
+                on_done(ok, (f'Restored {len(changes)} changed settings across profiles '
+                             f'{", ".join(map(str, plan))}; each was read back and verified.'
+                             if ok and changes else
+                             'The controller already matches this backup.' if ok else message))
+        except (OSError, ValueError) as e:
+            if on_done:
+                on_done(False, f'Restore failed: {e}')
     threading.Thread(target=run, daemon=True).start()

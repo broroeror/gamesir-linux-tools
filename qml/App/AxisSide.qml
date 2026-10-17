@@ -101,8 +101,9 @@ Item {
         intenSlider.value = intensity
         curve.setPoints(cv && cv.points ? cv.points : [[40, 41], [128, 128], [215, 214]])
         typeIdx = isStick ? c[side + "_traj"] : c[side + "_hair"]
-        if (isStick && bridge.isG7Pro) {
-            g7Resolution = c[side + "_resolution"]
+        if (isStick && bridge.g7Layout) {
+            if (c[side + "_resolution"] !== undefined)   // not mapped on the G7 SE
+                g7Resolution = c[side + "_resolution"]
             g7Sensitivity = c[side + "_sensitivity"]
             g7InvertX = c[side + "_invert_x"]
             g7InvertY = c[side + "_invert_y"]
@@ -219,7 +220,7 @@ Item {
                     width: parent.width; spacing: 6; topPadding: 6
                     // G7 stores byte +1 as a fixed curve scale/configured marker,
                     // not the Cyclone/8K adjustable-intensity field.
-                    visible: !bridge.isG7Pro && (root.curveType === 1 || root.curveType === 2)
+                    visible: !bridge.g7Layout && (root.curveType === 1 || root.curveType === 2)
                     Row {
                         width: parent.width
                         Text { text: "Intensity"; color: Theme.textDim
@@ -284,10 +285,12 @@ Item {
             }
 
             Card {
-                visible: root.isStick && bridge.isG7Pro
+                visible: root.isStick && bridge.g7Layout
                 title: "Stick hardware"; Layout.fillWidth: true
-                Text { text: "Resolution"; color: Theme.textDim; font.family: Theme.fontFamily }
+                Text { text: "Resolution"; color: Theme.textDim; font.family: Theme.fontFamily
+                       visible: !bridge.seFullView }
                 Flow {
+                    visible: !bridge.seFullView
                     width: parent.width; spacing: 6
                     Repeater {
                         model: [8, 9, 10, 11, 12]

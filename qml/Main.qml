@@ -31,7 +31,9 @@ Window {
     }
     // Tabs follow what the connected controller actually has, so a profile
     // without (say) mapped lighting or vibration motors doesn't get an empty page.
-    readonly property var controllerTabs: bridge.remapOnly ? ["Rebinds"] : bridge.isG7Pro
+    readonly property var controllerTabs: bridge.remapOnly
+        ? (bridge.seFullView ? ["Rebinds", "Sticks", "Triggers", "Vibration"] : ["Rebinds"])
+        : bridge.isG7Pro
         ? ["Rebinds", "Sticks"].concat(bridge.hasMotion ? ["Motion"] : [])
           .concat(["Triggers", "Vibration", "Device"])
           // A controller with no editable profile banks (the Kaleid: lighting is
@@ -1055,9 +1057,9 @@ Window {
                             }
                         }
 
-                        Divider { visible: !bridge.remapOnly }   // else two stack
-                        SectionHeader { visible: !bridge.remapOnly; text: "Backup & Restore" }
-                        BackupPanel { visible: !bridge.remapOnly; width: parent.width }
+                        Divider { visible: !bridge.remapOnly || bridge.seFullView }   // else two stack
+                        SectionHeader { visible: !bridge.remapOnly || bridge.seFullView; text: "Backup & Restore" }
+                        BackupPanel { visible: !bridge.remapOnly || bridge.seFullView; width: parent.width }
 
 
                         Divider {}

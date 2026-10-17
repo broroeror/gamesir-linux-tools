@@ -172,7 +172,8 @@ def _pick_selected(controllers):
     # initial selection away from a controller this app can configure.
     return next((c for c in live
                  if profiles.detect_one(c['pid'], c.get('product'))
-                 not in (None, profiles.G7_NATIVE, profiles.G7_PRO_OTHER, profiles.G7_SE)),
+                 not in (None, profiles.G7_NATIVE, profiles.G7_PRO_OTHER, profiles.G7_SE,
+                         profiles.G7_SE_OTHER)),
                 (live or controllers)[0])
 
 
@@ -305,11 +306,13 @@ def read_controller():
             state['config_phase'] = ''
             last_id = sel['id']        # profile number onto it (drives bank select)
         prof = profiles.detect_one(sel['pid'], sel.get('product'))
-        profiles.set_active(prof)                      # rest of app follows this
-        state['controller'] = prof.short if prof else None
         # Pin the version to THIS physical unit (bcdDevice on one of its nodes),
         # not the first device with this pid — matters with two identical units.
         _bcd = sel.get('bcd') or (device_bcd(sel['nodes'][0]) if sel['nodes'] else None)
+        if prof is profiles.G7_SE and g7se.select(_bcd):
+            profiles.apply_g7se_layout()               # before the bridge sees it
+        profiles.set_active(prof)                      # rest of app follows this
+        state['controller'] = prof.short if prof else None
         state['usb_bcd'] = _bcd
         state['firmware'] = firmware_version(sel['nodes'][0]) if sel['nodes'] else (
             f'{_bcd >> 8:x}.{_bcd & 0xff:02x}' if _bcd else None)
@@ -385,13 +388,28 @@ def read_controller():
                     state['config_status'] = 'G7 SE configuration disabled: cold-start replies unverified'
                     state['config_phase'] = 'failed'
                 elif _bcd != g7se.TESTED_DESCRIPTOR:
-                    state['config_status'] = 'G7 SE remapping is tested only on firmware descriptor 6.30'
+                    state['config_status'] = ('G7 SE remapping is tested only on firmware '
+                                              + ' and '.join(map(g7se.descriptor_name,
+                                                                 g7se.SUPPORTED_DESCRIPTORS)))
                     state['config_phase'] = 'failed'
                 elif not state.get('config_status', '').startswith(
                         ('G7 SE configuration ended', 'G7 SE input restoration failed')):
                     state['config_status'] = 'Released to games'
                     state['config_phase'] = 'released'
                 read_session_evdev(sel['id'], force_wrong_mode=True)
+            state['connected'] = False
+            time.sleep(0.3)
+            continue
+
+        # G7 SE firmware 6.64 hot-plugged on Linux: its host auto-detect falls
+        # back from 10a0 to DirectInput 1082. Only 1069 (Xbox GIP) configures.
+        if prof is profiles.G7_SE_OTHER:
+            state['connected'] = True
+            state['mode_ok'] = False
+            state['config_status'] = ('G7 SE in DirectInput mode: plug it in before '
+                                      'booting to get Xbox mode')
+            state['config_phase'] = 'failed'
+            read_session_evdev(sel['id'], force_wrong_mode=True)
             state['connected'] = False
             time.sleep(0.3)
             continue
@@ -824,7 +842,8 @@ def read_session_seusb(ctrl):
             if len(report) >= 9 and report[:2] == b'\x10\x00' and report[3:5] == b'\x3c\x05':
                 control.store_se_reply(report)
             elif (len(report) == 64 and report[:2] == b'\x10\x00'
-                    and report[2] == query_sequence and report[3:5] == b'\x3c\x0c'
+                    and g7se.reply_sequence_ok(report, query_sequence)
+                    and report[3:5] == b'\x3c\x0c'
                     and report[5] in g7se.PROFILE_BANKS):
                 state['profile'] = report[5]
                 state['profile_seq'] = state.get('profile_seq', 0) + 1

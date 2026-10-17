@@ -2,7 +2,41 @@
 
 Tested on Linux with USB identity **3537:1010**, firmware descriptor **6.30**
 (`bcdDevice=0630`), and Windows GameSir Nexus Legacy 1.5.3.0 packet captures.
+Firmware **6.64** (`3537:1069`) is covered in [its own section](#firmware-664-35371069).
 Other firmware remains input-only.
+
+## Firmware 6.64 (3537:1069)
+
+Firmware 6.64 has three identities: `10a0` (XInput, first enumeration),
+`1069` (Xbox GIP, configurable) and `1082` (DirectInput fallback, input only).
+Linux hot-plug ends at `1082`, because the pad picks its mode from how the host
+enumerates it. A pad the PC firmware enumerated first stays at `1069`: unplug
+it, reboot, plug it in at the boot menu (Dell: F12), then boot Linux. A kernel
+quirk for `10a0` is under review upstream
+([linux-usb](https://lore.kernel.org/linux-usb/20261002-master-v2-1-24b05d8792b5@gmail.com/)).
+
+On `1069` the startup, GIP authentication and register channel are the 6.30
+ones, except that replies carry the pad's own sequence counter. The 421-byte
+profile banks follow the **G7 Pro register map**. The editable fields are
+listed in `SETTINGS_664` and `REMAP_SLOTS` in `vendors/gamesir/models/g7se/protocol.py`:
+
+| Page | Fields |
+|---|---|
+| Rebinds | D-pad, LB/RB, LS/RS, A/B/X/Y, View, Menu, LT/RT (2-byte flag + target), L4/R4 (1-byte target); report rate per profile |
+| Sticks | deadzone / anti-deadzone, response curve, sensitivity, invert X/Y, trajectory |
+| Triggers | deadzone / anti-deadzone, response curve, hair-trigger mode |
+| Vibration | grip motors and trigger motors, with test buttons (GIP rumble) |
+| Backup & Restore | whole-bank images; restore writes only the fields above |
+
+How each was verified: L4/R4 and the report rate match Nexus 2.5.8 USBPcap
+writes byte for byte. Everything else uses the G7 Pro encoding and was written on
+bank 3 by `tools/g7se_write_test_664.py`. Each write changed exactly its own
+bytes, and the bank was restored byte-exact. On the pad, an app Save of
+a front-button remap took effect. Saves of the LT remap and the hair-trigger mode
+read back verified. Grip and trigger motors were felt through the test buttons
+and `tools/g7se_trigger_rumble_test_664.py`. Stick resolution and the trigger
+motors' Force/Sync stay hidden, because their meaning on this pad is unknown.
+Factory banks store hair mode `01`, which is shown as Off.
 
 ## Supported behavior
 

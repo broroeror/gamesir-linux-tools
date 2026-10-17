@@ -408,12 +408,53 @@ G7_PRO_OTHER = ControllerProfile(
 # G7 SE: verified rear-button records and controller-wide report rate.
 # Configuration is gated by the tested firmware descriptor.
 G7_SE = ControllerProfile(
-    name='GameSir G7 SE', short='G7 SE', usb_products=(0x1010,),
-    wired_products=(0x1010,), write_style='g7se', input_style='evdev', transport='usb_vendor',
+    name='GameSir G7 SE', short='G7 SE', usb_products=_se.CONFIG_PIDS,
+    wired_products=_se.CONFIG_PIDS, write_style='g7se', input_style='evdev', transport='usb_vendor',
     software_profile_switch=False,
     POLL_RATE=_se.POLL_RATE, POLL_RATES=_se.POLL_RATES,
     profile_banks=_se.PROFILE_BANKS, REMAP_TARGETS=_se.GAMEPAD_TARGETS,
     REMAP_SLOTS=_se.REMAP_SLOTS, supports_hair_thresholds=False,
+)
+
+
+
+# 6.64 stores these at the G7 Pro's addresses (see protocol.SETTINGS_664).
+_G7SE_664_FIELDS = dict(
+    VIB_L=0x0020, VIB_R=0x0021,
+    LT_DZ_MIN=0x00cf, LT_DZ_MAX=0x00d0, LT_ADZ_MIN=0x00d1, LT_ADZ_MAX=0x00d2,
+    LT_CURVE=0x00dc, LT_HAIR=0x00d8, RT_OFFSET=0x1c,
+    ST_TRAJ=0x013d, ST_DZ_MIN=0x013f, ST_DZ_MAX=0x0140, ST_ADZ_MIN=0x0141, ST_ADZ_MAX=0x0142,
+    ST_CURVE=0x0144, RS_OFFSET=0x20,
+)
+_G7SE_664_EXTRAS = {
+    'VIB_TRIG_L': 0x0022, 'VIB_TRIG_R': 0x0023,
+    'ST_INVERT_X': 0x0151, 'ST_INVERT_Y': 0x0152, 'ST_SENS': 0x0153,
+    'RS_INVERT_X': 0x0171, 'RS_INVERT_Y': 0x0172, 'RS_SENS': 0x0173,
+}
+
+
+def apply_g7se_layout():
+    """Refresh G7_SE's register fields after protocol.select() switched firmware."""
+    G7_SE.POLL_RATE = _se.POLL_RATE
+    G7_SE.profile_banks = _se.PROFILE_BANKS
+    G7_SE.REMAP_TARGETS = _se.GAMEPAD_TARGETS
+    G7_SE.REMAP_SLOTS = _se.REMAP_SLOTS
+    editable = bool(_se.SETTINGS)
+    for name, addr in _G7SE_664_FIELDS.items():
+        if name.endswith('_OFFSET'):
+            setattr(G7_SE, name, addr)
+        else:
+            setattr(G7_SE, name, addr if editable else None)
+    G7_SE.extras = dict(_G7SE_664_EXTRAS) if editable else {}
+    G7_SE.__post_init__()                   # re-derive the RT_*/RS_* mirrors
+
+
+# G7 SE firmware 6.64 fallback identities (XInput 10a0, and the DirectInput
+# 1082 it shares with the Kaleid). Detection only: input over evdev, no writes.
+G7_SE_OTHER = ControllerProfile(
+    name='GameSir G7 SE', short='G7 SE', usb_products=(_se.PID_XINPUT_664,),
+    wired_products=(_se.PID_XINPUT_664, _se.PID_HID_664),
+    write_style='none', input_style='evdev', profile_banks=(),
 )
 
 # Compatibility name for code/tests that referred to the old misidentified G7.
@@ -719,8 +760,8 @@ KALEID_OTHER = ControllerProfile(
 )
 
 
-ALL = (CYCLONE, G7_PRO, G7_NATIVE, G7_PRO_OTHER, G7_SE, G7_8K, TARANTULA_PRO_8K,
-       KALEID, KALEID_OTHER)
+ALL = (CYCLONE, G7_PRO, G7_NATIVE, G7_PRO_OTHER, G7_SE, G7_SE_OTHER, G7_8K,
+       TARANTULA_PRO_8K, KALEID, KALEID_OTHER)
 DEFAULT = CYCLONE
 
 
@@ -767,6 +808,10 @@ def detect_one(pid, product=None):
     # G7 Pro; anything else is left alone (not recognised, never written).
     if prof is G7_PRO and not _g7.is_g7_device(pid, product):
         return None
+    # 3537:1082 is the Kaleid's DirectInput mode and also where a G7 SE on
+    # firmware 6.64 lands when hot-plugged; the product string tells them apart.
+    if prof is KALEID_OTHER and pid == _se.PID_HID_664 and _se.is_g7se_product(product):
+        return G7_SE_OTHER
     return prof
 
 

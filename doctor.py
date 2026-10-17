@@ -85,6 +85,15 @@ except Exception:                      # partial install -- report what we can
 # fault; anything else is never opened and a denial there is the intended state.
 USB_IDENTITIES = dict(G7_IDENTITIES)
 USB_IDENTITIES.update(KALEID_IDENTITIES)
+# G7 SE firmware 6.64: input-only identities. Its 1082 fallback shares the
+# Kaleid's id and is relabelled per device from the product string.
+try:
+    from vendors.gamesir.models.g7se import protocol as _se
+    USB_IDENTITIES.update({
+        _se.PID_XINPUT_664: 'G7 SE 6.64 XInput mode (input only)',
+    })
+except Exception:                      # partial install -- report what we can
+    _se = None
 NEEDS_USB = frozenset(G7_NEEDS_USB) | frozenset(KALEID_WRITABLE)
 
 # A rule can legitimately live in EITHER directory: /etc is for rules an admin
@@ -528,7 +537,7 @@ def collect():
     try:
         from gs_common import find_controllers
         for dev in find_controllers():
-            if dev.get('pid') == 0x1010:
+            if _se and dev.get('pid') in _se.LAYOUT_PIDS:
                 meta = dev.get('usb') or {}
                 node = '/dev/bus/usb/%03d/%03d' % (meta.get('bus', 0), meta.get('address', 0))
                 rep['g7se_devices'].append({
@@ -538,14 +547,17 @@ def collect():
                     'access': os.access(node, os.R_OK | os.W_OK),
                     'interfaces': _interfaces(meta.get('sysfs')),
                 })
-                supported = dev.get('bcd') == 0x0630
+                tested = _se.LAYOUT_PIDS[dev['pid']]
+                supported = dev.get('bcd') == tested
                 rep['verdict'].append(
-                    'G7 SE (3537:1010) found. ' + (
-                    'L4/R4 remapping and 250/500/1000 Hz rate settings are verified on descriptor 6.30. '
+                    f'G7 SE (3537:{dev["pid"]:04x}) found. ' + (
+                    'L4/R4 remapping and 250/500/1000 Hz rate settings are verified on '
+                    f'descriptor {_se.descriptor_name(tested)}. '
                     'Configuration uses native USB with a fresh Xbox authentication '
                     'exchange when needed (requires OpenSSL). Release to games afterward.'
-                    if supported else 'This firmware is input-only; configuration was '
-                    'verified only on descriptor 6.30.') + ('' if os.access(node, os.R_OK | os.W_OK)
+                    if supported else 'This firmware is input-only; configuration on this '
+                    f'identity was verified only on descriptor {_se.descriptor_name(tested)}.')
+                    + ('' if os.access(node, os.R_OK | os.W_OK)
                         else ' USB access is missing; install the G7 SE udev rule and reconnect.'))
                 continue
             if dev.get('pid') not in USB_IDENTITIES:
@@ -559,8 +571,13 @@ def collect():
                 pass
             meta = dev.get('usb') or {}
             node = '/dev/bus/usb/%03d/%03d' % (meta.get('bus', 0), meta.get('address', 0))
+            identity = USB_IDENTITIES[dev['pid']]
+            se_fallback = bool(_se and dev['pid'] == _se.PID_HID_664
+                               and _se.is_g7se_product(dev.get('product')))
+            if se_fallback:
+                identity = 'G7 SE 6.64 DirectInput fallback (not configurable)'
             rep['usb_devices'].append({
-                'pid': dev['pid'], 'identity': USB_IDENTITIES[dev['pid']],
+                'pid': dev['pid'], 'identity': identity, 'g7se': se_fallback,
                 'product': dev.get('product', ''), 'port': dev['port'],
                 'node': node, 'access': os.access(node, os.R_OK | os.W_OK),
                 'interfaces': _interfaces(meta.get('sysfs') or dev.get('sysfs')),
@@ -704,7 +721,14 @@ def collect():
 
         kal_ready = [n for n in rep['usb_devices'] if n['pid'] in KALEID_WRITABLE]
         kal_other = [n for n in rep['usb_devices']
-                     if n['pid'] in KALEID_IDENTITIES and n['pid'] not in KALEID_WRITABLE]
+                     if n['pid'] in KALEID_IDENTITIES and n['pid'] not in KALEID_WRITABLE
+                     and not n.get('g7se')]
+        if any(n.get('g7se') for n in rep['usb_devices']):
+            rep['verdict'].append(
+                'G7 SE (firmware 6.64) is in its DirectInput fallback, 3537:1082. '
+                'Hot-plugged on Linux its host auto-detect gives up on Xbox mode; '
+                'plug it in before booting and it comes up as 3537:1069 (Xbox/GIP), '
+                'which xpad drives. Configuration is not supported on 6.64 yet.')
         if kal_ready:
             if any(n['access'] for n in kal_ready):
                 rep['verdict'].append('Kaleid lighting configuration access: OK.')
@@ -785,7 +809,7 @@ def format_report(rep):
     for n in rep.get('usb_devices', []) + rep.get('g7se_devices', []):
         L.append(f'- {n["node"]}  GameSir {n["pid"]:04x} '
                  f'({n.get("identity", "unknown")})  "{n["product"]}" port {n["port"]}')
-        if n['pid'] == 0x1010:
+        if _se and n['pid'] in _se.LAYOUT_PIDS:
             L.append('    diagnostic USB access: ' + ('OK' if n['access'] else 'PERMISSION DENIED'))
         elif n['pid'] not in NEEDS_USB:
             # Deadband only opens the identities it can configure, plus the one

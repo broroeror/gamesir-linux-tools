@@ -776,6 +776,9 @@ class GamesirBridge(QObject):
                 and self._loaded_profile == edit and self._config_loading is None
                 and self._config_generation == control.generation())
 
+    def _se_rate_banks(self):
+        return g7se.rate_banks(state.get('edit_profile') or state.get('profile'))
+
     def _poll_se_rates(self):
         # Independent of remap loading: a missing rate reply must not block L4/R4.
         if self._prof is not profiles.G7_SE or self._backup_busy:
@@ -795,10 +798,10 @@ class GamesirBridge(QObject):
         if self._se_rate_scope is None:
             self._se_rate_scope = scope
             self._se_rate_deadline = time.monotonic() + 3
-            control.request_regs([(bank, g7se.POLL_RATE, 1) for bank in g7se.RATE_BANKS])
+            control.request_regs([(bank, g7se.POLL_RATE, 1) for bank in self._se_rate_banks()])
         if self._se_rate_deadline is None:
             return
-        values = {bank: control.reg_result(bank, g7se.POLL_RATE) for bank in g7se.RATE_BANKS}
+        values = {bank: control.reg_result(bank, g7se.POLL_RATE) for bank in self._se_rate_banks()}
         if any(value is None for value in values.values()):
             if time.monotonic() >= self._se_rate_deadline:
                 control.cancel_se_rate_reads()
@@ -847,10 +850,14 @@ class GamesirBridge(QObject):
                     reqs += g7pro.blob_requests(0x20, g7pro.DOCK_BLOB_SIZE)
                     self._g7_dock_loading = True
             else:
-                reqs = [(bank, addr, ln) for addr, ln in self._prof.read_fields()
-                        if self._prof is not profiles.G7_SE or addr != g7se.POLL_RATE]
-                reqs += [(bank, addr, 8 if self._prof is profiles.G7_SE else 2)
+                # G7 SE 6.64: the profile fields are sliced out of one whole-bank read.
+                reqs = [] if self._se_full_view() else [
+                    (bank, addr, ln) for addr, ln in self._prof.read_fields()
+                    if self._prof is not profiles.G7_SE or addr != g7se.POLL_RATE]
+                reqs += [(bank, addr, g7se.remap_len(addr) if self._prof is profiles.G7_SE else 2)
                          for _n, addr in self._prof.REMAP_SLOTS]
+                if self._se_full_view():
+                    reqs += g7se.view_requests(bank)
             self._config_loading_gen = control.generation()
             control.request_regs(reqs)
             self._config_loading = bank
@@ -885,9 +892,17 @@ class GamesirBridge(QObject):
             self._config_generation = self._config_loading_gen
             self.configLoaded.emit()
             return
-        vals = {addr: control.reg_result(bank, addr)
-                for addr, _ln in self._prof.read_fields()
-                if self._prof is not profiles.G7_SE or addr != g7se.POLL_RATE}
+        view = None
+        if self._se_full_view():
+            view = g7se.stitch_view(bank, control.reg_result)
+            if view is None:
+                return
+            vals = {addr: list(view[addr:addr + ln]) for addr, ln in self._prof.read_fields()
+                    if addr != g7se.POLL_RATE}
+        else:
+            vals = {addr: control.reg_result(bank, addr)
+                    for addr, _ln in self._prof.read_fields()
+                    if self._prof is not profiles.G7_SE or addr != g7se.POLL_RATE}
         vals.update({addr: control.reg_result(bank, addr)
                      for _n, addr in self._prof.REMAP_SLOTS})
         if any(v is None for v in vals.values()):
@@ -901,6 +916,13 @@ class GamesirBridge(QObject):
             self._set_apply_status(str(exc))
             self.configLoaded.emit()
             return
+        if view is not None:
+            # G7 SE extras share the G7 Pro encoding (sensitivity, invert X/Y).
+            shown = g7pro.decode_profile(view.ljust(g7pro.PROFILE_BLOB_SIZE, b'\0'))
+            for key in self._SE_EXTRAS:
+                cand[key] = shown[key]
+            for key in ('vib_force_l', 'vib_sync_l', 'vib_force_r', 'vib_sync_r'):
+                cand[key] = shown[key]      # seeds the (hidden) toggles; never written
         # Guard against a transient/garbage read overwriting a good config (the
         # "triggers 0–0 after a page switch" bug): a deadzone MAX of 0 fully
         # deadzones the axis, which no real profile does — so it signals the
@@ -970,7 +992,7 @@ class GamesirBridge(QObject):
             rec = vals[addr]
             # store the raw target CODE (or -1 = unmapped) so keyboard/mouse
             # rebinds share one path; the UI resolves the label via targetLabel().
-            remap[name] = (g7se.decode_remap(rec) if p is profiles.G7_SE else
+            remap[name] = (g7se.decode_remap(rec, addr) if p is profiles.G7_SE else
                            (rec[1] if len(rec) > 1 else 0) if rec[0] else -1)
         out['remap'] = remap
         if p.CONTINUOUS_TRIGGER_SLOTS:
@@ -1096,11 +1118,17 @@ class GamesirBridge(QObject):
             if not g7se.CONFIGURATION_VERIFIED:
                 return 'G7 SE configuration is disabled: cold-start configuration replies are unverified.'
             if not self._se_configuration_supported():
-                return 'G7 SE remapping is tested only on firmware descriptor 6.30; input remains available.'
+                return ('G7 SE remapping is tested only on firmware '
+                        + ' and '.join(map(g7se.descriptor_name, g7se.SUPPORTED_DESCRIPTORS))
+                        + '; input remains available.')
             return 'Edit L4/R4 or Poll rate, then Save and Release to games.'
         if profiles.active() is profiles.G7_NATIVE:
             return ('Hold SHARE + MENU (☰) to switch the controller to XInput '
                     'mode. Note this also resets the active profile\'s remaps.')
+        if profiles.active() is profiles.G7_SE_OTHER:
+            return ('On firmware 6.64 the G7 SE picks its mode when it powers up. '
+                    'Hot-plugged on Linux it falls back to DirectInput; plug it in '
+                    'before booting and it comes up in Xbox mode.')
         if profiles.active() is profiles.KALEID_OTHER:
             return ('Press M + Xbox to cycle the controller to Xbox mode, where '
                     'its lighting is editable. The other two modes work in games '
@@ -1250,6 +1278,22 @@ class GamesirBridge(QObject):
     @Property(bool, notify=controllerChanged)
     def remapOnly(self):
         return self._prof is profiles.G7_SE
+
+    def _se_full_view(self):
+        return (self._prof is profiles.G7_SE and bool(g7se.FULL_VIEW)
+                and self._se_configuration_supported())
+
+    @Property(bool, notify=controllerChanged)
+    def seFullView(self):
+        """G7 SE firmware whose whole bank decodes with the G7 Pro map: the
+        Sticks/Triggers/Vibration pages are shown, read-only."""
+        return self._se_full_view()
+
+    @Property(bool, notify=controllerChanged)
+    def g7Layout(self):
+        """G7 Pro register layout (its extra stick/vibration fields)."""
+        return (profiles.is_recognized() and profiles.active() is profiles.G7_PRO) \
+            or self._se_full_view()
 
     @Property(bool, notify=controllerChanged)
     def hasConfigSession(self):
@@ -2258,7 +2302,7 @@ class GamesirBridge(QObject):
 
     @Slot(str)
     def exportBackup(self, url):
-        if self._backup_busy or self._prof is profiles.G7_SE:
+        if self._backup_busy or (self._prof is profiles.G7_SE and not self._se_full_view()):
             return
         self._backup_busy = True
         self.backupBusyChanged.emit()
@@ -2268,7 +2312,7 @@ class GamesirBridge(QObject):
 
     @Slot(str)
     def importBackup(self, url):
-        if self._backup_busy or self._prof is profiles.G7_SE:
+        if self._backup_busy or (self._prof is profiles.G7_SE and not self._se_full_view()):
             return
         try:
             data = backup.load(self._to_path(url))
@@ -2316,7 +2360,7 @@ class GamesirBridge(QObject):
         if self._prof is profiles.G7_SE:
             return (self._se_editable_session()
                     and self._se_rate_scope == self._se_settings_scope()
-                    and set(self._se_rates) == set(g7se.RATE_BANKS))
+                    and set(self._se_rates) == set(self._se_rate_banks()))
         return bool(self.pollRates and 'poll' in self._config and not self._backup_busy)
 
     @Property(int, notify=pollRateStateChanged)
@@ -2402,8 +2446,13 @@ class GamesirBridge(QObject):
             return
         bank = bank if bank is not None else self._prof.profile_bank(edit)
         pkey = key if key is not None else (bank, addr)
+        if self._prof is profiles.G7_SE and not self._se_editable_session():
+            return          # stale or unclaimed SE session: Apply would refuse it anyway
         self._pending[pkey] = {'addr': addr, 'bank': bank, 'data': list(data),
                                'label': label, 'display': str(display), 'kind': kind}
+        if self._prof is profiles.G7_SE:
+            # Apply pins every SE edit to the session its values were read in.
+            self._pending[pkey]['generation'] = self._config_generation
         self.pendingChanged.emit()
 
     # The write-side slots below no-op when the active profile lacks the field
@@ -2451,8 +2500,8 @@ class GamesirBridge(QObject):
         if side not in self._hair_addr:
             return
         name, data = cfg.HAIR_MODES[index]
-        if self._prof is profiles.G7_PRO:
-            data = [data[0]]
+        if self._prof in (profiles.G7_PRO, profiles.G7_SE):
+            data = [data[0]]                 # mode byte only on the G7 family
         self._queue(self._hair_addr[side], list(data), side.upper() + ' hair-trigger', name)
 
     @Slot(str, int)
@@ -2493,7 +2542,8 @@ class GamesirBridge(QObject):
                 self._pending.pop(key, None)
                 self.pendingChanged.emit()
                 return
-            self._queue(g7se.POLL_RATE, [index], 'Poll rate (all profiles)',
+            self._queue(g7se.POLL_RATE, [index],
+                        'Poll rate' if g7se.RATE_PER_PROFILE else 'Poll rate (all profiles)',
                         g7se.POLL_RATES[index], key=key, kind='se_rate')
             self._pending[key]['generation'] = control.generation()
             return
@@ -2571,7 +2621,7 @@ class GamesirBridge(QObject):
                     or source not in self._config.get('remap', {})):
                 return
             try:
-                data = g7se.remap_record(code)
+                data = g7se.remap_record(code, addr)
             except ValueError:
                 return
             self._queue(addr, data, 'Rebind ' + source,
@@ -2582,27 +2632,35 @@ class GamesirBridge(QObject):
         label = cfg.REMAP_NONE if code < 0 else self.targetLabel(code)
         self._queue(addr, data, 'Rebind ' + source, label)
 
+    _SE_EXTRAS = ('st_sensitivity', 'rs_sensitivity', 'st_invert_x', 'st_invert_y',
+                  'rs_invert_x', 'rs_invert_y', 'vib_trigger_l', 'vib_trigger_r')
+
     @Slot(str, int)
     def setG7Extra(self, name, value):
         """Stage one approved G7-only setting using its documented encoding."""
-        if self._prof is not profiles.G7_PRO:
+        if self._prof is profiles.G7_SE:
+            if not self._se_full_view() or name not in self._SE_EXTRAS:
+                return
+        elif self._prof is not profiles.G7_PRO:
             return
         x = self._prof.extras
         profile = self._prof.profile_bank(state.get('edit_profile') or state.get('profile'))
-        simple = {
-            'vib_trigger_l': (x['VIB_TRIG_L'], max(0, min(100, value))),
-            'vib_trigger_r': (x['VIB_TRIG_R'], max(0, min(100, value))),
-            'st_sensitivity': (x['ST_SENS'], max(0, min(100, value))),
-            'rs_sensitivity': (x['RS_SENS'], max(0, min(100, value))),
-            'st_resolution': (x['ST_RESOLUTION'], 12 - max(8, min(12, value))),
-            'rs_resolution': (x['RS_RESOLUTION'], 12 - max(8, min(12, value))),
-            'st_invert_x': (x['ST_INVERT_X'], 1 if value else 0),
-            'st_invert_y': (x['ST_INVERT_Y'], 1 if value else 0),
-            'rs_invert_x': (x['RS_INVERT_X'], 1 if value else 0),
-            'rs_invert_y': (x['RS_INVERT_Y'], 1 if value else 0),
-            'dpad_swap': (x['DPAD_SWAP'], 1 if value else 0),
-            'dpad_lock': (x['DPAD_LOCK'], 1 if value else 0),
+        enc = {
+            'vib_trigger_l': ('VIB_TRIG_L', lambda v: max(0, min(100, v))),
+            'vib_trigger_r': ('VIB_TRIG_R', lambda v: max(0, min(100, v))),
+            'st_sensitivity': ('ST_SENS', lambda v: max(0, min(100, v))),
+            'rs_sensitivity': ('RS_SENS', lambda v: max(0, min(100, v))),
+            'st_resolution': ('ST_RESOLUTION', lambda v: 12 - max(8, min(12, v))),
+            'rs_resolution': ('RS_RESOLUTION', lambda v: 12 - max(8, min(12, v))),
+            'st_invert_x': ('ST_INVERT_X', lambda v: 1 if v else 0),
+            'st_invert_y': ('ST_INVERT_Y', lambda v: 1 if v else 0),
+            'rs_invert_x': ('RS_INVERT_X', lambda v: 1 if v else 0),
+            'rs_invert_y': ('RS_INVERT_Y', lambda v: 1 if v else 0),
+            'dpad_swap': ('DPAD_SWAP', lambda v: 1 if v else 0),
+            'dpad_lock': ('DPAD_LOCK', lambda v: 1 if v else 0),
         }
+        # only the registers this model has (the G7 SE maps a subset)
+        simple = {k: (x[reg], f(value)) for k, (reg, f) in enc.items() if reg in x}
         if name in simple:
             addr, encoded = simple[name]
             self._config[name] = value
@@ -2689,7 +2747,7 @@ class GamesirBridge(QObject):
             self._config['poll'] = data[0]
         elif addr in self._addr_to_remap:
             rec = self._config.setdefault('remap', {})
-            rec[self._addr_to_remap[addr]] = (g7se.decode_remap(data) if self._prof is profiles.G7_SE
+            rec[self._addr_to_remap[addr]] = (g7se.decode_remap(data, addr) if self._prof is profiles.G7_SE
                 else (data[1] if len(data) > 1 else 0) if data[0] else -1)
         elif addr in self._addr_to_continuous:
             self._config.setdefault('continuous_trigger', {})[
@@ -2780,7 +2838,7 @@ class GamesirBridge(QObject):
                             raise ValueError('G7 SE report-rate values must be reloaded')
                         g7se.rate_write(1, r['bank'], r['data'])
                     else:
-                        g7se.remap_write(1, r['bank'], r['addr'], r['data'])
+                        g7se.settings_write(1, r['bank'], r['addr'], r['data'])
                 if r.get('kind') == 'continuous_trigger':
                     edit = state.get('edit_profile') or state.get('profile')
                     if (r.get('generation') != control.generation()
@@ -2800,7 +2858,7 @@ class GamesirBridge(QObject):
             for r in snapshot_pending.values():
                 if r.get('kind') == 'se_rate':
                     changes.extend((bank, g7se.POLL_RATE, list(r['data']))
-                                   for bank in g7se.RATE_BANKS)
+                                   for bank in g7se.rate_banks(r['bank']))
         prof, gen = self._prof, control.generation()
         edit_profile = state.get('edit_profile') or state.get('profile')
         original_profile = control.expected_profile()
@@ -3167,7 +3225,8 @@ class GamesirBridge(QObject):
         if motor not in ('left', 'right', 'left_trigger', 'right_trigger'):
             self.rumbleTestStatus.emit(False, 'Unknown vibration motor.')
             return
-        if motor.endswith('_trigger') and self._prof is not profiles.G7_PRO:
+        if motor.endswith('_trigger') and self._prof is not profiles.G7_PRO \
+                and not self._se_full_view():
             self.rumbleTestStatus.emit(False, 'Trigger tests require a supported G7 Pro.')
             return
         percent = max(0, min(100, int(strength)))

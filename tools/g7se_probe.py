@@ -365,8 +365,8 @@ class Session:
                       + bytes((length,)), log, short=True)
             sequence = self.sequence
             value = self.receive(handle, log, lambda r:
-                se.match_read(r, profile, offset, length) if len(r) > 2
-                and r[2] == sequence else None, heartbeat=keepalive)
+                se.match_read(r, profile, offset, length) if se.reply_sequence_ok(r, sequence)
+                else None, heartbeat=keepalive)
             reads.append({'profile': profile, 'offset': offset, 'length': length,
                           'sequence': sequence, 'data': None if value is None else value.hex()})
             time.sleep(0.05)
@@ -412,7 +412,7 @@ class Session:
             self.send(handle, 1, b'\x0b', log, short=True)
             sequence = self.sequence
             value = self.receive(handle, log, lambda r: r[5:] if len(r) >= 7
-                and r[:2] == b'\x10\x00' and r[2] == sequence
+                and r[:2] == b'\x10\x00' and se.reply_sequence_ok(r, sequence)
                 and r[3:5] == b'\x3c\x0c' else None, heartbeat=keepalive)
             evidence['active_profile_payload'] = None if value is None else value.hex()
             # The captured cold reconnect starts at profile offset zero.
@@ -481,7 +481,7 @@ class Session:
                       + bytes((length,)), log, short=True)
             sequence = self.sequence
             value = self.receive(handle, log, lambda r: se.match_read(r, bank, address, length)
-                if len(r) > 2 and r[2] == sequence else None, heartbeat=heartbeat)
+                if se.reply_sequence_ok(r, sequence) else None, heartbeat=heartbeat)
             if value is None:
                 raise UsbTransportError('Remap readback timed out')
             return value
@@ -577,7 +577,7 @@ class Session:
                       + bytes((length,)), log, short=True)
             sequence = self.sequence
             value = self.receive(handle, log, lambda r: se.match_read(r, bank, address, length)
-                if len(r) > 2 and r[2] == sequence else None, heartbeat=heartbeat)
+                if se.reply_sequence_ok(r, sequence) else None, heartbeat=heartbeat)
             if value is None:
                 raise UsbTransportError('Restore readback timed out')
             return value
@@ -662,7 +662,7 @@ class Session:
                 self.send(handle, 5, bytes((4, bank)) + address.to_bytes(2, 'big') + bytes((8,)), log, short=True)
                 read_sequence = self.sequence
                 readback = self.receive(handle, log, lambda r: se.match_read(r, bank, address, 8)
-                    if len(r) > 2 and r[2] == read_sequence else None)
+                    if se.reply_sequence_ok(r, read_sequence) else None)
                 item['readback_verified'] = readback == record
         finally:
             if handle is not None:
@@ -1226,13 +1226,13 @@ def main():
     try:
         roots = [Path(args.sysfs)] if args.sysfs else [p for p in Path('/sys/bus/usb/devices').glob('*')
             if (p / 'idVendor').exists() and (p / 'idVendor').read_text().strip() == '3537'
-            and (p / 'idProduct').read_text().strip() == '1010']
+            and (p / 'idProduct').read_text().strip() == f'{se.PID:04x}']
         if len(roots) != 1:
             raise UsbTransportError('Select exactly one G7 SE with --sysfs')
         report['before'] = topology(roots[0])
         if (report['before']['idVendor'], report['before']['idProduct'],
-                report['before']['bcdDevice']) != ('3537', '1010', '0630'):
-            raise UsbTransportError('Probe is limited to 3537:1010 descriptor 6.30')
+                report['before']['bcdDevice']) != (f'{se.VID:04x}', f'{se.PID:04x}', f'{se.TESTED_DESCRIPTOR:04x}'):
+            raise UsbTransportError(f'Probe is limited to 3537:{se.PID:04x} descriptor {se.TESTED_DESCRIPTOR:04x}')
         if args.rate_roundtrip or args.verify_rate_reconnect or args.restore_rate_originals:
             from tools.g7se_rates import run
             success = run(roots[0], args.output,

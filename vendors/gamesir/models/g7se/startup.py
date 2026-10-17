@@ -21,7 +21,8 @@ class Startup:
         self.identity = self._identity()
         if (self.identity['idVendor'], self.identity['idProduct'],
                 self.identity['bcdDevice'], int(self.identity['busnum']),
-                int(self.identity['devnum'])) != ('3537', '1010', '0630', bus, address):
+                int(self.identity['devnum'])) != (f'{se.VID:04x}', f'{se.PID:04x}',
+                                                 f'{se.TESTED_DESCRIPTOR:04x}', bus, address):
             raise OSError('G7 SE startup device identity does not match selection')
 
     def _identity(self):
@@ -63,8 +64,8 @@ class Startup:
             request = se.nexus_request(sequence, 5, bytes((4, 1, 0, 0, 55)))
             exchange.raw(request, 'startup-profile-read')
             value = self.receive(self.handle, self.log, lambda reply:
-                se.match_read(reply, 1, 0, 55) if len(reply) > 2
-                and reply[2] == sequence else None, seconds=.6)
+                se.match_read(reply, 1, 0, 55)
+                if se.reply_sequence_ok(reply, sequence) else None, seconds=.6)
             if value is None:
                 return False
             values.append(value)
