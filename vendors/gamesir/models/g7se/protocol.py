@@ -77,7 +77,14 @@ LAYOUTS = {
                          ('Menu', 23))),
     0x0664: dict(
         PID=PID_GIP_664, RATE_BANKS=PROFILE_BANKS, RATE_PER_PROFILE=True, POLL_RATE=0x0030,
-        REMAP_LEN=1, REMAP_SLOTS=(('L4', 0x00b3), ('R4', 0x00c1)),
+        # Front buttons: 2-byte G7 Pro-style slots (flag 01 + target, 00 00 =
+        # default), verified on bank 3 by tools/g7se_write_test_664.py. L4/R4
+        # keep their captured 1-byte target form (their flag is always 01).
+        REMAP_LEN=1, REMAP_SLOTS=(
+            ('Dpad Up', 0x0042), ('Dpad Down', 0x0049), ('Dpad Left', 0x0050),
+            ('Dpad Right', 0x0057), ('LB', 0x005e), ('RB', 0x0065), ('LS', 0x006c),
+            ('RS', 0x0073), ('A', 0x007a), ('B', 0x0081), ('X', 0x0088), ('Y', 0x008f),
+            ('View', 0x009d), ('Menu', 0x00a4), ('L4', 0x00b3), ('R4', 0x00c1)),
         REMAP_DEFAULTS={0x00b3: 0x11, 0x00c1: 0x12},
         # The 6.64 bank follows the G7 Pro register map (vibration 0x20.., trigger
         # blocks 0xcf/0xeb, stick blocks 0x13c/0x15c), so the whole bank is read
@@ -118,7 +125,26 @@ def rate_banks(profile):
     return (profile,) if RATE_PER_PROFILE else RATE_BANKS
 
 
+def remap_len(address):
+    """Bytes in one source-button record at ``address``."""
+    if REMAP_LEN == 1 and address not in REMAP_DEFAULTS:
+        return 2                      # 6.64 front-button slot: flag + target
+    return REMAP_LEN
+
+
+def _targets():
+    return dict((c, n) for n, c in GAMEPAD_TARGETS)
+
+
 def remap_record(code, address=None):
+    if remap_len(address) == 2:
+        if address not in dict(REMAP_SLOTS).values():
+            raise ValueError('Unsupported G7 SE remap source')
+        if code == -1:
+            return b'\0\0'
+        if code not in _targets():
+            raise ValueError('Unsupported G7 SE gamepad target')
+        return bytes((1, code))
     if REMAP_LEN == 1:
         if address not in REMAP_DEFAULTS:
             raise ValueError('Unsupported G7 SE remap source')
@@ -136,6 +162,13 @@ def remap_record(code, address=None):
 
 def decode_remap(record, address=None):
     record = bytes(record)
+    if remap_len(address) == 2:
+        if len(record) == 2 and address in dict(REMAP_SLOTS).values():
+            if record[0] == 0:
+                return -1
+            if record[0] == 1 and record[1] in _targets():
+                return record[1]
+        raise ValueError('Unknown G7 SE button record; editing refused')
     if REMAP_LEN == 1:
         if len(record) == 1 and address in REMAP_DEFAULTS:
             if record[0] == REMAP_DEFAULTS[address]:
@@ -157,7 +190,7 @@ def remap_write(sequence, profile, address, record):
         raise ValueError('Unsupported G7 SE remap source/profile')
     record = bytes(record)
     decode_remap(record, address)
-    body = bytes((3, profile)) + address.to_bytes(2, 'big') + bytes((REMAP_LEN,)) + record
+    body = bytes((3, profile)) + address.to_bytes(2, 'big') + bytes((len(record),)) + record
     return bytes((15, 0, sequence, 60)) + body.ljust(60, b'\0')
 
 
@@ -240,7 +273,7 @@ def allowed_setting_read(bank, address, length):
         return True
     return ((bank in RATE_BANKS and address == POLL_RATE and length == 1)
             or (bank in PROFILE_BANKS and address in dict(REMAP_SLOTS).values()
-                and length == REMAP_LEN))
+                and length == remap_len(address)))
 
 
 def open_device(bus, address, sysfs):

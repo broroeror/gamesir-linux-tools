@@ -26,6 +26,9 @@ TESTS = [  # name, address, new bytes (the original is read from the pad)
     ('ls_invert_y', 0x0152, [1]),
     ('lt_deadzone_min', 0x00cf, [15]),
     ('ls_curve_block', 0x0144, [0, 100, 0, 0, 0x39, 0x40, 0x80, 0x80, 0xc6, 0xbf]),
+    ('remap_a_to_b', 0x007a, [1, 0x0a]),          # G7 Pro slot layout: flag, target
+    ('remap_dpad_up_to_y', 0x0042, [1, 0x0c]),
+    ('remap_menu_to_a', 0x00a4, [1, 0x09]),
 ]
 
 
@@ -116,7 +119,7 @@ def main():
         if pad.bank(BANK) != snap:
             raise OSError('bank 3 reads are not repeatable; nothing written')
         for name, address, new in TESTS:
-            if args.only and name != args.only:
+            if args.only and name not in args.only.split(','):
                 continue
             orig = list(snap[address:address + len(new)])
             t = {'name': name, 'address': hex(address), 'original': bytes(orig).hex(),

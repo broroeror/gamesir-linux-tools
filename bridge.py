@@ -854,7 +854,7 @@ class GamesirBridge(QObject):
                 reqs = [] if self._se_full_view() else [
                     (bank, addr, ln) for addr, ln in self._prof.read_fields()
                     if self._prof is not profiles.G7_SE or addr != g7se.POLL_RATE]
-                reqs += [(bank, addr, g7se.REMAP_LEN if self._prof is profiles.G7_SE else 2)
+                reqs += [(bank, addr, g7se.remap_len(addr) if self._prof is profiles.G7_SE else 2)
                          for _n, addr in self._prof.REMAP_SLOTS]
                 if self._se_full_view():
                     reqs += g7se.view_requests(bank)

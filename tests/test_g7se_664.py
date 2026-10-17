@@ -72,6 +72,24 @@ class Layout664Tests(unittest.TestCase):
         self.assertFalse(se.allowed_app_request(bytes(bad)))
         self.assertFalse(se.allowed_app_request(self.write('0f00053c030100ba0101')))
 
+    def test_front_button_slots_match_the_bank3_test(self):
+        # tools/g7se_write_test_664.py: A->B, Dpad Up->Y and Menu->A each changed
+        # exactly their two bytes and restored byte-exact.
+        self.assertEqual(se.remap_len(0x007a), 2)
+        self.assertEqual(se.remap_len(0x00b3), 1)
+        self.assertEqual(se.remap_write(9, 3, 0x007a, se.remap_record(0x0a, 0x007a)),
+                         self.write('0f00093c0303007a02010a'))
+        self.assertEqual(se.remap_record(-1, 0x0042), b'\0\0')
+        self.assertEqual(se.decode_remap(b'\0\0', 0x0042), -1)
+        self.assertEqual(se.decode_remap(b'\x01\x0c', 0x0042), 0x0c)
+        for bad in (b'\x02\x0c', b'\x01\x7f', b'\x0c'):
+            with self.assertRaises(ValueError):
+                se.decode_remap(bad, 0x0042)
+        self.assertTrue(se.allowed_setting_read(1, 0x00a4, 2))
+        self.assertFalse(se.allowed_setting_read(1, 0x00a4, 1))
+        self.assertTrue(se.allowed_app_request(self.write('0f00093c030100a4020109')))
+        self.assertFalse(se.allowed_app_request(self.write('0f00093c030100a5020109')))  # off-slot
+
     def test_630_layout_is_unchanged(self):
         se.select(0x0630)
         self.assertEqual((se.PID, se.POLL_RATE, se.REMAP_LEN), (0x1010, 0x0036, 8))
