@@ -213,8 +213,6 @@ def rumble(left, right, gen=None, write_style=None, trigger_left=0, trigger_righ
     if style not in ('g7', 'g7se', 'cyclone'):
         return False
     if style in ('g7', 'g7se'):
-        if style == 'g7se' and (trigger_left or trigger_right):
-            return False        # G7 SE trigger motors are unverified
         global _gip_seq
         with _gip_seq_lock:
             _gip_seq = (_gip_seq % 255) + 1  # GIP reserves sequence zero
@@ -239,7 +237,7 @@ def rumble_test(on_done=None, motor='grips', strength=0xC0):
             'left_trigger': (0, 0, strength_value, 0),
             'right_trigger': (0, 0, 0, strength_value),
         }
-        if motor not in motors or (motor.endswith('_trigger') and style != 'g7'):
+        if motor not in motors or (motor.endswith('_trigger') and style not in ('g7', 'g7se')):
             if on_done:
                 on_done(False, 'This motor test is not supported for the selected controller.')
             return

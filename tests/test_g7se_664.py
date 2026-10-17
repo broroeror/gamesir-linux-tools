@@ -90,12 +90,17 @@ class Layout664Tests(unittest.TestCase):
         self.assertTrue(se.allowed_app_request(self.write('0f00093c030100a4020109')))
         self.assertFalse(se.allowed_app_request(self.write('0f00093c030100a5020109')))  # off-slot
 
-    def test_grip_rumble_is_the_only_gip_rumble_allowed(self):
-        # Same 13-byte GIP rumble xpad sends; the pad's grips answered it via xpad.
+    def test_gip_rumble_is_allowed_only_in_its_exact_form(self):
+        # Same 13-byte GIP rumble xpad sends; grips and both trigger motors were
+        # felt on the pad (trigger_rumble_test.py, 2026-10-17).
         self.assertTrue(se.allowed_app_request(se.rumble_packet(5, 192, 0)))
+        self.assertTrue(se.allowed_app_request(se.rumble_packet(5, 0, 0, 192, 0)))  # LT
         self.assertTrue(se.allowed_app_request(se.rumble_packet(5, 0, 0)))       # stop
-        trig = bytearray(se.rumble_packet(5, 192, 0)); trig[6] = 50
-        self.assertFalse(se.allowed_app_request(bytes(trig)))                   # trigger motor
+        bad = bytearray(se.rumble_packet(5, 192, 0)); bad[6] = 101
+        self.assertFalse(se.allowed_app_request(bytes(bad)))                    # > 100 %
+        bad = bytearray(se.rumble_packet(5, 192, 0)); bad[10] = 0xff
+        self.assertFalse(se.allowed_app_request(bytes(bad)))                    # duration
+        self.assertTrue(se.allowed_setting_read(1, 0x0022, 1))
         self.assertFalse(se.allowed_app_request(se.rumble_packet(0, 192, 0)))    # seq 0
         se.select(0x0630)
         self.assertFalse(se.allowed_app_request(se.rumble_packet(5, 192, 0)))

@@ -29,6 +29,8 @@ TESTS = [  # name, address, new bytes (the original is read from the pad)
     ('remap_a_to_b', 0x007a, [1, 0x0a]),          # G7 Pro slot layout: flag, target
     ('remap_dpad_up_to_y', 0x0042, [1, 0x0c]),
     ('remap_menu_to_a', 0x00a4, [1, 0x09]),
+    ('vib_trigger_left', 0x0022, [40]),
+    ('vib_trigger_right', 0x0023, [40]),
 ]
 
 

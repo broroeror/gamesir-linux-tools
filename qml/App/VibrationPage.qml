@@ -127,11 +127,12 @@ Item {
             }
 
             Card {
-                visible: bridge.g7Layout && !bridge.seFullView; title: "Trigger motors"; Layout.fillWidth: true
+                visible: bridge.g7Layout; title: "Trigger motors"; Layout.fillWidth: true
                 // GameSir doesn't document what Force and Sync do, so say only what
                 // was observed: with Force on, a trigger's test stays silent
                 // (Amazon edition, 2026-10-06) -- it read as a broken test.
                 Text {
+                    visible: !bridge.seFullView
                     width: parent.width; wrapMode: Text.WordWrap
                     text: "A trigger's test can stay silent while its Force option is on."
                     color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
@@ -160,6 +161,7 @@ Item {
                         onClicked: page.testMotor("left_trigger", trigLSlider.value)
                     }
                     Row {
+                        visible: !bridge.seFullView     // Force/Sync unmapped on the G7 SE
                         spacing: 16
                         Row { spacing: 6; Text { text: "Force"; color: Theme.textDim }
                             ToggleSwitch { checked: page.forceL
@@ -192,6 +194,7 @@ Item {
                         onClicked: page.testMotor("right_trigger", trigRSlider.value)
                     }
                     Row {
+                        visible: !bridge.seFullView     // Force/Sync unmapped on the G7 SE
                         spacing: 16
                         Row { spacing: 6; Text { text: "Force"; color: Theme.textDim }
                             ToggleSwitch { checked: page.forceR

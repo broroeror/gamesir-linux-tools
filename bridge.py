@@ -921,6 +921,8 @@ class GamesirBridge(QObject):
             shown = g7pro.decode_profile(view.ljust(g7pro.PROFILE_BLOB_SIZE, b'\0'))
             for key in self._SE_EXTRAS:
                 cand[key] = shown[key]
+            for key in ('vib_force_l', 'vib_sync_l', 'vib_force_r', 'vib_sync_r'):
+                cand[key] = shown[key]      # seeds the (hidden) toggles; never written
         # Guard against a transient/garbage read overwriting a good config (the
         # "triggers 0–0 after a page switch" bug): a deadzone MAX of 0 fully
         # deadzones the axis, which no real profile does — so it signals the
@@ -2626,7 +2628,7 @@ class GamesirBridge(QObject):
         self._queue(addr, data, 'Rebind ' + source, label)
 
     _SE_EXTRAS = ('st_sensitivity', 'rs_sensitivity', 'st_invert_x', 'st_invert_y',
-                  'rs_invert_x', 'rs_invert_y')
+                  'rs_invert_x', 'rs_invert_y', 'vib_trigger_l', 'vib_trigger_r')
 
     @Slot(str, int)
     def setG7Extra(self, name, value):
@@ -3218,7 +3220,8 @@ class GamesirBridge(QObject):
         if motor not in ('left', 'right', 'left_trigger', 'right_trigger'):
             self.rumbleTestStatus.emit(False, 'Unknown vibration motor.')
             return
-        if motor.endswith('_trigger') and self._prof is not profiles.G7_PRO:
+        if motor.endswith('_trigger') and self._prof is not profiles.G7_PRO \
+                and not self._se_full_view():
             self.rumbleTestStatus.emit(False, 'Trigger tests require a supported G7 Pro.')
             return
         percent = max(0, min(100, int(strength)))

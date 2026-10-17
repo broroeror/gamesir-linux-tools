@@ -48,6 +48,7 @@ def _curve(data):
 # trigger fields at +0x1c (right trigger), as on the G7 Pro.
 SETTINGS_664 = {
     0x0020: (1, _percent), 0x0021: (1, _percent),            # grip vibration L/R
+    0x0022: (1, _percent), 0x0023: (1, _percent),            # trigger vibration L/R
     **{a + o: (1, _percent) for o in (0, 0x1c)                 # trigger dz / anti-dz
        for a in (0x00cf, 0x00d0, 0x00d1, 0x00d2)},
     **{a + o: (1, _percent) for o in (0, 0x20)                 # stick dz / anti-dz
@@ -201,11 +202,12 @@ def rumble_packet(sequence, left, right, trigger_left=0, trigger_right=0):
 
 
 def allowed_rumble(request):
-    """Only the 13-byte GIP rumble/stop packet, grip motors only, on 6.64."""
+    """Only the 13-byte GIP rumble/stop packet (grips + triggers), on 6.64."""
     request = bytes(request)
     if not FULL_VIEW or len(request) != 13 or request[:2] != b'\x09\x00' or request[2] == 0:
         return False
-    return request == rumble_packet(request[2], *(round(p * 255 / 100) for p in request[8:10]))
+    lt, rt, left, right = (round(p * 255 / 100) for p in request[6:10])
+    return request == rumble_packet(request[2], left, right, lt, rt)
 
 
 def allowed_app_request(request):
