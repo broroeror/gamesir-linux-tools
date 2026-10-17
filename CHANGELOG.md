@@ -8,6 +8,12 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
 ## [Unreleased]
 
 ### Added
+- **GameSir G7 SE firmware 6.64** (`3537:1069`): every button's remap
+  (including LT/RT), sticks (deadzones, curves, sensitivity, invert,
+  trajectory), triggers (deadzones, curves, hair trigger), grip and trigger
+  vibration with motor tests, per-profile report rate, and Backup & Restore.
+  The `1082` fallback is no longer mistaken for a Kaleid. See
+  [docs/g7se.md](docs/g7se.md#firmware-664-35371069).
 - `deadband --doctor --probe`: opt-in, read-only device questions for bug
   reports — a G502 X's firmware, onboard-profile layout and per-profile
   checksums (and where a mismatched one really sits), and whether an

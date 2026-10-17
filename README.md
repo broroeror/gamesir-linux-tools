@@ -101,8 +101,12 @@ can't positively identify. Fork it and customize it however you like.
 >
 > The **G7 SE** (`3537:1010`, firmware descriptor 6.30) supports L4/R4 gamepad
 > remapping in three profiles and controller-wide 250/500/1000 Hz report-rate
-> settings, with staged Save, verified readback and rollback. See
-> [G7 SE support](docs/g7se.md).
+> settings, with staged Save, verified readback and rollback. On firmware
+> **6.64** (`3537:1069`, its Xbox GIP identity) it is configured like a G7 Pro
+> without gyro: every button's remap, sticks, triggers, hair trigger, grip and
+> trigger vibration, report rate and Backup & Restore. 6.64 only reaches 1069
+> when the PC firmware enumerates it first (plug it in at the boot menu); a
+> hot-plugged pad falls back to `3537:1082`. See [G7 SE support](docs/g7se.md).
 >
 > The **Tarantula Pro 8K** is configured in its PC mode, `3537:103d`: rebinds for all
 > nine extra buttons (L4, R4, C1–C4, T1–T3), macros, sticks, triggers, gyro and
