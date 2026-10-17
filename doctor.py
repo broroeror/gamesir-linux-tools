@@ -540,19 +540,25 @@ def collect():
             if _se and dev.get('pid') in _se.LAYOUT_PIDS:
                 meta = dev.get('usb') or {}
                 node = '/dev/bus/usb/%03d/%03d' % (meta.get('bus', 0), meta.get('address', 0))
+                tested = _se.LAYOUT_PIDS[dev['pid']]
+                full = bool(_se.LAYOUTS[tested].get('FULL_VIEW'))
                 rep['g7se_devices'].append({
-                    'pid': dev['pid'], 'identity': 'G7 SE (rear remaps and report rate)',
+                    'pid': dev['pid'],
+                    'identity': 'G7 SE (' + ('full configuration' if full
+                                             else 'rear remaps and report rate') + ')',
                     'product': dev.get('product', ''), 'port': dev['port'],
                     'bcd': dev.get('bcd'), 'node': node,
                     'access': os.access(node, os.R_OK | os.W_OK),
                     'interfaces': _interfaces(meta.get('sysfs')),
                 })
-                tested = _se.LAYOUT_PIDS[dev['pid']]
                 supported = dev.get('bcd') == tested
+                features = ('Button remaps (including LT/RT), sticks, triggers, grip and '
+                            'trigger vibration, report rate and Backup & Restore are'
+                            if full else
+                            'L4/R4 remapping and 250/500/1000 Hz rate settings are')
                 rep['verdict'].append(
                     f'G7 SE (3537:{dev["pid"]:04x}) found. ' + (
-                    'L4/R4 remapping and 250/500/1000 Hz rate settings are verified on '
-                    f'descriptor {_se.descriptor_name(tested)}. '
+                    f'{features} verified on descriptor {_se.descriptor_name(tested)}. '
                     'Configuration uses native USB with a fresh Xbox authentication '
                     'exchange when needed (requires OpenSSL). Release to games afterward.'
                     if supported else 'This firmware is input-only; configuration on this '
