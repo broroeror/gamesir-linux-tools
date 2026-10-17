@@ -1101,6 +1101,10 @@ class GamesirBridge(QObject):
         if profiles.active() is profiles.G7_NATIVE:
             return ('Hold SHARE + MENU (☰) to switch the controller to XInput '
                     'mode. Note this also resets the active profile\'s remaps.')
+        if profiles.active() is profiles.G7_SE_OTHER:
+            return ('On firmware 6.64 the G7 SE picks its mode when it powers up. '
+                    'Hot-plugged on Linux it falls back to DirectInput; plug it in '
+                    'before booting and it comes up in Xbox mode.')
         if profiles.active() is profiles.KALEID_OTHER:
             return ('Press M + Xbox to cycle the controller to Xbox mode, where '
                     'its lighting is editable. The other two modes work in games '

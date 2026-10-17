@@ -416,6 +416,14 @@ G7_SE = ControllerProfile(
     REMAP_SLOTS=_se.REMAP_SLOTS, supports_hair_thresholds=False,
 )
 
+# G7 SE firmware 6.64 identities (GIP 1069, XInput 10a0, and the DirectInput
+# 1082 it shares with the Kaleid). Detection only: input over evdev, no writes.
+G7_SE_OTHER = ControllerProfile(
+    name='GameSir G7 SE', short='G7 SE', usb_products=_se.OTHER_PIDS,
+    wired_products=_se.OTHER_PIDS + (_se.PID_HID_664,),
+    write_style='none', input_style='evdev', profile_banks=(),
+)
+
 # Compatibility name for code/tests that referred to the old misidentified G7.
 G7 = G7_PRO
 
@@ -719,8 +727,8 @@ KALEID_OTHER = ControllerProfile(
 )
 
 
-ALL = (CYCLONE, G7_PRO, G7_NATIVE, G7_PRO_OTHER, G7_SE, G7_8K, TARANTULA_PRO_8K,
-       KALEID, KALEID_OTHER)
+ALL = (CYCLONE, G7_PRO, G7_NATIVE, G7_PRO_OTHER, G7_SE, G7_SE_OTHER, G7_8K,
+       TARANTULA_PRO_8K, KALEID, KALEID_OTHER)
 DEFAULT = CYCLONE
 
 
@@ -767,6 +775,10 @@ def detect_one(pid, product=None):
     # G7 Pro; anything else is left alone (not recognised, never written).
     if prof is G7_PRO and not _g7.is_g7_device(pid, product):
         return None
+    # 3537:1082 is the Kaleid's DirectInput mode and also where a G7 SE on
+    # firmware 6.64 lands when hot-plugged; the product string tells them apart.
+    if prof is KALEID_OTHER and pid == _se.PID_HID_664 and _se.is_g7se_product(product):
+        return G7_SE_OTHER
     return prof
 
 

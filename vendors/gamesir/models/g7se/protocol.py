@@ -9,6 +9,21 @@ VID = 0x3537
 PID = 0x1010
 TESTED_DESCRIPTOR = 0x0630
 CONFIGURATION_VERIFIED = True  # Firmware 0630: authenticated reads and remap roundtrips.
+# Firmware 6.64 enumerates under different ids and auto-detects the host: hot-
+# plugged on Linux it offers 10a0 (XInput), drops off the bus ~2-4 ms after the
+# config descriptor is read and comes back as 1082 (DirectInput, the id the
+# Kaleid also uses). Plugged in across a cold boot it settles on 1069 (Xbox GIP)
+# and xpad binds it. Input only: no configuration reply has been verified there.
+PID_GIP_664 = 0x1069
+PID_XINPUT_664 = 0x10a0
+PID_HID_664 = 0x1082
+OTHER_PIDS = (PID_GIP_664, PID_XINPUT_664)
+
+
+def is_g7se_product(product):
+    return bool(product) and 'g7 se' in product.lower()
+
+
 PROFILE_SIZE = 421
 PROFILE_BANKS = (1, 2, 3)  # Nexus exposes three editable profiles.
 RATE_BANKS = (1, 2, 3, 4)  # Nexus applies its controller-wide rate to all banks.

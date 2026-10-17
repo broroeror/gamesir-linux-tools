@@ -172,7 +172,8 @@ def _pick_selected(controllers):
     # initial selection away from a controller this app can configure.
     return next((c for c in live
                  if profiles.detect_one(c['pid'], c.get('product'))
-                 not in (None, profiles.G7_NATIVE, profiles.G7_PRO_OTHER, profiles.G7_SE)),
+                 not in (None, profiles.G7_NATIVE, profiles.G7_PRO_OTHER, profiles.G7_SE,
+                         profiles.G7_SE_OTHER)),
                 (live or controllers)[0])
 
 
@@ -392,6 +393,21 @@ def read_controller():
                     state['config_status'] = 'Released to games'
                     state['config_phase'] = 'released'
                 read_session_evdev(sel['id'], force_wrong_mode=True)
+            state['connected'] = False
+            time.sleep(0.3)
+            continue
+
+        # G7 SE firmware 6.64. GIP (1069) is a proper Xbox pad; the other two are
+        # what the auto-detect falls back to when hot-plugged.
+        if prof is profiles.G7_SE_OTHER:
+            state['connected'] = True
+            state['mode_ok'] = sel['pid'] == g7se.PID_GIP_664
+            state['config_status'] = (
+                'G7 SE firmware 6.64 — config isn\'t supported yet; input works.'
+                if state['mode_ok'] else
+                'G7 SE in DirectInput mode: plug it in before booting to get Xbox mode')
+            state['config_phase'] = 'failed'
+            read_session_evdev(sel['id'], force_wrong_mode=not state['mode_ok'])
             state['connected'] = False
             time.sleep(0.3)
             continue
