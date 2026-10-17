@@ -2446,8 +2446,13 @@ class GamesirBridge(QObject):
             return
         bank = bank if bank is not None else self._prof.profile_bank(edit)
         pkey = key if key is not None else (bank, addr)
+        if self._prof is profiles.G7_SE and not self._se_editable_session():
+            return          # stale or unclaimed SE session: Apply would refuse it anyway
         self._pending[pkey] = {'addr': addr, 'bank': bank, 'data': list(data),
                                'label': label, 'display': str(display), 'kind': kind}
+        if self._prof is profiles.G7_SE:
+            # Apply pins every SE edit to the session its values were read in.
+            self._pending[pkey]['generation'] = self._config_generation
         self.pendingChanged.emit()
 
     # The write-side slots below no-op when the active profile lacks the field
