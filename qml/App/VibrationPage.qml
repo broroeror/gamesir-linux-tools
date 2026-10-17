@@ -82,7 +82,6 @@ Item {
                     onMoved: bridge.setScalar("vib_l", value)
                 }
                 PillButton {
-                    visible: !bridge.seFullView     // no G7 SE rumble path here
                     objectName: "testLeftGrip"
                     label: "Test left grip (heavy motor)"
                     enabled: !page.testRunning && vibL.value > 0
@@ -102,7 +101,6 @@ Item {
                     onMoved: bridge.setScalar("vib_r", value)
                 }
                 PillButton {
-                    visible: !bridge.seFullView
                     objectName: "testRightGrip"
                     label: "Test right grip (light motor)"
                     enabled: !page.testRunning && vibR.value > 0
@@ -119,7 +117,6 @@ Item {
                     color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                 }
                 PillButton {
-                    visible: !bridge.seFullView
                     label: "Test both grip motors"
                     enabled: !page.testRunning && (!bridge.g7Layout || bridge.configClaimed)
                     onClicked: {

@@ -210,13 +210,16 @@ _gip_seq_lock = threading.Lock()
 
 def rumble(left, right, gen=None, write_style=None, trigger_left=0, trigger_right=0):
     style = write_style or profiles.active().write_style
-    if style not in ('g7', 'cyclone'):
+    if style not in ('g7', 'g7se', 'cyclone'):
         return False
-    if style == 'g7':
+    if style in ('g7', 'g7se'):
+        if style == 'g7se' and (trigger_left or trigger_right):
+            return False        # G7 SE trigger motors are unverified
         global _gip_seq
         with _gip_seq_lock:
             _gip_seq = (_gip_seq % 255) + 1  # GIP reserves sequence zero
-            packet = g7pro.rumble_packet(_gip_seq, left, right, trigger_left, trigger_right)
+            make = g7se.rumble_packet if style == 'g7se' else g7pro.rumble_packet
+            packet = make(_gip_seq, left, right, trigger_left, trigger_right)
             return send_cmd(*packet, gen=gen, padded=False)
     if trigger_left or trigger_right:
         return False

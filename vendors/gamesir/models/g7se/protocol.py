@@ -194,9 +194,25 @@ def remap_write(sequence, profile, address, record):
     return bytes((15, 0, sequence, 60)) + body.ljust(60, b'\0')
 
 
+def rumble_packet(sequence, left, right, trigger_left=0, trigger_right=0):
+    """Xbox GIP rumble (command 0x09), as xpad sends in GIP mode: 400 ms."""
+    from vendors.gamesir.models.g7pro import protocol as g7
+    return g7.rumble_packet(sequence, left, right, trigger_left, trigger_right)
+
+
+def allowed_rumble(request):
+    """Only the 13-byte GIP rumble/stop packet, grip motors only, on 6.64."""
+    request = bytes(request)
+    if not FULL_VIEW or len(request) != 13 or request[:2] != b'\x09\x00' or request[2] == 0:
+        return False
+    return request == rumble_packet(request[2], *(round(p * 255 / 100) for p in request[8:10]))
+
+
 def allowed_app_request(request):
     """Final production USB guard: no unrelated settings/profile/dock writes."""
     request = bytes(request)
+    if len(request) == 13 and request[:1] == b'\x09':
+        return allowed_rumble(request)
     try:
         if len(request) < 5 or request[:2] != b'\x0f\x00':
             return False
