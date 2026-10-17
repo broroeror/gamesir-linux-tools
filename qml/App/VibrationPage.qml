@@ -25,7 +25,7 @@ Item {
         var c = bridge.config
         if (c.vib_l === undefined) return
         vibL.value = c.vib_l; vibR.value = c.vib_r
-        if (bridge.isG7Pro) {
+        if (bridge.g7Layout) {
             trigL = c.vib_trigger_l; trigR = c.vib_trigger_r
             trigLSlider.value = c.vib_trigger_l; trigRSlider.value = c.vib_trigger_r
             forceL = c.vib_force_l; syncL = c.vib_sync_l
@@ -85,7 +85,7 @@ Item {
                     objectName: "testLeftGrip"
                     label: "Test left grip (heavy motor)"
                     enabled: !page.testRunning && vibL.value > 0
-                             && (!bridge.isG7Pro || bridge.configClaimed)
+                             && (!bridge.g7Layout || bridge.configClaimed)
                     onClicked: page.testMotor("left", vibL.value)
                 }
                 Row {
@@ -104,7 +104,7 @@ Item {
                     objectName: "testRightGrip"
                     label: "Test right grip (light motor)"
                     enabled: !page.testRunning && vibR.value > 0
-                             && (!bridge.isG7Pro || bridge.configClaimed)
+                             && (!bridge.g7Layout || bridge.configClaimed)
                     onClicked: page.testMotor("right", vibR.value)
                 }
                 // Xbox-style pads have ONE motor per grip: a heavy one on the left and
@@ -118,7 +118,7 @@ Item {
                 }
                 PillButton {
                     label: "Test both grip motors"
-                    enabled: !page.testRunning && (!bridge.isG7Pro || bridge.configClaimed)
+                    enabled: !page.testRunning && (!bridge.g7Layout || bridge.configClaimed)
                     onClicked: {
                         page.testError = ""; page.testRunning = true
                         bridge.rumbleTest()
@@ -127,7 +127,7 @@ Item {
             }
 
             Card {
-                visible: bridge.isG7Pro; title: "Trigger motors"; Layout.fillWidth: true
+                visible: bridge.g7Layout; title: "Trigger motors"; Layout.fillWidth: true
                 // GameSir doesn't document what Force and Sync do, so say only what
                 // was observed: with Force on, a trigger's test stays silent
                 // (Amazon edition, 2026-10-06) -- it read as a broken test.

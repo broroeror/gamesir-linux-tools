@@ -40,6 +40,7 @@ LAYOUTS = {
     0x0630: dict(
         PID=0x1010, RATE_BANKS=(1, 2, 3, 4), RATE_PER_PROFILE=False, POLL_RATE=0x0036,
         REMAP_LEN=8, REMAP_SLOTS=(('L4', 0x00ab), ('R4', 0x00c7)), REMAP_DEFAULTS={},
+        FULL_VIEW=False,
         GAMEPAD_TARGETS=(('Dpad Up', 1), ('Dpad Down', 2), ('Dpad Left', 3),
                          ('Dpad Right', 4), ('LB', 5), ('RB', 6), ('LS', 7), ('RS', 8),
                          ('A', 15), ('B', 16), ('X', 17), ('Y', 18), ('View', 22),
@@ -48,6 +49,10 @@ LAYOUTS = {
         PID=PID_GIP_664, RATE_BANKS=PROFILE_BANKS, RATE_PER_PROFILE=True, POLL_RATE=0x0030,
         REMAP_LEN=1, REMAP_SLOTS=(('L4', 0x00b3), ('R4', 0x00c1)),
         REMAP_DEFAULTS={0x00b3: 0x11, 0x00c1: 0x12},
+        # The 6.64 bank follows the G7 Pro register map (vibration 0x20.., trigger
+        # blocks 0xcf/0xeb, stick blocks 0x13c/0x15c), so the whole bank is read
+        # and shown read-only. Writes stay limited to the captured L4/R4/rate.
+        FULL_VIEW=True,
         GAMEPAD_TARGETS=(('Dpad Up', 1), ('Dpad Down', 2), ('Dpad Left', 3),
                          ('Dpad Right', 4), ('LB', 5), ('RB', 6), ('LS', 7), ('RS', 8),
                          ('A', 9), ('B', 10), ('X', 11), ('Y', 12), ('View', 14),
@@ -57,7 +62,8 @@ SUPPORTED_DESCRIPTORS = tuple(LAYOUTS)
 CONFIG_PIDS = tuple(layout['PID'] for layout in LAYOUTS.values())
 LAYOUT_PIDS = {layout['PID']: descriptor for descriptor, layout in LAYOUTS.items()}
 RATE_BANKS = RATE_PER_PROFILE = POLL_RATE = None
-REMAP_LEN = REMAP_SLOTS = REMAP_DEFAULTS = GAMEPAD_TARGETS = None
+REMAP_LEN = REMAP_SLOTS = REMAP_DEFAULTS = GAMEPAD_TARGETS = FULL_VIEW = None
+READ_CHUNK = 0x37  # bytes per register read reply on this channel
 
 
 def select(descriptor):
@@ -167,7 +173,26 @@ def settings_write(sequence, bank, address, data):
     return remap_write(sequence, bank, address, data)
 
 
+def view_requests(bank):
+    """Chunked reads covering one whole profile bank (read-only view)."""
+    return [(bank, off, min(READ_CHUNK, PROFILE_SIZE - off))
+            for off in range(0, PROFILE_SIZE, READ_CHUNK)]
+
+
+def stitch_view(bank, result):
+    """Assemble a bank from ``result(bank, offset)`` replies, or None."""
+    out = bytearray()
+    for _bank, off, size in view_requests(bank):
+        part = result(bank, off)
+        if part is None or len(part) < size:
+            return None
+        out.extend(part[:size])
+    return bytes(out)
+
+
 def allowed_setting_read(bank, address, length):
+    if FULL_VIEW and bank in PROFILE_BANKS and (bank, address, length) in view_requests(bank):
+        return True
     return ((bank in RATE_BANKS and address == POLL_RATE and length == 1)
             or (bank in PROFILE_BANKS and address in dict(REMAP_SLOTS).values()
                 and length == REMAP_LEN))

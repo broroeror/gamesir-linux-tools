@@ -281,6 +281,7 @@ class GamesirBridge(QObject):
         self._se_rates = {}
         self._se_rate_scope = None
         self._se_rate_deadline = None
+        self._se_view_deadline = None
         g = lambda a: getattr(prof, a)
         self._scalars = {k: (g(a), lbl) for k, (a, lbl) in _SCALAR_FIELDS.items()
                          if g(a) is not None}
@@ -386,6 +387,7 @@ class GamesirBridge(QObject):
         self._se_rates = {}
         self._se_rate_scope = None
         self._se_rate_deadline = None
+        self._se_view_deadline = None
         self._loaded_profile = None
         self._config_loading = None
         self._config_loading_gen = None
@@ -854,6 +856,10 @@ class GamesirBridge(QObject):
                         if self._prof is not profiles.G7_SE or addr != g7se.POLL_RATE]
                 reqs += [(bank, addr, g7se.REMAP_LEN if self._prof is profiles.G7_SE else 2)
                          for _n, addr in self._prof.REMAP_SLOTS]
+                if self._se_full_view():
+                    # Whole bank for the read-only Sticks/Triggers/Vibration view.
+                    reqs += g7se.view_requests(bank)
+                    self._se_view_deadline = time.monotonic() + 4
             self._config_loading_gen = control.generation()
             control.request_regs(reqs)
             self._config_loading = bank
@@ -895,6 +901,11 @@ class GamesirBridge(QObject):
                      for _n, addr in self._prof.REMAP_SLOTS})
         if any(v is None for v in vals.values()):
             return
+        view = None
+        if self._se_full_view():
+            view = g7se.stitch_view(bank, control.reg_result)
+            if view is None and time.monotonic() < (self._se_view_deadline or 0):
+                return      # the view is optional: give up on it after the deadline
         self._config_loading = None
         try:
             cand = self._build_config(vals)
@@ -904,6 +915,12 @@ class GamesirBridge(QObject):
             self._set_apply_status(str(exc))
             self.configLoaded.emit()
             return
+        if view is not None:
+            shown = g7pro.decode_profile(view.ljust(g7pro.PROFILE_BLOB_SIZE, b'\0'))
+            for key in ('remap', 'motion', 'poll', 'dpad_swap', 'dpad_lock'):
+                shown.pop(key, None)
+            for key, value in shown.items():
+                cand.setdefault(key, value)
         # Guard against a transient/garbage read overwriting a good config (the
         # "triggers 0–0 after a page switch" bug): a deadzone MAX of 0 fully
         # deadzones the axis, which no real profile does — so it signals the
@@ -1259,6 +1276,22 @@ class GamesirBridge(QObject):
     @Property(bool, notify=controllerChanged)
     def remapOnly(self):
         return self._prof is profiles.G7_SE
+
+    def _se_full_view(self):
+        return (self._prof is profiles.G7_SE and bool(g7se.FULL_VIEW)
+                and self._se_configuration_supported())
+
+    @Property(bool, notify=controllerChanged)
+    def seFullView(self):
+        """G7 SE firmware whose whole bank decodes with the G7 Pro map: the
+        Sticks/Triggers/Vibration pages are shown, read-only."""
+        return self._se_full_view()
+
+    @Property(bool, notify=controllerChanged)
+    def g7Layout(self):
+        """G7 Pro register layout (its extra stick/vibration fields)."""
+        return (profiles.is_recognized() and profiles.active() is profiles.G7_PRO) \
+            or self._se_full_view()
 
     @Property(bool, notify=controllerChanged)
     def hasConfigSession(self):
