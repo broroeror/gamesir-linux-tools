@@ -571,6 +571,10 @@ def apply_backup(data, on_progress=None, on_done=None):
     escapes the controller's known register map -- see _validate_writes."""
     if data.get('format') == SE_FORMAT:
         return _apply_se_backup(data, on_progress, on_done)
+    # The generic path below has no rollback; a G7 SE restores only its own
+    # verified, transactional format.
+    if ctrl.active() is ctrl.G7_SE:
+        raise ValueError('a connected G7 SE restores only G7 SE (g7se-banks) backups')
     if _is_g7_semantic(data):
         if ctrl.active() is not ctrl.G7_PRO:
             raise ValueError('schema-4 backup requires a connected G7 Pro')

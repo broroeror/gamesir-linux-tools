@@ -148,6 +148,22 @@ class BackupProfileSwitchTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'G7 Pro'):
             backup.apply_backup(g7)               # a Cyclone is connected
 
+    def test_a_g7_se_refuses_every_backup_but_its_own(self):
+        cyclone = {'schema': 3, 'device': profiles.CYCLONE.name,
+                   'profiles': {'1': {'0x0020': {'addr': '0x0020', 'bytes': [7]}}},
+                   'lighting': {'fields': {}}}
+        g7 = {'schema': 4, 'device': profiles.G7_PRO.name,
+              'profiles': {'1': {'vib_l': 50}}, 'lighting': {}}
+        profiles.set_active(profiles.G7_SE)
+        try:
+            for data in (cyclone, g7):
+                with patch.object(backup, '_expand_units') as generic, \
+                        self.assertRaisesRegex(ValueError, 'g7se-banks'):
+                    backup.apply_backup(data)
+                generic.assert_not_called()
+        finally:
+            profiles.set_active(profiles.CYCLONE)
+
     # --- core-pass review (C1-C9) -------------------------------------------
     def test_a_refused_switch_fails_at_once(self):
         with patch.object(control, 'set_profile', lambda n, gen=None: False):
