@@ -65,6 +65,14 @@ class Layout664Tests(unittest.TestCase):
         self.assertTrue(se.allowed_setting_read(1, 0x00b3, 1))
         self.assertFalse(se.allowed_setting_read(1, 0x00b3, 8))
 
+    def test_only_the_captured_rates_are_offered(self):
+        self.assertEqual(se.POLL_RATES, ('500 Hz', '1000 Hz'))
+        self.assertEqual([se.decode_rate(bytes((c,))) for c in (1, 2)], [0, 1])
+        with self.assertRaises(ValueError):
+            se.decode_rate(b'\x00')                 # 250 Hz was never captured on 6.64
+        with self.assertRaises(ValueError):
+            se.rate_write(1, 1, b'\x00')
+
     def test_app_guard_accepts_only_these_writes(self):
         ok = se.remap_write(5, 2, 0x00c1, b'\x05')
         self.assertTrue(se.allowed_app_request(ok))

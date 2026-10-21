@@ -3,7 +3,9 @@
 Record semantics verified on descriptor 6.30 with Nexus captures and Linux
 roundtrips, and on 6.64 with Nexus 2.5.8 captures (one change per capture).
 Cold connections require a fresh verified GIP v1 handshake.
-Writes allow only complete L4/R4 records and the captured report-rate byte.
+On 6.30 writes allow only complete L4/R4 records and the captured report-rate
+byte; on 6.64 also the profile settings in SETTINGS_664 and the front-button
+remap slots, each checked by its validator before it is sent.
 The module constants describe the selected firmware; select() switches them.
 """
 
@@ -27,7 +29,6 @@ def is_g7se_product(product):
 
 PROFILE_SIZE = 421
 PROFILE_BANKS = (1, 2, 3)  # Nexus exposes three editable profiles.
-POLL_RATES = ('250 Hz', '500 Hz', '1000 Hz')
 
 def _percent(data):
     return len(data) == 1 and data[0] <= 100
@@ -48,8 +49,9 @@ def _curve(data):
     return len(data) == 10 and data[0] <= 3 and data[1] <= 100 and data[2:4] == b'\0\0'
 
 
-# 6.64 profile settings with a verified plain write: on bank 3, each one changed
-# exactly its own bytes and restored byte-exact (write_test_664.py, 2026-10-17).
+# 6.64 profile settings with a verified plain write: on bank 3, every address
+# below (both sides, every byte of each block) changed exactly its own bytes and
+# restored byte-exact (tools/g7se_write_test_664.py, 2026-10-17 and 2026-10-21).
 # address -> (length, validator). Stick fields repeat at +0x20 (right stick),
 # trigger fields at +0x1c (right trigger), as on the G7 Pro.
 SETTINGS_664 = {
@@ -73,11 +75,13 @@ SETTINGS_664 = {
 #         one controller-wide rate byte that Nexus writes to all four banks.
 #   6.64: a 1-byte target code at the end of each 7-byte button record, where
 #         the default is the button's own code (L4 11, R4 12); the rate byte is
-#         per profile (Nexus 2.5.8 wrote only the edited bank). Rate code 00 is
-#         assumed to be 250 Hz like 6.30; 01 and 02 were captured.
+#         per profile (Nexus 2.5.8 wrote only the edited bank). Only codes 01
+#         (500 Hz) and 02 (1000 Hz) were captured, so 00 (250 Hz on 6.30) is
+#         not offered.
 LAYOUTS = {
     0x0630: dict(
         PID=0x1010, RATE_BANKS=(1, 2, 3, 4), RATE_PER_PROFILE=False, POLL_RATE=0x0036,
+        RATE_CODES=(0, 1, 2), POLL_RATES=('250 Hz', '500 Hz', '1000 Hz'),
         REMAP_LEN=8, REMAP_SLOTS=(('L4', 0x00ab), ('R4', 0x00c7)), REMAP_DEFAULTS={},
         FULL_VIEW=False, SETTINGS={},
         GAMEPAD_TARGETS=(('Dpad Up', 1), ('Dpad Down', 2), ('Dpad Left', 3),
@@ -86,6 +90,7 @@ LAYOUTS = {
                          ('Menu', 23))),
     0x0664: dict(
         PID=PID_GIP_664, RATE_BANKS=PROFILE_BANKS, RATE_PER_PROFILE=True, POLL_RATE=0x0030,
+        RATE_CODES=(1, 2), POLL_RATES=('500 Hz', '1000 Hz'),
         # Front buttons: 2-byte G7 Pro-style slots (flag 01 + target, 00 00 =
         # default), verified on bank 3 by tools/g7se_write_test_664.py. L4/R4
         # keep their captured 1-byte target form (their flag is always 01).
@@ -98,7 +103,7 @@ LAYOUTS = {
         REMAP_DEFAULTS={0x00b3: 0x11, 0x00c1: 0x12},
         # The 6.64 bank follows the G7 Pro register map (vibration 0x20.., trigger
         # blocks 0xcf/0xeb, stick blocks 0x13c/0x15c), so the whole bank is read
-        # and shown read-only. Writes stay limited to the captured L4/R4/rate.
+        # into the editor; only SETTINGS_664, the remap slots and the rate write.
         FULL_VIEW=True, SETTINGS=SETTINGS_664,
         GAMEPAD_TARGETS=(('Dpad Up', 1), ('Dpad Down', 2), ('Dpad Left', 3),
                          ('Dpad Right', 4), ('LB', 5), ('RB', 6), ('LS', 7), ('RS', 8),
@@ -108,7 +113,7 @@ LAYOUTS = {
 SUPPORTED_DESCRIPTORS = tuple(LAYOUTS)
 CONFIG_PIDS = tuple(layout['PID'] for layout in LAYOUTS.values())
 LAYOUT_PIDS = {layout['PID']: descriptor for descriptor, layout in LAYOUTS.items()}
-RATE_BANKS = RATE_PER_PROFILE = POLL_RATE = None
+RATE_BANKS = RATE_PER_PROFILE = POLL_RATE = RATE_CODES = POLL_RATES = None
 REMAP_LEN = REMAP_SLOTS = REMAP_DEFAULTS = GAMEPAD_TARGETS = FULL_VIEW = SETTINGS = None
 READ_CHUNK = 0x37  # bytes per register read reply on this channel
 
@@ -242,10 +247,11 @@ def allowed_app_request(request):
 
 
 def decode_rate(data):
+    """Index into POLL_RATES for a rate byte this firmware's layout offers."""
     data = bytes(data)
-    if len(data) != 1 or data[0] not in range(len(POLL_RATES)):
+    if len(data) != 1 or data[0] not in RATE_CODES:
         raise ValueError('Unknown G7 SE report-rate value; editing refused')
-    return data[0]
+    return RATE_CODES.index(data[0])
 
 
 def rate_write(sequence, bank, data):
@@ -277,7 +283,7 @@ def settings_write(sequence, bank, address, data):
 
 
 def view_requests(bank):
-    """Chunked reads covering one whole profile bank (read-only view)."""
+    """Chunked reads covering one whole profile bank (the 6.64 full view)."""
     return [(bank, off, min(READ_CHUNK, PROFILE_SIZE - off))
             for off in range(0, PROFILE_SIZE, READ_CHUNK)]
 

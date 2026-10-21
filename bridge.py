@@ -1121,6 +1121,8 @@ class GamesirBridge(QObject):
                 return ('G7 SE remapping is tested only on firmware '
                         + ' and '.join(map(g7se.descriptor_name, g7se.SUPPORTED_DESCRIPTORS))
                         + '; input remains available.')
+            if g7se.FULL_VIEW:
+                return 'Edit any page, then Save and Release to games.'
             return 'Edit L4/R4 or Poll rate, then Save and Release to games.'
         if profiles.active() is profiles.G7_NATIVE:
             return ('Hold SHARE + MENU (☰) to switch the controller to XInput '
@@ -1286,7 +1288,7 @@ class GamesirBridge(QObject):
     @Property(bool, notify=controllerChanged)
     def seFullView(self):
         """G7 SE firmware whose whole bank decodes with the G7 Pro map: the
-        Sticks/Triggers/Vibration pages are shown, read-only."""
+        Sticks/Triggers/Vibration pages are shown and their SETTINGS fields edit."""
         return self._se_full_view()
 
     @Property(bool, notify=controllerChanged)
@@ -2369,6 +2371,8 @@ class GamesirBridge(QObject):
             return -1
         for record in self._pending.values():
             if record['addr'] == self._prof.POLL_RATE:
+                if self._prof is profiles.G7_SE:
+                    return g7se.decode_rate(record['data'])
                 return record['data'][0]
         return self._config.get('poll', -1)
 
@@ -2542,7 +2546,7 @@ class GamesirBridge(QObject):
                 self._pending.pop(key, None)
                 self.pendingChanged.emit()
                 return
-            self._queue(g7se.POLL_RATE, [index],
+            self._queue(g7se.POLL_RATE, [g7se.RATE_CODES[index]],
                         'Poll rate' if g7se.RATE_PER_PROFILE else 'Poll rate (all profiles)',
                         g7se.POLL_RATES[index], key=key, kind='se_rate')
             self._pending[key]['generation'] = control.generation()

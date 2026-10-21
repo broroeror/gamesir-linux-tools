@@ -436,6 +436,7 @@ _G7SE_664_EXTRAS = {
 def apply_g7se_layout():
     """Refresh G7_SE's register fields after protocol.select() switched firmware."""
     G7_SE.POLL_RATE = _se.POLL_RATE
+    G7_SE.POLL_RATES = _se.POLL_RATES
     G7_SE.profile_banks = _se.PROFILE_BANKS
     G7_SE.REMAP_TARGETS = _se.GAMEPAD_TARGETS
     G7_SE.REMAP_SLOTS = _se.REMAP_SLOTS
