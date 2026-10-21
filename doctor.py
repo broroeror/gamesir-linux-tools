@@ -85,8 +85,9 @@ except Exception:                      # partial install -- report what we can
 # fault; anything else is never opened and a denial there is the intended state.
 USB_IDENTITIES = dict(G7_IDENTITIES)
 USB_IDENTITIES.update(KALEID_IDENTITIES)
-# G7 SE firmware 6.64: input-only identities. Its 1082 fallback shares the
-# Kaleid's id and is relabelled per device from the product string.
+# G7 SE firmware 6.64 hot-plug fallbacks (input only; its configurable identity
+# is 1069). The 1082 fallback shares the Kaleid's id and is relabelled per
+# device from the product string.
 try:
     from vendors.gamesir.models.g7se import protocol as _se
     USB_IDENTITIES.update({
@@ -734,7 +735,7 @@ def collect():
                 'G7 SE (firmware 6.64) is in its DirectInput fallback, 3537:1082. '
                 'Hot-plugged on Linux its host auto-detect gives up on Xbox mode; '
                 'plug it in before booting and it comes up as 3537:1069 (Xbox/GIP), '
-                'which xpad drives. Configuration is not supported on 6.64 yet.')
+                'which xpad drives and Deadband configures.')
         if kal_ready:
             if any(n['access'] for n in kal_ready):
                 rep['verdict'].append('Kaleid lighting configuration access: OK.')
