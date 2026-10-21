@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """G7 SE 6.64: GIP rumble on the trigger channels (LT, RT), then the grips as a control.
-Deadband must be closed. Usage: python3 -I trigger_rumble_test.py"""
+
+Developer tool: it sends rumble commands to the controller (no settings are
+written); end users never need it.
+Deadband must be closed. Usage: python3 -I tools/g7se_trigger_rumble_test_664.py"""
 import sys, time
 from pathlib import Path
 
@@ -20,9 +23,9 @@ st = Startup(h, bus, addr, root)
 seq = 0
 try:
     print('startup:', st.run())
-    for label, lt, rt, l, r in (('GATILHO ESQUERDO', 192, 0, 0, 0),
-                                ('GATILHO DIREITO', 0, 192, 0, 0),
-                                ('MAOS (controle)', 0, 0, 192, 192)):
+    for label, lt, rt, l, r in (('LEFT TRIGGER', 192, 0, 0, 0),
+                                ('RIGHT TRIGGER', 0, 192, 0, 0),
+                                ('GRIPS (control)', 0, 0, 192, 192)):
         print('->', label, flush=True)
         for _ in range(2):                      # 2 x 400 ms
             seq = seq % 255 + 1

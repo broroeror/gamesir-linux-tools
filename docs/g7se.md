@@ -29,14 +29,24 @@ listed in `SETTINGS_664` and `REMAP_SLOTS` in `vendors/gamesir/models/g7se/proto
 | Backup & Restore | whole-bank images; restore writes only the fields above |
 
 How each was verified: L4/R4 and the report rate match Nexus 2.5.8 USBPcap
-writes byte for byte. Everything else uses the G7 Pro encoding and was written on
-bank 3 by `tools/g7se_write_test_664.py`. Each write changed exactly its own
-bytes, and the bank was restored byte-exact. On the pad, an app Save of
+writes byte for byte. Everything else uses the G7 Pro encoding, and every address
+in `SETTINGS_664` and `REMAP_SLOTS` was written on bank 3 by
+`tools/g7se_write_test_664.py`: left and right copies, each deadzone and
+anti-deadzone byte, and all four curve blocks. Each write changed exactly its own
+bytes, and the bank was restored byte-exact. That proves storage; the effect on the pad
+was checked for front-button remaps and the motors. Factory banks hold zeros in
+the trigger curve blocks, so a trigger curve's effect on the pad is untested. On the pad, an app Save of
 a front-button remap took effect. Saves of the LT remap and the hair-trigger mode
 read back verified. Grip and trigger motors were felt through the test buttons
 and `tools/g7se_trigger_rumble_test_664.py`. Stick resolution and the trigger
 motors' Force/Sync stay hidden, because their meaning on this pad is unknown.
 Factory banks store hair mode `01`, which is shown as Off.
+
+The report rate offers **500 Hz and 1000 Hz** only: Nexus wrote codes `01` and
+`02`, and `00` (250 Hz on 6.30) was never captured, so it is neither offered
+nor accepted from a backup. With a G7 SE connected, Restore accepts only its own
+`g7se-banks` backups; other formats would use the generic path, which has no
+rollback.
 
 ## Supported behavior
 

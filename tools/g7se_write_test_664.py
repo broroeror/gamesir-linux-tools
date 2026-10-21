@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """G7 SE 6.64 (3537:1069): do plain short-form writes land byte-exact?
 
+Developer tool: it WRITES to the controller (bank 3 only) and restores each
+field right after; end users never need it.
+
 Each test, on bank 3 only: snapshot the whole bank -> one plain write
 (0f 00 seq 3c 03 bank hi lo len data) -> re-read the whole bank and diff ->
 write the original bytes back -> re-read and compare with the snapshot.
@@ -38,6 +41,30 @@ TESTS = [  # name, address, new bytes (the original is read from the pad)
     ('rs_trajectory_raw', 0x015d, [1]),
     ('lt_hair_adaptive', 0x00d8, [0x81]),
     ('rt_hair_fixed', 0x00f4, [0x82]),
+    # Copies and neighbours of the fields above (PR #31 review): right-side
+    # blocks, the remaining deadzone bytes, the other motors and the curves.
+    ('vibration_right', 0x0021, [30]),
+    ('ls_invert_x', 0x0151, [1]),
+    ('rs_invert_x', 0x0171, [1]),
+    ('rs_invert_y', 0x0172, [1]),
+    ('rs_sensitivity', 0x0173, [60]),
+    ('ls_deadzone_max', 0x0140, [90]),
+    ('ls_antidz_min', 0x0141, [5]),
+    ('ls_antidz_max', 0x0142, [95]),
+    ('rs_deadzone_min', 0x015f, [20]),
+    ('rs_deadzone_max', 0x0160, [90]),
+    ('rs_antidz_min', 0x0161, [5]),
+    ('rs_antidz_max', 0x0162, [95]),
+    ('rs_curve_block', 0x0164, [0, 100, 0, 0, 0x39, 0x40, 0x80, 0x80, 0xc6, 0xbf]),
+    ('lt_deadzone_max', 0x00d0, [90]),
+    ('lt_antidz_min', 0x00d1, [5]),
+    ('lt_antidz_max', 0x00d2, [95]),
+    ('rt_deadzone_min', 0x00eb, [15]),
+    ('rt_deadzone_max', 0x00ec, [90]),
+    ('rt_antidz_min', 0x00ed, [5]),
+    ('rt_antidz_max', 0x00ee, [95]),
+    ('lt_curve_block', 0x00dc, [1, 100, 0, 0, 0x5e, 0x17, 0xb0, 0x4f, 0xe8, 0xa1]),
+    ('rt_curve_block', 0x00f8, [1, 100, 0, 0, 0x5e, 0x17, 0xb0, 0x4f, 0xe8, 0xa1]),
 ]
 
 
@@ -134,6 +161,10 @@ def main():
             t = {'name': name, 'address': hex(address), 'original': bytes(orig).hex(),
                  'written': bytes(new).hex()}
             out['tests'].append(t)
+            if orig == list(new):
+                t['skipped'] = 'value already on the pad; not a write test'
+                print(f'{name:16} SKIPPED: the pad already holds {bytes(new).hex()}')
+                continue
             pad.heartbeat()
             t['ack_write'] = pad.write(BANK, address, new)
             after = pad.bank(BANK)
