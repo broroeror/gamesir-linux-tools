@@ -272,10 +272,10 @@ Item {
                             }
                         }
                     }
-                    Text { visible: !bridge.remapOnly; text: "Keyboard & mouse"; color: Theme.textDim; topPadding: 6
+                    Text { visible: !bridge.remapOnly && bridge.hasKeyboardMouseTargets; text: "Keyboard & mouse"; color: Theme.textDim; topPadding: 6
                            font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                     Flow {
-                        visible: !bridge.remapOnly
+                        visible: !bridge.remapOnly && bridge.hasKeyboardMouseTargets
                         width: parent.width; spacing: 6
                         PillButton { label: "⌨ Keyboard"; onClicked: rebindPicker.open("keyboard") }
                         PillButton { label: "🖱 Mouse";    onClicked: rebindPicker.open("mouse") }
@@ -283,7 +283,7 @@ Item {
                 }
 
                 Card {
-                    visible: bridge.isG7Pro; title: "D-pad options"; Layout.fillWidth: true
+                    visible: bridge.hasDpadOptions; title: "D-pad options"; Layout.fillWidth: true
                     Row {
                         width: parent.width
                         Text { text: "Swap left stick / D-pad"; color: Theme.textDim }

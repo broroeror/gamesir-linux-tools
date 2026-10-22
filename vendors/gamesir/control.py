@@ -20,6 +20,7 @@ import controller_profile as profiles
 from vendors.gamesir.models.g7pro import protocol as g7pro
 from vendors.gamesir.models.kaleid import protocol as kaleid
 from vendors.gamesir.models.g7se import protocol as g7se
+from vendors.gamesir.models.nova2lite import protocol as nova2lite
 
 _write_lock = threading.Lock()   # one COMMAND at a time (send_cmd)
 _wseq_lock = threading.Lock()    # one write SEQUENCE at a time (write_reg) — the
@@ -210,7 +211,7 @@ _gip_seq_lock = threading.Lock()
 
 def rumble(left, right, gen=None, write_style=None, trigger_left=0, trigger_right=0):
     style = write_style or profiles.active().write_style
-    if style not in ('g7', 'cyclone'):
+    if style not in ('g7', 'cyclone', 't4n2'):
         return False
     if style == 'g7':
         global _gip_seq
@@ -220,6 +221,8 @@ def rumble(left, right, gen=None, write_style=None, trigger_left=0, trigger_righ
             return send_cmd(*packet, gen=gen, padded=False)
     if trigger_left or trigger_right:
         return False
+    if style == 't4n2':
+        return send_cmd(*nova2lite.rumble_packet(left, right), gen=gen, padded=False)
     return send_cmd(0x0F, 0x20, 0x66, 0x55, left, right, gen=gen)
 
 
@@ -327,6 +330,18 @@ def write_reg(bank, addr, data, write_style=None, gen=None):
             except ValueError:
                 return False
             return send_cmd(*request, gen=gen, padded=False)
+    if style == 't4n2':
+        if profiles.active() is not profiles.NOVA_2_LITE:
+            return False
+        with _wseq_lock:
+            pkts = nova2lite.write_packets(bank, addr, data)
+            if not pkts:
+                return False
+            for pkt in pkts:
+                if not send_cmd(*pkt, gen=gen, padded=False):
+                    return False
+                time.sleep(0.02)
+            return True
     enveloped = style in ('g7', 'gip')
     # inner block caps at 60B (5B header + 55 data); a bare Cyclone frame spends
     # 4 more bytes on the report header, leaving 48
@@ -500,6 +515,21 @@ def store_se_reply(report):
         return True
 
 
+def store_t4n2_reply(report):
+    """Route a Nova 2 Lite T4N2 read reply to the in-flight read request."""
+    global _inflight
+    with _read_lock:
+        if _inflight is None:
+            return False
+        bank, addr, length = _inflight['cmd']
+        data = nova2lite.match_read_reply(report, bank, addr, length)
+        if data is None:
+            return False
+        _read_results[(bank, addr)] = list(data)
+        _inflight = None
+        return True
+
+
 def _reset_reads():
     """Drop all queued/in-flight reads and their results. Called on every (re)bind
     and disconnect so a new session never inherits the previous device's pending
@@ -510,6 +540,7 @@ def _reset_reads():
         _read_q.clear()
         _read_results.clear()
         _inflight = None
+        nova2lite.reset_session_state()
 
 
 def request_regs(reqs):
@@ -557,6 +588,12 @@ def store_reg_result(bank, addr, data):
             _inflight = None
 
 
+def reads_idle():
+    """True when no register read is queued or in flight."""
+    with _read_lock:
+        return _inflight is None and not _read_q
+
+
 def pump_reads():
     """Run from the reader thread between device reads: keep exactly one
     register read in flight, resending if a reply is dropped (the controller
@@ -581,6 +618,14 @@ def pump_reads():
             with _read_lock:
                 if _inflight is not None and _inflight['cmd'] == cmd:
                     _inflight['sequence'] = sequence
+        elif style == 't4n2':
+            pkt = nova2lite.read_request_packet(bank, addr, length)
+            if pkt is not None:
+                send_cmd(*pkt, probe=True, padded=False)
+            else:
+                with _read_lock:
+                    if _inflight is not None and _inflight['cmd'] == cmd:
+                        _inflight = None
         elif style == 'gip':
             # Same envelope as the G7, but on the 0x3c vendor channel: that is the
             # one verified to answer reads on the Kaleid, where the G7's 0x05 was

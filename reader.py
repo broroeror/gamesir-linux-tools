@@ -14,6 +14,7 @@ import math
 import os
 import select
 import struct
+import sys
 import threading
 import time
 import hidcompat as hid   # either python HID library; see hidcompat.py
@@ -28,6 +29,7 @@ from vendors.gamesir.models.g7pro import protocol as g7pro
 from vendors.gamesir.models.kaleid import protocol as kaleid
 from vendors.gamesir.models.g7se import protocol as g7se
 from vendors.gamesir.models.g7se import input as g7se_input
+from vendors.gamesir.models.nova2lite import protocol as nova2lite
 
 
 _active_usb_handle = None
@@ -126,9 +128,15 @@ def _probe_live(ctrl, prof=None):
     # dongle. We have no empty-vs-live signal for those — assume live.
     if prof is not None and prof.input_style in ('evdev', 'g7_usb', 'gip_usb'):
         return True
+    if prof is profiles.NOVA_2_LITE and ctrl['pid'] in nova2lite.WIRED_PIDS:
+        return True
     key = _live_key(ctrl)
     if key not in _live_cache:
-        _live_cache[key] = has_live_pad(ctrl['nodes'])
+        if prof is profiles.NOVA_2_LITE:
+            _live_cache[key] = any(nova2lite.streams_live_data(n)
+                                   for n in (ctrl['nodes'] or []))
+        else:
+            _live_cache[key] = has_live_pad(ctrl['nodes'])
     return _live_cache[key]
 
 
@@ -176,7 +184,65 @@ def _pick_selected(controllers):
                 (live or controllers)[0])
 
 
-
+def read_session_t4n2(device, driving_id):
+    """Read one Nova 2 Lite (T4N2) over its 0xFF7A vendor hidraw interface."""
+    control.set_device(device)
+    state['driving'] = driving_id
+    state['mode_ok'] = True
+    state['profile'] = 1
+    state['profile_seq'] = state.get('profile_seq', 0) + 1
+    state['edit_profile'] = 1
+    control.send_cmd(*nova2lite.device_info_packet(), probe=True, padded=False)
+    time.sleep(0.02)
+    control.send_cmd(*nova2lite.enable_stream_packet(), probe=True, padded=False)
+    last_scan = time.time()
+    last_info = time.time()
+    try:
+        while not sys.is_finalizing():
+            if state.get('demo'):
+                break
+            control.pump_reads()
+            now = time.time()
+            if now - last_scan > 1.0:
+                last_scan = now
+                ids = [c['id'] for c in _rescan()]
+                if driving_id not in ids:
+                    break
+                sel = state.get('selected')
+                if sel in ids and sel != driving_id:
+                    break
+            if now - last_info > 5.0 and control.reads_idle():
+                last_info = now
+                control.send_cmd(*nova2lite.device_info_packet(), probe=True, padded=False)
+            data = device.read(64, timeout_ms=100)
+            if state.get('demo') or sys.is_finalizing():
+                break
+            if not data:
+                continue
+            if data[0] == 0x01:
+                info = nova2lite.parse_device_info(data)
+                if info:
+                    state.update(info)
+                continue
+            if data[0] == 0xF4:
+                parsed = nova2lite.parse_input(data)
+                if parsed:
+                    state['mode_ok'] = True
+                    state.update(parsed)
+                continue
+            control.store_t4n2_reply(data)
+    except Exception as exc:
+        if not sys.is_finalizing():
+            print(f'[reader] T4N2 vendor session for {driving_id} ended: {exc!r}', flush=True)
+    finally:
+        if not sys.is_finalizing():
+            try:
+                control.send_cmd(*nova2lite.disable_stream_packet(), probe=True, padded=False)
+            except Exception:
+                pass
+            control.clear_device()
+            if not state.get('demo'):
+                state['driving'] = None
 
 
 def read_session(device, driving_id):
@@ -424,8 +490,11 @@ def read_controller():
             time.sleep(0.3)
             continue
 
-        # Cyclone: vendor hidraw 0x12 stream.
-        devnode = pick_live_node(sel['nodes'])
+        # Nova 2 Lite (T4N2) or Cyclone family: vendor hidraw stream.
+        if prof is profiles.NOVA_2_LITE:
+            devnode = nova2lite.pick_vendor_node(sel['nodes'])
+        else:
+            devnode = pick_live_node(sel['nodes'])
         if not devnode:
             state['connected'] = False
             time.sleep(1.0)
@@ -450,7 +519,10 @@ def read_controller():
 
         state['access'] = 'ok'
         state['connected'] = True
-        read_session(device, sel['id'])   # blocks until drop / switch
+        if prof is profiles.NOVA_2_LITE:
+            read_session_t4n2(device, sel['id'])
+        else:
+            read_session(device, sel['id'])   # blocks until drop / switch
         try:
             device.close()
         except Exception:

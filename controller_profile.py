@@ -29,6 +29,7 @@ import vendors.gamesir.config as _cy
 from vendors.gamesir.models.g7pro import protocol as _g7
 from vendors.gamesir.models.kaleid import protocol as _kal
 from vendors.gamesir.models.g7se import protocol as _se
+from vendors.gamesir.models.nova2lite import protocol as _n2l
 
 
 # --- shared enums / block formats (identical across the vendor family) -------
@@ -214,6 +215,8 @@ class ControllerProfile:
         format length; other scalars read 1. Skips unsupported (None) fields."""
         dzlen = 2 if self.dz_wide else 1
         bytes1 = [self.VIB_L, self.VIB_R, self.POLL_RATE, self.ST_TRAJ, self.RS_TRAJ]
+        if self.write_style == 't4n2':
+            bytes1 += [self.extras.get('DPAD_SWAP'), self.extras.get('DPAD_LOCK')]
         dz = [self.LT_DZ_MIN, self.LT_DZ_MAX, self.LT_ADZ_MIN, self.LT_ADZ_MAX,
               self.RT_DZ_MIN, self.RT_DZ_MAX, self.RT_ADZ_MIN, self.RT_ADZ_MAX,
               self.ST_DZ_MIN, self.ST_DZ_MAX, self.ST_ADZ_MIN, self.ST_ADZ_MAX,
@@ -254,6 +257,8 @@ class ControllerProfile:
             (self.RS_DZ_MIN, 'Right stick deadzone min'), (self.RS_DZ_MAX, 'Right stick deadzone max'),
             (self.RS_ADZ_MIN, 'Right stick anti-deadzone min'),
             (self.RS_ADZ_MAX, 'Right stick anti-deadzone max'), (self.RS_CURVE, 'Right stick curve'),
+            (self.extras.get('DPAD_SWAP') if self.write_style == 't4n2' else None, 'Swap left stick / D-pad'),
+            (self.extras.get('DPAD_LOCK') if self.write_style == 't4n2' else None, 'Diagonal lock'),
         ]
         labels = {a: n for a, n in pairs if a is not None}
         for name, addr in self.REMAP_SLOTS:
@@ -719,8 +724,42 @@ KALEID_OTHER = ControllerProfile(
 )
 
 
+# --- GameSir Nova 2 Lite (T4N2) : 0xFF7A vendor HID protocol -----------------
+# Wired (3537:100f) and 2.4 GHz wireless dongle (3537:1098). Speaks the T4N2
+# opcode-based HID protocol on the 0xFF7A vendor interface (see
+# models/nova2lite/protocol.py). Exposes one active profile bank so the full
+# Sticks / Triggers / Rebinds / Vibration / Backup editor works seamlessly.
+NOVA_2_LITE = ControllerProfile(
+    name='GameSir Nova 2 Lite',
+    short='Nova 2 Lite',
+    usb_products=_n2l.CONFIG_PIDS,
+    wired_products=_n2l.WIRED_PIDS,
+    write_style='t4n2',
+    input_style='t4n2_0xf4',
+    profile_banks=(1,),
+    factory_reset=False,
+    lighting_style='none',
+    has_motion=False,
+    has_macros=False,
+    supports_hair_thresholds=False,
+    software_profile_switch=False,
+    VIB_L=_n2l.VIB_L, VIB_R=_n2l.VIB_R,
+    LT_DZ_MIN=_n2l.LT_DZ_MIN, LT_DZ_MAX=_n2l.LT_DZ_MAX,
+    LT_HAIR=_n2l.LT_HAIR, RT_OFFSET=_n2l.RT_OFFSET,
+    ST_TRAJ=_n2l.ST_TRAJ, ST_DZ_MIN=_n2l.ST_DZ_MIN, ST_DZ_MAX=_n2l.ST_DZ_MAX,
+    ST_ADZ_MIN=_n2l.ST_ADZ_MIN, ST_ADZ_MAX=_n2l.ST_ADZ_MAX,
+    ST_CURVE=_n2l.ST_CURVE, RS_OFFSET=_n2l.RS_OFFSET,
+    REMAP_SLOTS=_n2l.REMAP_SLOTS,
+    REMAP_TARGETS=_n2l.GAMEPAD_TARGETS,
+    extras={
+        'DPAD_SWAP': _n2l.DPAD_SWAP,
+        'DPAD_LOCK': _n2l.DPAD_LOCK,
+    },
+)
+
+
 ALL = (CYCLONE, G7_PRO, G7_NATIVE, G7_PRO_OTHER, G7_SE, G7_8K, TARANTULA_PRO_8K,
-       KALEID, KALEID_OTHER)
+       KALEID, KALEID_OTHER, NOVA_2_LITE)
 DEFAULT = CYCLONE
 
 
