@@ -2645,6 +2645,20 @@ class GamesirBridge(QObject):
                         cfg.REMAP_NONE if code == -1 else self.targetLabel(code), kind='se_remap')
             self._pending[(edit, addr)]['generation'] = self._config_generation
             return
+        if self._prof is profiles.NOVA_2_LITE:
+            # T4N2 encodes a button mapped to itself as Default and reads it
+            # back as [00 00]. Stage that same value so Save can verify it.
+            code = -1 if code < 0 else code & 0xff
+            if code == dict(self._prof.REMAP_TARGETS).get(source):
+                code = -1
+            # Save may already be applying a different snapshot. Keep a newer
+            # selection pending even when it matches the old loaded value.
+            if not self._backup_busy and self._config.get('remap', {}).get(source) == code:
+                edit = state.get('edit_profile') or state.get('profile')
+                pkey = (self._prof.profile_bank(edit), addr)
+                if self._pending.pop(pkey, None) is not None:
+                    self.pendingChanged.emit()
+                return
         data = [0x00, 0x00] if code < 0 else [0x01, code & 0xff]
         label = cfg.REMAP_NONE if code < 0 else self.targetLabel(code)
         self._queue(addr, data, 'Rebind ' + source, label)
