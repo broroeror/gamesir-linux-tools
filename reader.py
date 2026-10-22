@@ -14,6 +14,7 @@ import math
 import os
 import select
 import struct
+import sys
 import threading
 import time
 import hidcompat as hid   # either python HID library; see hidcompat.py
@@ -191,7 +192,7 @@ def read_session(device, driving_id):
     threading.Thread(target=maintenance_loop, args=(alive,), daemon=True).start()
     last_scan = 0.0
     try:
-        while True:
+        while not sys.is_finalizing():
             if state.get('demo'):      # demo mode took over: release the live
                 break                   # device so read_controller can idle it
             control.pump_reads()   # keep queued register reads moving
@@ -205,7 +206,7 @@ def read_session(device, driving_id):
                 if sel in ids and sel != driving_id:  # user switched controllers
                     break
             data = device.read(64, timeout_ms=200)
-            if state.get('demo'):          # demo flipped on during the blocking
+            if state.get('demo') or sys.is_finalizing():  # demo flipped on during the blocking
                 break                       # read — bail before stamping any state
             if not data:
                 continue
@@ -234,12 +235,14 @@ def read_session(device, driving_id):
     except Exception as exc:
         # The session ends either way (unplug, EIO, a short report); say why
         # instead of the pad just blinking out and back with nothing logged.
-        print(f'[reader] vendor session for {driving_id} ended: {exc!r}', flush=True)
+        if not sys.is_finalizing():
+            print(f'[reader] vendor session for {driving_id} ended: {exc!r}', flush=True)
     finally:
         alive[0] = False
-        control.clear_device()
-        if not state.get('demo'):      # in demo the bridge owns driving
-            state['driving'] = None    # vendor session closed
+        if not sys.is_finalizing():
+            control.clear_device()
+            if not state.get('demo'):      # in demo the bridge owns driving
+                state['driving'] = None    # vendor session closed
 
 
 def _rescan():

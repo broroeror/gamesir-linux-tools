@@ -8,8 +8,10 @@ def forbidden(*args, **kwargs):
     raise AssertionError('hardware access forbidden in UI checks')
 
 hid = types.ModuleType('hid')
-hid.device = hid.enumerate = forbidden
+hid.device = type('ForbiddenDevice', (), {'__init__': forbidden})
+hid.enumerate = forbidden
 sys.modules['hid'] = hid
+sys.modules['hidraw'] = None
 
 from PySide6.QtCore import Q_ARG, QEventLoop, QMetaObject, QObject, Qt, QTimer, QUrl
 from PySide6.QtGui import QGuiApplication

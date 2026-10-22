@@ -3,6 +3,7 @@ import importlib
 import sys
 import types
 import unittest
+import weakref
 
 
 class HidcompatTests(unittest.TestCase):
@@ -34,6 +35,35 @@ class HidcompatTests(unittest.TestCase):
     def test_uses_hid_when_there_is_no_hidraw_module(self):
         hc = self._load({'hid': self._fake('hid'), 'hidraw': None})
         self.assertEqual(hc.enumerate()[0]['path'], b'hid')
+
+    def test_open_disables_shutdown_finalizer_but_preserves_explicit_close(self):
+        closed = []
+
+        class Device:
+            __slots__ = ('finalizer', '__weakref__')
+
+            def open_path(self, path):
+                self.finalizer = weakref.finalize(self, closed.append, path)
+
+            def open(self, vendor_id, product_id, serial_number):
+                self.finalizer = weakref.finalize(self, closed.append, serial_number)
+
+            def close(self):
+                self.finalizer()
+
+        module = self._fake('hid')
+        module.device = Device
+        hc = self._load({'hid': module, 'hidraw': None})
+        for method, args, label in (('open_path', (b'/test/hidraw',), b'/test/hidraw'),
+                                    ('open', (0x3537, 0x100f, 'serial'), 'serial')):
+            with self.subTest(method=method):
+                dev = hc.device()
+                getattr(dev, method)(*args)
+                self.assertFalse(dev.finalizer.atexit)
+                self.assertTrue(dev.finalizer.alive)
+                dev.close()
+                self.assertEqual(closed[-1], label)
+                self.assertFalse(dev.finalizer.alive)
 
 
 if __name__ == '__main__':

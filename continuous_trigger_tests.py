@@ -17,8 +17,10 @@ def forbidden(*args, **kwargs):
     raise AssertionError('hardware access forbidden in Continuous Trigger tests')
 
 hid = types.ModuleType('hid')
-hid.device = hid.enumerate = forbidden
+hid.device = type('ForbiddenDevice', (), {'__init__': forbidden})
+hid.enumerate = forbidden
 sys.modules['hid'] = hid
+sys.modules['hidraw'] = None
 from gs_state import state
 import backup
 import controller_profile as profiles
@@ -53,7 +55,7 @@ class ContinuousTriggerTests(unittest.TestCase):
         profiles.set_active(profiles.CYCLONE)
         state.update(connected=True, driving='offline-unit', selected='offline-unit',
                      controller='Cyclone 2', profile=1, edit_profile=1)
-        self.gen = patch.object(control, 'generation', return_value=71)
+        self.gen = patch.object(control, '_generation', 71)
         self.gen.start()
         self.addCleanup(self.gen.stop)
         # Use the actual bridge methods on platforms without Qt. The separate

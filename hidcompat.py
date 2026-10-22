@@ -18,6 +18,8 @@ cython-hidapi is installed it is passed straight through, untouched. When only
 pyhidapi is, a thin adapter gives it the cython-hidapi shape. pyhidapi loads the
 system ``libhidapi-hidraw`` first, so it gets the hidraw backend the app needs.
 """
+import gc as _gc
+
 try:
     # cython-hidapi built with BOTH backends (some distro packages) installs the
     # hidraw one as `hidraw` and keeps `hid` for libusb, which can't open
@@ -28,11 +30,25 @@ except ImportError:
     import hid as _hid
 
 if hasattr(_hid, 'device'):
-    # cython-hidapi: the API the app is written against. No wrapping at all.
+    # cython-hidapi: the API the app is written against. Disable atexit on its
+    # internal weakref.finalize so interpreter shutdown never calls hid_close()
+    # on the main thread while a daemon reader thread is inside hid_read_timeout().
     IMPL = 'hidapi (cython)'
-    device = _hid.device
     enumerate = _hid.enumerate
     __version__ = getattr(_hid, '__version__', '?')
+
+    class device(_hid.device):
+        def open_path(self, path):
+            super().open_path(path)
+            for ref in _gc.get_referents(self):
+                if hasattr(ref, 'atexit'):
+                    ref.atexit = False
+
+        def open(self, vendor_id=0, product_id=0, serial_number=None):
+            super().open(vendor_id, product_id, serial_number)
+            for ref in _gc.get_referents(self):
+                if hasattr(ref, 'atexit'):
+                    ref.atexit = False
 
 else:
     IMPL = 'python-hid (ctypes)'
