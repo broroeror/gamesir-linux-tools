@@ -2352,6 +2352,10 @@ class GamesirBridge(QObject):
             self.backupStatus.emit(False, f'Backup is not restorable: {e}')
 
     # ------------------------------------------------------------- config editor
+    @Property(int, notify=controllerChanged)
+    def vibrationStep(self):
+        return self._prof.vibration_step
+
     @Property('QVariantMap', notify=configLoaded)
     def config(self):
         """The selected profile's read-back config (friendly key -> value). QML
@@ -2492,6 +2496,9 @@ class GamesirBridge(QObject):
 
     def _scalar_bytes(self, key, value):
         """(device bytes, display text) for a scalar field's value."""
+        if key in ('vib_l', 'vib_r') and self._prof.vibration_step > 1:
+            step = self._prof.vibration_step
+            value = max(0, min(100, int(float(value) / step + 0.5) * step))
         if self._prof.dz_wide and key in _WIDE_SCALAR_KEYS:
             w = max(0, min(1000, int(round(float(value) * 10))))   # percent (0.1 steps) -> 16-bit ×10
             return [(w >> 8) & 0xFF, w & 0xFF], '%.1f' % (w / 10.0)

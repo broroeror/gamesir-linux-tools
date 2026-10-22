@@ -7,6 +7,7 @@ Item {
     property real to: 100
     property real value: 0
     property bool integer: true
+    property real stepSize: 0
     signal moved(real value)
 
     implicitHeight: 18
@@ -32,6 +33,9 @@ Item {
         function upd(mx) {
             var f = Math.max(0, Math.min(1, mx / track.width))
             var v = s.from + f * (s.to - s.from)
+            if (s.stepSize > 0)
+                v = Math.max(s.from, Math.min(s.to,
+                    s.from + Math.round((v - s.from) / s.stepSize) * s.stepSize))
             if (s.integer) v = Math.round(v)
             if (v !== s.value) { s.value = v; s.moved(v) }
         }

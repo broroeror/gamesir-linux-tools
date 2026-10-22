@@ -470,6 +470,69 @@ class MotionTests(unittest.TestCase):
         page.deleteLater()
         engine.deleteLater()
 
+    def test_vibration_sliders_stage_values_without_qml_warnings(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtQml import QQmlExpression, qmlContext
+        from PySide6.QtQuick import QQuickWindow
+        from PySide6.QtTest import QTest
+
+        root = Path(__file__).resolve().parents[1]
+        for prof in (profiles.NOVA_2_LITE, profiles.G7_PRO):
+            with self.subTest(model=prof.short):
+                profiles.set_active(prof)
+                self.bridge._apply_profile(prof)
+                self.bridge._config = {
+                    'vib_l': 50, 'vib_r': 100, 'vib_trigger_l': 25, 'vib_trigger_r': 100,
+                    'vib_force_l': False, 'vib_force_r': False,
+                    'vib_sync_l': False, 'vib_sync_r': False,
+                }
+                engine = QQmlApplicationEngine()
+                engine.addImportPath(str(root / 'qml'))
+                engine.rootContext().setContextProperty('bridge', self.bridge)
+                errors = []
+                engine.warnings.connect(lambda warnings: errors.extend(w.toString() for w in warnings))
+                engine.load(QUrl.fromLocalFile(str(root / 'qml/App/VibrationPage.qml')))
+                self.assertTrue(engine.rootObjects(), errors)
+                page = engine.rootObjects()[0]
+                window = QQuickWindow()
+                window.resize(800, 1100)
+                page.setParentItem(window.contentItem())
+                page.setWidth(800)
+                page.setHeight(1100)
+                window.show()
+                self.app.processEvents()
+                self.assertEqual(self.bridge.pendingCount, 0)  # seeding never stages edits
+                step = 25 if prof is profiles.NOVA_2_LITE else 1
+                self.assertEqual(self.bridge.vibrationStep, step)
+                cases = [('vibL', prof.VIB_L, 32, 25 if step == 25 else 32),
+                         ('vibR', prof.VIB_R, 64, 75 if step == 25 else 64)]
+                if prof is profiles.G7_PRO:
+                    cases += [('trigLSlider', prof.extras['VIB_TRIG_L'], 48, 48),
+                              ('trigRSlider', prof.extras['VIB_TRIG_R'], 96, 96)]
+                with patch.object(control, 'write_reg') as write:
+                    for slider, addr, value, expected in cases:
+                        if slider in ('vibL', 'vibR'):
+                            expr = QQmlExpression(qmlContext(page), page, f'{slider}.stepSize')
+                            self.assertEqual(expr.evaluate()[0], step)
+                        expr = QQmlExpression(qmlContext(page), page,
+                            f'{slider}.mapToItem(null, {slider}.width * {value}/100, {slider}.height/2)')
+                        point = expr.evaluate()[0]
+                        self.assertFalse(expr.hasError(), expr.error().toString())
+                        QTest.mouseClick(window, Qt.LeftButton, Qt.NoModifier, point.toPoint())
+                        expr = QQmlExpression(qmlContext(page), page, f'{slider}.value')
+                        self.assertEqual(expr.evaluate()[0], expected)
+                        records = [r for r in self.bridge._pending.values() if r['addr'] == addr]
+                        self.assertEqual(len(records), 1)
+                        self.assertEqual(records[0]['bank'], 1)
+                        self.assertEqual(records[0]['data'], [expected])
+                    write.assert_not_called()
+                self.assertEqual(self.bridge.pendingCount, len(cases))
+                self.assertEqual(errors, [])
+                self.bridge.discardConfig()
+                window.hide()
+                page.setParentItem(None)
+                del expr, page, engine, window
+
     def test_vibration_buttons_route_slider_strength_and_serialize_previews(self):
         from PySide6.QtCore import QObject, QMetaObject
         self.bridge._config = {

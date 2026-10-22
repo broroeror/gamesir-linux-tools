@@ -46,6 +46,10 @@ REPORT_LEN = 64
 # --- Register address map (synthetic bank-1 layout matching Cyclone offsets) ---
 VIB_L = _cy.VIB_L               # 0x0020
 VIB_R = _cy.VIB_R               # 0x0021
+# Firmware 1.82 floors arbitrary strengths to 0/25/50/75/100 (32 -> 25,
+# 64 -> 50, hardware-verified). Stage those levels before Save so read-back
+# verification compares against a value the controller can actually store.
+VIBRATION_STEP = 25
 DPAD_SWAP = 0x002B              # 0x23 0x04
 DPAD_LOCK = 0x002D              # 0x23 0x01
 

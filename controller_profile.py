@@ -89,6 +89,7 @@ class ControllerProfile:
     has_motion: bool = False        # gyro Aim/Tilt config (8K)
     has_macros: bool = False        # per-paddle macro editor
     supports_hair_thresholds: bool = True
+    vibration_step: int = 1               # grip strength percent per supported level
     device_settings_style: str = 'none'
 
     # Vendor command 0x07 selects a profile across most of the family. The Kaleid
@@ -742,6 +743,7 @@ NOVA_2_LITE = ControllerProfile(
     has_motion=False,
     has_macros=False,
     supports_hair_thresholds=False,
+    vibration_step=_n2l.VIBRATION_STEP,
     software_profile_switch=False,
     VIB_L=_n2l.VIB_L, VIB_R=_n2l.VIB_R,
     LT_DZ_MIN=_n2l.LT_DZ_MIN, LT_DZ_MAX=_n2l.LT_DZ_MAX,
