@@ -516,6 +516,17 @@ def _validate_writes(writes):
     drive register writes to arbitrary banks/addresses. Raises ValueError on the
     first violation (the whole restore is refused; nothing is written)."""
     allowed = _allowed_addrs()
+    prof = ctrl.active()
+    setting_blocks = None
+    if prof.write_style == 't4n2':
+        # T4N2 addresses describe settings, not independently writable bytes.
+        # In particular, a remap's first byte alone would RESET that mapping.
+        # Refuse old byte-split recovery files before starting the worker or
+        # writing even an otherwise valid field from the same file.
+        setting_blocks = set(_all_requests())
+        setting_blocks.update((bank, addr, 1) for bank in prof.profile_banks
+                              for addr in (prof.LT_HAIR, prof.RT_HAIR)
+                              if addr is not None)  # Fixed hair mode is one byte
     for bank, addr, byts in writes:
         ok = allowed.get(bank)
         if ok is None:
@@ -529,6 +540,11 @@ def _validate_writes(writes):
             raise ValueError('backup writes outside the known register map '
                              f'(bank 0x{bank:02x} addr 0x{addr:04x}, '
                              f'{len(byts)} bytes)')
+        if setting_blocks is not None and (bank, addr, len(byts)) not in setting_blocks:
+            raise ValueError('Nova 2 Lite requires complete setting blocks '
+                             f'(bank 0x{bank:02x} addr 0x{addr:04x}, '
+                             f'{len(byts)} bytes); byte-split recovery files '
+                             'cannot be restored')
 
 
 def _is_g7_semantic(data):

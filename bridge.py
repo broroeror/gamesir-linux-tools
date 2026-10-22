@@ -2956,7 +2956,7 @@ class GamesirBridge(QObject):
                               if prof.POLL_RATE is not None and prof is not profiles.G7_SE else set())
                 ok, message = register_transaction.apply(
                     changes, read, write, os.path.join(base, 'deadband', 'controller-backups'),
-                    prof.name, unverified=unverified)
+                    prof.name, unverified=unverified, recovery_blocks=prof.write_style == 't4n2')
                 if ok:
                     for key, r in snapshot_pending.items():
                         if r.get('kind') == 'lighting':
