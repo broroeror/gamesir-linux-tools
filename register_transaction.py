@@ -32,11 +32,15 @@ def prune(directory, keep=KEEP_RECOVERY_FILES):
             pass
 
 
-def apply(changes, read, write, directory, device, unverified=()):
+def apply(changes, read, write, directory, device, unverified=(), *, recovery_blocks=False):
     """Snapshot changed registers before writing; verify and recover on failure.
 
     read/write must reject a changed device session. The recovery file uses the
     existing labelled GameSir schema, so Backup & Restore can import it.
+
+    `recovery_blocks` keeps each pre-write record intact for transports such as
+    T4N2, whose synthetic registers can only be restored as complete settings.
+    Raw register transports keep byte entries to preserve overlapping edits.
 
     `unverified` = (bank, addr) writes that can't be read back because the pad
     re-enumerates after them -- the poll rate on the 8K and Tarantula. They are
@@ -60,10 +64,17 @@ def apply(changes, read, write, directory, device, unverified=()):
     for bank, addr, raw in original:
         fields = (payload['lighting']['fields'] if bank == 0x20 else
                   payload['profiles'].setdefault(str(bank), {}))
-        # Byte entries preserve overlapping edits of different lengths too.
-        for offset, byte in enumerate(raw):
-            address = addr + offset
-            fields[f'0x{address:04x}'] = {'addr': f'0x{address:04x}', 'bytes': [byte]}
+        if recovery_blocks:
+            key = f'0x{addr:04x}'
+            # All reads precede all writes. Keep the longest snapshot when a
+            # setting was staged more than once (e.g. a hair mode/full block).
+            if key not in fields or len(raw) > len(fields[key]['bytes']):
+                fields[key] = {'addr': key, 'bytes': raw}
+        else:
+            # Byte entries preserve overlapping edits of different lengths too.
+            for offset, byte in enumerate(raw):
+                address = addr + offset
+                fields[f'0x{address:04x}'] = {'addr': f'0x{address:04x}', 'bytes': [byte]}
     os.makedirs(directory, exist_ok=True)
     fd, pending = tempfile.mkstemp(prefix='before_apply_', suffix='.pending', dir=directory)
     path = pending[:-len('.pending')] + '.json'

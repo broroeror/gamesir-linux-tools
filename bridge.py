@@ -267,6 +267,7 @@ class GamesirBridge(QObject):
 
         self._light_timer = QTimer(self)
         self._light_timer.setInterval(120)       # gather record/config read chunks
+        self._light_timer.timeout.connect(self._poll_status)
         self._light_timer.timeout.connect(self._poll_lighting)
         self._light_timer.timeout.connect(self._poll_lighting_8k)
         self._light_timer.timeout.connect(self._poll_motion)
@@ -979,6 +980,10 @@ class GamesirBridge(QObject):
             out['continuous_trigger'] = {
                 name: cfg.continuous_trigger_state(vals.get(addr))
                 for name, addr in p.CONTINUOUS_TRIGGER_SLOTS}
+        if 'DPAD_SWAP' in p.extras and p.extras['DPAD_SWAP'] in vals:
+            out['dpad_swap'] = bool(g(p.extras['DPAD_SWAP']))
+        if 'DPAD_LOCK' in p.extras and p.extras['DPAD_LOCK'] in vals:
+            out['dpad_lock'] = bool(g(p.extras['DPAD_LOCK']))
         return out
 
     # --------------------------------------------------------- input readouts
@@ -1060,7 +1065,7 @@ class GamesirBridge(QObject):
         a missing property as undefined, so the Reset-profile button just never
         appeared, and resetProfileToDefault() would have raised on its own guard.
         smoke_test now checks every bridge.<name> the QML uses exists."""
-        return profiles.is_recognized() and self._prof.input_style == 'cyclone_0x12'
+        return profiles.is_recognized() and self._prof.input_style in ('cyclone_0x12', 't4n2_0xf4')
 
     @Property(int, notify=controllerChanged)
     def profileCount(self):
@@ -1245,6 +1250,22 @@ class GamesirBridge(QObject):
     def isG7Pro(self):
         return profiles.is_recognized() and profiles.active() is profiles.G7_PRO
 
+    @Property(bool, notify=controllerChanged)
+    def hasDpadOptions(self):
+        return bool(profiles.is_recognized() and 'DPAD_SWAP' in self._prof.extras)
+
+    @Property(bool, notify=controllerChanged)
+    def hasKeyboardMouseTargets(self):
+        return self._prof not in (profiles.G7_SE, profiles.NOVA_2_LITE)
+
+    @Property(bool, notify=controllerChanged)
+    def hasTriggerCurve(self):
+        return self._prof.LT_CURVE is not None
+
+    @Property(bool, notify=controllerChanged)
+    def hasTriggerAntiDeadzone(self):
+        return self._prof.LT_ADZ_MIN is not None
+
     def _se_configuration_supported(self):
         return (g7se.CONFIGURATION_VERIFIED
                 and state.get('usb_bcd') == g7se.TESTED_DESCRIPTOR)
@@ -1375,7 +1396,7 @@ class GamesirBridge(QObject):
     # whole 480-byte semantic blobs; the older synthetic-register demo backend
     # only emulates individual hidraw register reads.
     _DEMO_MODELS = (profiles.CYCLONE, profiles.G7_8K, profiles.TARANTULA_PRO_8K,
-                    profiles.KALEID)
+                    profiles.KALEID, profiles.NOVA_2_LITE)
 
     @staticmethod
     def _demo_id(prof):
@@ -2046,7 +2067,7 @@ class GamesirBridge(QObject):
     def targetCategories(self):
         """Categorized targets for the macro/remap picker: [{name, targets:[{name,code}]}].
         Buttons (gamepad) + Keyboard + Mouse — the controller emits all three."""
-        if self._prof is profiles.G7_SE:
+        if self._prof in (profiles.G7_SE, profiles.NOVA_2_LITE):
             return [{'name': 'Buttons', 'targets': self.buttonTargets}]
         return [{'name': cat, 'targets': [{'name': n, 'code': c} for n, c in
                 (self._prof.REMAP_TARGETS if cat == 'Buttons' else items) if c != 0xff]}
@@ -2078,7 +2099,7 @@ class GamesirBridge(QObject):
 
     @Property('QVariantList', notify=controllerChanged)
     def mouseTargets(self):
-        if self._prof is profiles.G7_SE:
+        if self._prof in (profiles.G7_SE, profiles.NOVA_2_LITE):
             return []
         items = g7pro.MOUSE_TARGETS if self._prof is profiles.G7_PRO else cfg.MOUSE_TARGETS
         return [{'name': n, 'code': c} for n, c in items]
@@ -2331,6 +2352,10 @@ class GamesirBridge(QObject):
             self.backupStatus.emit(False, f'Backup is not restorable: {e}')
 
     # ------------------------------------------------------------- config editor
+    @Property(int, notify=controllerChanged)
+    def vibrationStep(self):
+        return self._prof.vibration_step
+
     @Property('QVariantMap', notify=configLoaded)
     def config(self):
         """The selected profile's read-back config (friendly key -> value). QML
@@ -2471,6 +2496,9 @@ class GamesirBridge(QObject):
 
     def _scalar_bytes(self, key, value):
         """(device bytes, display text) for a scalar field's value."""
+        if key in ('vib_l', 'vib_r') and self._prof.vibration_step > 1:
+            step = self._prof.vibration_step
+            value = max(0, min(100, int(float(value) / step + 0.5) * step))
         if self._prof.dz_wide and key in _WIDE_SCALAR_KEYS:
             w = max(0, min(1000, int(round(float(value) * 10))))   # percent (0.1 steps) -> 16-bit ×10
             return [(w >> 8) & 0xFF, w & 0xFF], '%.1f' % (w / 10.0)
@@ -2581,7 +2609,7 @@ class GamesirBridge(QObject):
 
     @Slot(str, str)
     def setRemap(self, source, target):
-        if self._prof is profiles.G7_SE:
+        if self._prof in (profiles.G7_SE, profiles.NOVA_2_LITE):
             code = dict(self._prof.REMAP_TARGETS).get(target)
             if target == cfg.REMAP_NONE:
                 code = -1
@@ -2617,13 +2645,35 @@ class GamesirBridge(QObject):
                         cfg.REMAP_NONE if code == -1 else self.targetLabel(code), kind='se_remap')
             self._pending[(edit, addr)]['generation'] = self._config_generation
             return
+        if self._prof is profiles.NOVA_2_LITE:
+            # T4N2 encodes a button mapped to itself as Default and reads it
+            # back as [00 00]. Stage that same value so Save can verify it.
+            code = -1 if code < 0 else code & 0xff
+            if code == dict(self._prof.REMAP_TARGETS).get(source):
+                code = -1
+            # Save may already be applying a different snapshot. Keep a newer
+            # selection pending even when it matches the old loaded value.
+            if not self._backup_busy and self._config.get('remap', {}).get(source) == code:
+                edit = state.get('edit_profile') or state.get('profile')
+                pkey = (self._prof.profile_bank(edit), addr)
+                if self._pending.pop(pkey, None) is not None:
+                    self.pendingChanged.emit()
+                return
         data = [0x00, 0x00] if code < 0 else [0x01, code & 0xff]
         label = cfg.REMAP_NONE if code < 0 else self.targetLabel(code)
         self._queue(addr, data, 'Rebind ' + source, label)
 
     @Slot(str, int)
     def setG7Extra(self, name, value):
-        """Stage one approved G7-only setting using its documented encoding."""
+        """Stage one approved G7-only (or Nova 2 Lite D-pad) setting."""
+        if self._prof is profiles.NOVA_2_LITE and name in ('dpad_swap', 'dpad_lock'):
+            x = self._prof.extras
+            addr = x['DPAD_SWAP' if name == 'dpad_swap' else 'DPAD_LOCK']
+            encoded = 1 if value else 0
+            self._config[name] = bool(encoded)
+            self._queue(addr, [encoded], name.replace('_', ' ').title(),
+                        'On' if encoded else 'Off')
+            return
         if self._prof is not profiles.G7_PRO:
             return
         x = self._prof.extras
@@ -2733,6 +2783,10 @@ class GamesirBridge(QObject):
         elif addr in self._addr_to_continuous:
             self._config.setdefault('continuous_trigger', {})[
                 self._addr_to_continuous[addr]] = cfg.continuous_trigger_state(data)
+        elif 'DPAD_SWAP' in self._prof.extras and addr == self._prof.extras['DPAD_SWAP']:
+            self._config['dpad_swap'] = bool(data[0])
+        elif 'DPAD_LOCK' in self._prof.extras and addr == self._prof.extras['DPAD_LOCK']:
+            self._config['dpad_lock'] = bool(data[0])
 
     @Slot()
     def applyConfig(self):
@@ -2742,7 +2796,7 @@ class GamesirBridge(QObject):
         # Continuous Trigger batches (#22) while everything else took the path
         # below; two save paths drift. The G7 Pro keeps the path below -- its
         # writes go over its own enveloped channel with per-field quirks.
-        if self._prof.write_style in ('cyclone', 'g7se', 'gip'):
+        if self._prof.write_style in ('cyclone', 'g7se', 'gip', 't4n2'):
             self._apply_transactional()
             return
         edit = state.get('edit_profile') or state.get('profile')
@@ -2798,7 +2852,7 @@ class GamesirBridge(QObject):
         if self._prof is profiles.G7_SE and not g7se.CONFIGURATION_VERIFIED:
             self._set_apply_status('Apply refused: G7 SE cold-start replies remain unverified')
             return
-        if (self._prof.write_style not in ('cyclone', 'g7se', 'gip') or profiles.active() is not self._prof
+        if (self._prof.write_style not in ('cyclone', 'g7se', 'gip', 't4n2') or profiles.active() is not self._prof
                 or not profiles.is_recognized() or not state.get('connected')
                 or self._driving != state.get('driving')
                 or state.get('driving') != state.get('selected')):
@@ -2916,7 +2970,7 @@ class GamesirBridge(QObject):
                               if prof.POLL_RATE is not None and prof is not profiles.G7_SE else set())
                 ok, message = register_transaction.apply(
                     changes, read, write, os.path.join(base, 'deadband', 'controller-backups'),
-                    prof.name, unverified=unverified)
+                    prof.name, unverified=unverified, recovery_blocks=prof.write_style == 't4n2')
                 if ok:
                     for key, r in snapshot_pending.items():
                         if r.get('kind') == 'lighting':

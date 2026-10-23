@@ -79,7 +79,8 @@ Item {
                 }
                 AccentSlider {
                     id: vibL; width: parent.width; from: 0; to: 100
-                    onMoved: bridge.setScalar("vib_l", value)
+                    stepSize: bridge.vibrationStep
+                    onMoved: function(value) { bridge.setScalar("vib_l", value) }
                 }
                 PillButton {
                     objectName: "testLeftGrip"
@@ -98,7 +99,8 @@ Item {
                 }
                 AccentSlider {
                     id: vibR; width: parent.width; from: 0; to: 100
-                    onMoved: bridge.setScalar("vib_r", value)
+                    stepSize: bridge.vibrationStep
+                    onMoved: function(value) { bridge.setScalar("vib_r", value) }
                 }
                 PillButton {
                     objectName: "testRightGrip"
@@ -151,7 +153,9 @@ Item {
                     }
                     AccentSlider {
                         id: trigLSlider; width: parent.width; from: 0; to: 100
-                        onMoved: { page.trigL = value; bridge.setG7Extra("vib_trigger_l", value) }
+                        onMoved: function(value) {
+                            page.trigL = value; bridge.setG7Extra("vib_trigger_l", value)
+                        }
                     }
                     PillButton {
                         objectName: "testLeftTrigger"
@@ -183,7 +187,9 @@ Item {
                     }
                     AccentSlider {
                         id: trigRSlider; width: parent.width; from: 0; to: 100
-                        onMoved: { page.trigR = value; bridge.setG7Extra("vib_trigger_r", value) }
+                        onMoved: function(value) {
+                            page.trigR = value; bridge.setG7Extra("vib_trigger_r", value)
+                        }
                     }
                     PillButton {
                         objectName: "testRightTrigger"

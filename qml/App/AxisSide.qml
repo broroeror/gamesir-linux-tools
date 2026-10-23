@@ -94,7 +94,11 @@ Item {
         // and re-apply once the real config arrives.
         if (!bridge.profile || c[side + "_dz_min"] === undefined) return
         dz.lo = c[side + "_dz_min"]; dz.hi = c[side + "_dz_max"]
-        adz.lo = c[side + "_adz_min"]; adz.hi = c[side + "_adz_max"]
+        if (c[side + "_adz_min"] !== undefined) {
+            adz.lo = c[side + "_adz_min"]; adz.hi = c[side + "_adz_max"]
+        } else {
+            adz.lo = 0; adz.hi = 100
+        }
         var cv = c[side + "_curve"]
         curveType = cv ? cv.type : 0
         intensity = (cv && cv.intensity !== undefined) ? cv.intensity : 100
@@ -133,9 +137,13 @@ Item {
         var dzMin = 5, dzMax = isStick ? 100 : 95
         dz.lo = dzMin; dz.hi = dzMax; adz.lo = 0; adz.hi = 100
         bridge.setScalar(side + "_dz_min", dzMin); bridge.setScalar(side + "_dz_max", dzMax)
-        bridge.setScalar(side + "_adz_min", 0); bridge.setScalar(side + "_adz_max", 100)
+        if (isStick || bridge.hasTriggerAntiDeadzone) {
+            bridge.setScalar(side + "_adz_min", 0); bridge.setScalar(side + "_adz_max", 100)
+        }
         curveType = 0; curve.setPoints(bridge.curvePresets["Linear"])
-        bridge.setCurve(side, "Linear", [])
+        if (isStick || bridge.hasTriggerCurve) {
+            bridge.setCurve(side, "Linear", [])
+        }
         typeIdx = 0
         if (isStick) bridge.setTraj(side, 0); else bridge.setHair(side, 0)
     }
@@ -183,6 +191,7 @@ Item {
             }
 
             Card {
+                visible: root.isStick || bridge.hasTriggerAntiDeadzone
                 title: "Anti-Deadzone"; Layout.fillWidth: true
                 headerValue: root.fmtDz(adz.lo) + "–" + root.fmtDz(adz.hi); spacing: 8
                 RangeSlider {
@@ -194,6 +203,7 @@ Item {
             }
 
             Card {
+                visible: root.isStick || bridge.hasTriggerCurve
                 title: "Curve Adjustment"; Layout.fillWidth: true
                 Flow {
                     width: parent.width; spacing: 8
@@ -348,6 +358,7 @@ Item {
 
             Card {
                 id: graphCard
+                visible: root.isStick || bridge.hasTriggerCurve
                 title: "Response Curve"; Layout.fillWidth: true
                 Row {
                     width: parent.width; spacing: 6
