@@ -44,7 +44,7 @@ Item {
             // (G7 Pro and 8K alike, confirmed by hand) -- not underside paddles.
             "L5": [0.465, 0.050], "R5": [0.535, 0.050],
             "L4": [0.390, 0.660], "R4": [0.610, 0.660],
-            "Home": [0.50, 0.165], "LED": [0.50, 0.405]
+            "Home": [0.50, 0.165], "Share": [0.50, 0.280], "LED": [0.50, 0.405]
         },
         size: { stick: 0.115, face: 0.072, dpad: 0.11, mini: 0.042, home: 0.085 }
     })
@@ -386,6 +386,9 @@ Item {
 
     MiniBtn { nx: root.at("View")[0]; ny: root.at("View")[1]; glyph: "❐"; on: root.btn("view") }
     MiniBtn { nx: root.at("Menu")[0]; ny: root.at("Menu")[1]; glyph: "☰"; on: root.btn("menu") }
+
+    // The 8K's capture button reports as Share on the vendor input channel. Tested on Aimlabs G7 Pro 8K
+    MiniBtn { nx: root.at("Share")[0]; ny: root.at("Share")[1]; glyph: "⛶"; on: root.btn("share") }
 
     // ---- Tarantula-only parts ----
     // The small round button between View and Menu, and the GameSir-logo Home
