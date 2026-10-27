@@ -35,6 +35,9 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
   controllers instead of its orange product colours.
 
 ### Fixed
+- The G502 X first-time setup didn't appear on a mouse whose profile list names
+  its factory sectors instead of being blank, which is how at least one fresh
+  G502 X ships (#28).
 - The G502 X macros tab opened empty for a button that already had a macro
   saved on the mouse. Saved macros now load into the editor; one made in
   another app that the editor can't represent says so instead.
