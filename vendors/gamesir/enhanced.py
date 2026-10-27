@@ -23,6 +23,7 @@ Run a live decode to verify:  sudo python3 gamesir_enhanced.py
 """
 
 import time
+import controller_profile as profiles
 from gs_common import find_vendor_hidraw, pad
 
 DPAD = {
@@ -34,8 +35,6 @@ DPAD = {
 
 def parse_enhanced(d):
     """Parse a 64-byte 0x12 report into a state dict."""
-    import controller_profile as profiles
-
     b5, b6, b60 = d[5], d[6], d[60]
 
     extra_shoulders = profiles.active() is profiles.G7_8K

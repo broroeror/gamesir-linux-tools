@@ -44,7 +44,9 @@ Item {
             // (G7 Pro and 8K alike, confirmed by hand) -- not underside paddles.
             "L5": [0.465, 0.050], "R5": [0.535, 0.050],
             "L4": [0.390, 0.660], "R4": [0.610, 0.660],
-            "Home": [0.50, 0.165], "Share": [0.50, 0.280], "LED": [0.50, 0.405]
+            // the small button below Home: Share on the 8K, Capture on the Cyclone
+            "Home": [0.50, 0.165], "Share": [0.50, 0.280], "Capture": [0.50, 0.280],
+            "LED": [0.50, 0.405]
         },
         size: { stick: 0.115, face: 0.072, dpad: 0.11, mini: 0.042, home: 0.085 }
     })
@@ -387,13 +389,13 @@ Item {
     MiniBtn { nx: root.at("View")[0]; ny: root.at("View")[1]; glyph: "❐"; on: root.btn("view") }
     MiniBtn { nx: root.at("Menu")[0]; ny: root.at("Menu")[1]; glyph: "☰"; on: root.btn("menu") }
 
-    // The 8K's capture button reports as Share on the vendor input channel. Tested on Aimlabs G7 Pro 8K
-    MiniBtn { nx: root.at("Share")[0]; ny: root.at("Share")[1]; glyph: "⛶"; on: root.btn("share") }
+    // The button below Home reports as Share on the vendor input channel (#50,
+    // tested on an Aimlabs G7 Pro 8K); the Tarantula's sits between View and Menu.
+    MiniBtn { nx: root.at("Share")[0]; ny: root.at("Share")[1]; glyph: root.isTar ? "○" : "⛶"
+              on: root.btn("share") }
 
     // ---- Tarantula-only parts ----
-    // The small round button between View and Menu, and the GameSir-logo Home
-    // button between the sticks (with its status LED above it).
-    MiniBtn { visible: root.isTar; nx: root.at("Share")[0]; ny: root.at("Share")[1]; glyph: "○" }
+    // The GameSir-logo Home button between the sticks (with its status LED above it).
     Item {
         visible: root.isTar
         x: root.width * root.at("Home")[0] - width / 2

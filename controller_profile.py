@@ -531,10 +531,10 @@ G7_8K = ControllerProfile(
 
     # remaps: Cyclone's standard-12 + L4 unchanged, then 8K-specific paddles
     REMAP_SLOTS=tuple(_cy.REMAP_SLOTS[:13]) + (
-        ('Share', 0x00ab),
         ('R4', 0x015b),
         ('L5', 0x0204),
         ('R5', 0x02ad),
+        ('Share', 0x00ab),                  # the Cyclone's Capture slot (#50)
     ),
     MACRO_SLOTS=(('L4', 0x00b2), ('R4', 0x015b),   # 8K has 4 back paddles
                  ('L5', 0x0204), ('R5', 0x02ad)),
