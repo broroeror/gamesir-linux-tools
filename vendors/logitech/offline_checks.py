@@ -286,6 +286,20 @@ def main():
     check('a slot holding unknown data is never overwritten', not ok and 'left alone' in msg, msg)
     check('...and nothing at all was written', {k: bytes(v) for k, v in dev.s.items()} == before)
 
+    # #28's mouse: the RAM directory isn't blank, it LISTS the ROM sectors
+    dev = FactoryMouse()
+    listing = bytes.fromhex('01010100' '01020100' 'ffff0000')
+    dev.s[0] = bytearray(listing + b'\xff' * (SIZE - len(listing)))
+    check('a profile list naming only factory sectors counts as factory-only',
+          dev.profile_headers() == [(ROM_GOOD, 1), (ROM_JUNK, 1)] and config.factory_only(dev))
+    ok, msg = config.setup_editable_profiles(dev, INFO)
+    check('...and setup replaces it with editable slots 1 and 2',
+          ok and dev.profile_headers() == [(1, 1), (2, 1)] and dev.current == 1, msg)
+    dev = FactoryMouse()
+    listing = bytes.fromhex('00010100' '00020100' 'ffff0000')
+    dev.s[0] = bytearray(listing + b'\xff' * (SIZE - len(listing)))
+    check('a mouse that lists editable slots is not factory-only', not config.factory_only(dev))
+
     class FailsOnList(FactoryMouse):
         def write_sector(self, sec, data):
             if sec == 0:

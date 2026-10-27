@@ -1045,6 +1045,11 @@ def _probe_mouse():
             info = dev.onboard_info()
         except Exception as e:
             return out + [f'- onboard profiles: unavailable ({e!r})']
+        try:                       # blank, or listing sectors? (#28: both mean factory)
+            head = dev._mem_read16(info['feature_index'], 0x0000, 0)
+            out.append(f'- profile list (RAM sector 0) starts: {bytes(head[:12]).hex(" ")}')
+        except Exception as e:
+            out.append(f'- profile list: unreadable ({e!r})')
         out.append('- onboard: ' + ', '.join(f'{k} {info[k]}' for k in (
             'memory_model_id', 'profile_format', 'macro_format', 'profile_count',
             'oob_count', 'button_count', 'sector_count', 'sector_size')))

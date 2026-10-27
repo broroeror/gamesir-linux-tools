@@ -695,13 +695,17 @@ def _plausible_profile(prof):
 
 
 def factory_only(dev):
-    """True when the mouse has never had editable profiles: its RAM directory
-    (sector 0x0000) is blank, so it runs the read-only factory copies in ROM.
-    G HUB sets editable copies up on first use; a mouse that never met G HUB
-    (or was wiped) has none, and every edit then hits a ROM sector (#28)."""
+    """True when the mouse has never had editable profiles, so it runs the
+    read-only factory copies in ROM: its RAM directory (sector 0x0000) is
+    blank, OR it lists nothing but ROM sectors (0x0100 and up) -- how a G502 X
+    that never met G HUB came out of the box (#28). G HUB sets editable copies
+    up on first use; without them every edit hits a ROM sector."""
     idx = dev.get_feature_index(hidpp.FEATURE_ONBOARD_PROFILES)
     first = dev._mem_read16(idx, hidpp.RAM_DIRECTORY, 0)
-    return first[0:4] in (b'\x00\x00\x00\x00', b'\xff\xff\xff\xff')
+    if first[0:4] in (b'\x00\x00\x00\x00', b'\xff\xff\xff\xff'):
+        return True
+    listed = dev.profile_headers()          # the RAM directory, as it's not blank
+    return bool(listed) and all(sector >= hidpp.ROM_DIRECTORY for sector, _en in listed)
 
 
 def _directory_bytes(entries, size):
