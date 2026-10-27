@@ -246,6 +246,35 @@ unavailable. On a G7 Pro, Deadband automatically handles `3537:100a`; for
 `3537:1022`, hold **SHARE + MENU (☰)** together — note this also resets the active profile's remaps and the Shift layer, to reach wired `3537:109b` or
 dongle `3537:109c`. On the other controllers, use the Start / pause mode control.
 
+### The controller drops out of XInput mode as soon as it connects
+
+Some controllers fail Linux's very first setup request in XInput mode and fall
+back to another mode within a second. In `dmesg` it reads
+`can't set config #1, error -71`, then the controller reappears under a different
+ID. Known so far:
+
+| Controller | XInput ID that fails | Falls back to |
+| --- | --- | --- |
+| G7 Pro 8K PC, Phantom Blade 0 edition (wired) | `3537:1034` | `3537:10b8` |
+| G7 SE, firmware 6.64 | `3537:10a0` | `3537:1082` |
+
+A kernel setting fixes it by making that first request the way Windows does. To
+try it until the next reboot:
+
+```sh
+echo '3537:1034:r' | sudo tee /sys/module/usbcore/parameters/quirks
+```
+
+then unplug the controller, plug it back in and switch it to XInput. Use the ID
+from the table for your controller; for several, separate them with commas
+(`3537:1034:r,3537:10a0:r`).
+
+To keep it, add `usbcore.quirks=3537:1034:r` to your kernel command line. Where
+that lives depends on your bootloader: for GRUB it's `GRUB_CMDLINE_LINUX_DEFAULT`
+in `/etc/default/grub` (then `sudo grub-mkconfig -o /boot/grub/grub.cfg`), for
+systemd-boot the `options` line in your entry under `/boot/loader/entries/`. Your
+distribution's documentation on kernel parameters covers the rest.
+
 ### Settings don't stick, or a restore reports unconfirmed blocks
 
 The controller **silently drops a command sent right after another**, so a naïve

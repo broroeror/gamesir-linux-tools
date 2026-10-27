@@ -495,11 +495,15 @@ G7_8K = ControllerProfile(
                                             #   split follows the pair convention, not
                                             #   verified here — we own the Nioh edition)
                   0x1032, 0x1033,           # Royal2 edition:  1032 wired / 1033 dongle
-                  0x10b7, 0x10b9),          # Championship edition: 10b7 wired / 10b9
+                  0x10b7, 0x10b9,           # Championship edition: 10b7 wired / 10b9
                                             #   dongle, both owner-verified (issue #23).
                                             #   NOT a consecutive pair: 10b8 was the
                                             #   guess, and it was wrong
-    wired_products=(0x10c7, 0x10c5, 0x1032, 0x10b7),
+                  0x1034, 0x1035),          # Phantom Blade 0 edition: 1034 wired / 1035
+                                            #   receiver (Windows hardware IDs, #29;
+                                            #   probed on Linux, #44). 10b8 is its plain-
+                                            #   HID fallback -> G7_8K_HID below
+    wired_products=(0x10c7, 0x10c5, 0x1032, 0x10b7, 0x1034),
     write_style='cyclone',                  # bare 0f03 writes (NOT the g7 envelope)
     input_style='cyclone_0x12',             # live 0x12 on the vendor hidraw
     profile_banks=(1, 2, 3, 4),             # 4 profiles, confirmed via the app
@@ -762,8 +766,18 @@ KALEID_OTHER = ControllerProfile(
 )
 
 
+# The Phantom Blade 0 8K's plain-HID mode (3537:10b8, wired and receiver alike).
+# Linux's first setup request makes its XInput identity (1034) fail with -71 and
+# fall back here -- the same as the G7 SE's 10a0 (#41), and the same cure: the
+# usbcore quirk `r` keeps it on 1034 (#44). Input only; no config channel.
+G7_8K_HID = ControllerProfile(
+    name='GameSir G7 Pro 8K PC', short='G7 Pro 8K PC', usb_products=(0x10b8,),
+    wired_products=(), write_style='none', input_style='evdev', profile_banks=(),
+)
+
+
 ALL = (CYCLONE, G7_PRO, G7_NATIVE, G7_PRO_OTHER, G7_SE, G7_SE_OTHER, G7_8K,
-       TARANTULA_PRO_8K, KALEID, KALEID_OTHER)
+       G7_8K_HID, TARANTULA_PRO_8K, KALEID, KALEID_OTHER)
 DEFAULT = CYCLONE
 
 

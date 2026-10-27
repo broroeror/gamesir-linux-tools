@@ -1092,25 +1092,27 @@ def _probe_mouse():
 
 
 def _probe_gamesir():
-    """Unrecognised GameSir pads that declare the family's 0x0f/0x10 vendor
-    reports: ask the family's three READ questions (firmware version, active
-    profile, one 16-byte register read) and print the raw replies. That says
-    whether a new pad speaks the protocol the supported ones do (issue #11)."""
+    """GameSir pads Deadband can't configure -- unrecognised ones, and input-only
+    modes of known ones (G7 SE 10a0, #41) -- that declare the family's 0x0f/0x10
+    vendor reports: ask the family's three READ questions (firmware version,
+    active profile, one 16-byte register read) and print the raw replies. That
+    says whether the pad speaks the protocol the supported ones do (#11)."""
     import controller_profile as profiles
     from gs_common import pad
     try:
         import hidcompat as hid
     except Exception as e:
         return ['### Probe: GameSir', f'- HID library unavailable: {e}']
-    out = ['### Probe: unrecognised GameSir controllers']
+    out = ['### Probe: GameSir controllers Deadband can\'t configure yet']
     asked, seen = 0, set()
     for d in hid.enumerate():
         if d.get('vendor_id') != 0x3537 or d.get('path') in seen:
             continue        # hidapi lists a node once per collection: ask it once
         seen.add(d.get('path'))
         pid, product = d.get('product_id'), d.get('product_string') or ''
-        if profiles.detect_one(pid, product) is not None:
-            continue                             # supported: nothing to learn
+        known = profiles.detect_one(pid, product)
+        if known is not None and known.write_style != 'none':
+            continue                             # configurable: nothing to learn
         path = d.get('path')
         node = os.path.basename(path.decode() if isinstance(path, bytes) else path)
         channel = _vendor_channel(os.path.join('/sys/class/hidraw', node))
@@ -1142,7 +1144,7 @@ def _probe_gamesir():
             except Exception:
                 pass
     if not asked:
-        out.append('- none connected (every GameSir device present is already supported)')
+        out.append('- none connected (every GameSir device present can be configured)')
     return out
 
 

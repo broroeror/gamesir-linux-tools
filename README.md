@@ -97,7 +97,7 @@ can't positively identify. Fork it and customize it however you like.
 > The **G7 Pro 8K PC** comes in several editions that are the same controller under
 > different USB ids: **Nioh** (`3537:10c7` wired, `3537:10c8` dongle — my own pad),
 > **Royal2** (`1032`/`1033`, added by its owner [@kakxem](https://github.com/kakxem)),
-> **Championship** (`10b7` wired, `10b9` dongle, verified by its owner) and **Aimlabs** (`10c5`/`10c6`, recognised from a user report).
+> **Championship** (`10b7` wired, `10b9` dongle, verified by its owner), **Aimlabs** (`10c5`/`10c6`, recognised from a user report) and **Phantom Blade 0** (`1034` wired, `1035` receiver, from owners' reports). The Phantom Blade 0 needs a kernel setting on Linux to stay in XInput mode; see the [Manual](MANUAL.md#the-controller-drops-out-of-xinput-mode-as-soon-as-it-connects).
 >
 > The **G7 SE** (`3537:1010`, firmware descriptor 6.30) supports L4/R4 gamepad
 > remapping in three profiles and controller-wide 250/500/1000 Hz report-rate

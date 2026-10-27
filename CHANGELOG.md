@@ -20,6 +20,16 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
   template export to line the art up with the buttons. Thanks to
   [@sinchrotron](https://github.com/sinchrotron) for the idea (#42).
 
+- **G7 Pro 8K PC, Phantom Blade 0 edition** (`1034` wired, `1035` receiver),
+  from three owners' reports (#29, #44, #46). Its plain-HID mode (`10b8`) now
+  says it needs a kernel setting to stay in XInput, and the Manual has a new
+  troubleshooting entry for that (also covers the G7 SE's `10a0`, #41).
+- **G7 Pro 8K: L5/R5 light up when pressed, and the Share button can be
+  remapped.** Contributed by
+  [@SemiRealProductions](https://github.com/SemiRealProductions) (#49, #50).
+- `--probe` also asks the input-only modes of known controllers, such as the
+  G7 SE's `10a0` (#41).
+
 ### Changed
 - The Tarantula Pro 8K is drawn in the same slate style as the other
   controllers instead of its orange product colours.

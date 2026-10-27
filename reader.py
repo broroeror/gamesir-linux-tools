@@ -174,7 +174,7 @@ def _pick_selected(controllers):
     return next((c for c in live
                  if profiles.detect_one(c['pid'], c.get('product'))
                  not in (None, profiles.G7_NATIVE, profiles.G7_PRO_OTHER, profiles.G7_SE,
-                         profiles.G7_SE_OTHER)),
+                         profiles.G7_SE_OTHER, profiles.G7_8K_HID)),
                 (live or controllers)[0])
 
 
@@ -412,6 +412,19 @@ def read_controller():
                     state['config_status'] = 'Released to games'
                     state['config_phase'] = 'released'
                 read_session_evdev(sel['id'], force_wrong_mode=True)
+            state['connected'] = False
+            time.sleep(0.3)
+            continue
+
+        # G7 Pro 8K (Phantom Blade 0) in plain-HID mode: its XInput identity
+        # failed Linux's first setup request; a kernel setting keeps it there.
+        if prof is profiles.G7_8K_HID:
+            state['connected'] = True
+            state['mode_ok'] = False
+            state['config_status'] = ('G7 Pro 8K in plain-HID mode: Linux needs a kernel '
+                                      'setting to keep it in XInput (Manual → Troubleshooting)')
+            state['config_phase'] = 'failed'
+            read_session_evdev(sel['id'], force_wrong_mode=True)
             state['connected'] = False
             time.sleep(0.3)
             continue
