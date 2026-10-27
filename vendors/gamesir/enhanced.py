@@ -17,6 +17,7 @@ Byte map (byte 0 = report ID 0x12), DS4-style early bytes + GameSir extras:
   37    battery/charge status flag   <-- candidate
   58,59 RAW copies of byte 5/6 (pre-binding)
   60    extra buttons: Home 0x01, Share 0x02, L4 0x08, R4 0x10, M 0x20
+  63    G7 Pro 8K physical shoulders: L5 0x01, R5 0x02 (pre-binding)
 
 Run a live decode to verify:  sudo python3 gamesir_enhanced.py
 """
@@ -33,7 +34,16 @@ DPAD = {
 
 def parse_enhanced(d):
     """Parse a 64-byte 0x12 report into a state dict."""
+    import controller_profile as profiles
+
     b5, b6, b60 = d[5], d[6], d[60]
+
+    extra_shoulders = profiles.active() is profiles.G7_8K
+    # Confirmed on an Aimlabs 8K wireless controller (3537:10c6). These
+    # physical bits remain independent of mapped output in byte 5/6. Keep
+    # decoding model-specific: byte 63 is not established on other models.
+    shoulders = d[63] if extra_shoulders and len(d) > 63 else 0
+
     return {
         'lx': d[1], 'ly': d[2], 'rx': d[3], 'ry': d[4],
         'lt': d[8], 'rt': d[9],
@@ -57,6 +67,8 @@ def parse_enhanced(d):
         'share': bool(b60 & 0x02),
         'l4':    bool(b60 & 0x08),
         'r4':    bool(b60 & 0x10),
+        'l5':    bool(shoulders & 0x01),
+        'r5':    bool(shoulders & 0x02),
         'm':     bool(b60 & 0x20),
         # battery: byte 36 = percent (confirmed), byte 35 bit 0 = charging/cable
         'battery': d[36],
