@@ -82,9 +82,13 @@ def _event_bytes(ev):
 
 
 def block_bytes(events, max_events=MAX_EVENTS):
-    """[count, event0, event1, ...] to write at base+COUNT_OFF."""
+    """[count, event0, event1, ..., zeros] to write at base+COUNT_OFF.
+
+    Zero-filled to `max_events`: the firmware plays on past `count` until it
+    reaches an empty step, so a macro shortened in place kept playing the old
+    macro's leftover steps (#51, verified on an 8K)."""
     evs = list(events)[:max_events]
     out = [len(evs)]
     for ev in evs:
         out += _event_bytes(ev)
-    return out
+    return out + [0] * ((max_events - len(evs)) * EVENT_LEN)

@@ -512,6 +512,8 @@ G7_8K = ControllerProfile(
                                             # NOT the Cyclone keyframe model
     has_motion=True,                        # Aim/Tilt gyro block (bank 0x01)
     has_macros=True,                        # per-paddle macros
+    macro_max=31,                           # the block's last byte (+0xa8) is a setting
+                                            # (0x0a on every paddle), not step 32 (#51)
 
     # Vibration + poll ARE shared with the Cyclone (verified live). But the
     # stick/trigger ANALOG SHAPING is NOT — the 8K's high-rate engine reads it

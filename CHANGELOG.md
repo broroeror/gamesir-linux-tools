@@ -35,6 +35,10 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
   controllers instead of its orange product colours.
 
 ### Fixed
+- A controller macro made shorter kept playing the old macro's leftover steps,
+  because the controller doesn't stop at the step count. Saving a macro now
+  clears the rest of its steps. On the G7 Pro 8K, macros are capped at 31 steps
+  so they no longer overwrite a setting stored after them (#51).
 - The G502 X first-time setup didn't appear on a mouse whose profile list names
   its factory sectors instead of being blank, which is how at least one fresh
   G502 X ships (#28).
