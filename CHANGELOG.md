@@ -35,6 +35,10 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
   controllers instead of its orange product colours.
 
 ### Fixed
+- The navigation, numpad and media keys in the remap and macro pickers sent
+  different keys than their labels said (Delete came out as Page Down, for
+  example). Every one has now been checked on a Cyclone 2 and an 8K, and
+  bindings made in GameSir's app show their real names (#47).
 - A controller macro made shorter kept playing the old macro's leftover steps,
   because the controller doesn't stop at the step count. Saving a macro now
   clears the rest of its steps. On the G7 Pro 8K, macros are capped at 31 steps

@@ -333,22 +333,22 @@ MOUSE_TARGETS = [
     ('Mouse 4', 0xcb), ('Mouse 5', 0xcc), ('Scroll Up', 0xcd), ('Scroll Down', 0xce),
 ]
 
-# "Numeric Keypad" tab (media / navigation / volume / arrows / numpad). Codes are
-# NON-sequential (the app's own numbering) so they're listed explicitly, from cap
-# 32_8k_numpad: contiguous 0x7b-0x9b, with 0x7a = the greyed/non-mappable Stop key
-# (excluded). Numpad keys are prefixed "Num " to disambiguate from the main
-# keyboard's own digits/operators (which have different codes). Rows roughly mirror
-# the app's layout: nav/media on the left, the numpad block on the right.
+# "Numeric Keypad" tab (media / navigation / volume / arrows / numpad), codes
+# 0x7a-0x9b. Each one was assigned to a button and its output read from evdev on a
+# Cyclone 2 and an 8K (#47); the same codes as the G7 Pro's numpad. The order is
+# the USB HID one except the arrows (Up, Down, Left, Right). Numpad keys are
+# prefixed "Num " to tell them from the main keyboard's digits/operators. Rows
+# roughly mirror the app's layout: nav/media on the left, the numpad on the right.
 _NP_ROWS = [
-    [('Play', 0x9a, 1.5), ('Rewind', 0x9b, 1.5), ('FastFwd', 0x99, 1.6),
-     ('NumLock', 0x92, 1.7), ('Num /', 0x93, 1.1), ('Num *', 0x94, 1.1), ('Num -', 0x88, 1.1)],
-    [('Insert', 0x7b, 1.5), ('Home', 0x7c, 1.5), ('PgUp', 0x95, 1.6),
-     ('Num 7', 0x8f, 1.1), ('Num 8', 0x90, 1.1), ('Num 9', 0x91, 1.1), ('Num +', 0x80, 1.1)],
-    [('Delete', 0x96, 1.5), ('End', 0x98, 1.5), ('PgDn', 0x97, 1.6),
-     ('Num 4', 0x8c, 1.1), ('Num 5', 0x8d, 1.1), ('Num 6', 0x8e, 1.1)],
-    [('Vol -', 0x7d, 1.5), ('Mute', 0x7e, 1.5), ('Vol +', 0x7f, 1.6),
-     ('Num 1', 0x8a, 1.1), ('Num 2', 0x82, 1.1), ('Num 3', 0x81, 1.1), ('Num Enter', 0x83, 1.7)],
-    [('Up', 0x84, 1.5), ('Left', 0x85, 1.5), ('Down', 0x86, 1.6), ('Right', 0x87, 1.1),
+    [('Play/Pause', 0x95, 1.5), ('Prev', 0x98, 1.5), ('Next', 0x97, 1.6),
+     ('NumLock', 0x84, 1.7), ('Num /', 0x85, 1.1), ('Num *', 0x86, 1.1), ('Num -', 0x87, 1.1)],
+    [('Insert', 0x7a, 1.5), ('Home', 0x7b, 1.5), ('PgUp', 0x7c, 1.6),
+     ('Num 7', 0x92, 1.1), ('Num 8', 0x93, 1.1), ('Num 9', 0x94, 1.1), ('Num +', 0x88, 1.1)],
+    [('Delete', 0x7d, 1.5), ('End', 0x7e, 1.5), ('PgDn', 0x7f, 1.6),
+     ('Num 4', 0x8f, 1.1), ('Num 5', 0x90, 1.1), ('Num 6', 0x91, 1.1), ('Stop', 0x96, 1.1)],
+    [('Vol -', 0x9a, 1.5), ('Mute', 0x9b, 1.5), ('Vol +', 0x99, 1.6),
+     ('Num 1', 0x8c, 1.1), ('Num 2', 0x8d, 1.1), ('Num 3', 0x8e, 1.1), ('Num Enter', 0x8a, 1.7)],
+    [('Up', 0x80, 1.5), ('Left', 0x82, 1.5), ('Down', 0x81, 1.6), ('Right', 0x83, 1.1),
      ('Num 0', 0x8b, 1.1), ('Num .', 0x89, 1.1)],
 ]
 NUMPAD_TARGETS = [(n, c) for row in _NP_ROWS for (n, c, _w) in row]

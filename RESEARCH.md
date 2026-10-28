@@ -423,6 +423,36 @@ See [G7 SE protocol and validation notes](docs/g7se.md).
 
 ---
 
+## Remap and macro target codes `0x7a`–`0x9b` (2026-10-27)
+
+Measured, not inferred from the app's layout: each code was assigned to a button
+on a Cyclone 2 (`100b`) and the output read from evdev (grabbed), with an 8K
+(`10c8`) spot check agreeing on every code tried (#47). The earlier table had
+been named by key position in a capture and was wrong throughout.
+
+| Codes | Keys |
+| --- | --- |
+| `0x7a`–`0x7f` | Insert, Home, Page Up, Delete, End, Page Down |
+| `0x80`–`0x83` | Up, Down, Left, Right |
+| `0x84`–`0x88` | Num Lock, Num /, Num \*, Num −, Num + |
+| `0x89`–`0x8b` | Num ., Num Enter, Num 0 |
+| `0x8c`–`0x94` | Num 1 … Num 9 |
+| `0x95`–`0x9b` | Play/Pause, Stop, Next, Previous, Volume up, Volume down, Mute |
+
+The media codes leave the pad as consumer reports (report ID 2, two 16-bit array
+fields, e.g. `02 e9 00 00 00` = Volume up). **On the Cyclone's `100b` identity
+Linux drops them:** its descriptor declares the consumer range as Usage Minimum
+`0x00` and a 4-byte Usage Maximum `0x0000FFFF`, which the kernel reads as an
+extended usage on page 0, so the range is empty and no Consumer Control device
+is created. Windows handles it. The 8K's descriptor works and its media keys
+arrive. A descriptor fixup (HID-BPF) should fix the Cyclone; untried.
+
+Paddle macros on the 8K: the firmware plays past the stored step count until an
+empty step, and each paddle block's last byte (`+0xa8`, `0x0a` on every paddle)
+is a setting rather than step 32 (#51).
+
+---
+
 ## Logitech G502 X LIGHTSPEED — fully supported
 
 A different vendor and a completely different protocol from the GameSir family:
