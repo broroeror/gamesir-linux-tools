@@ -1139,6 +1139,9 @@ class GamesirBridge(QObject):
             return ('Press M + Xbox to cycle the controller to Xbox mode, where '
                     'its lighting is editable. The other two modes work in games '
                     'but expose no configuration channel.')
+        if profiles.active() is profiles.TARANTULA_PRO_8K:
+            return ('Not in PC/Xbox mode. Hold Home + X for 2 seconds (until the '
+                    'light turns green) to switch to PC mode.')
         return ('Not in Xbox mode. Use the controller\'s Start / pause buttons '
                 'to switch to Xbox/XInput mode so the app can read it.')
 

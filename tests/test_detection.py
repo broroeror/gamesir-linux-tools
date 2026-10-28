@@ -77,6 +77,12 @@ class DetectionTests(unittest.TestCase):
         self.assertIs(profiles.detect_one(0x0575, 'GameSir-Cyclone 2'), profiles.CYCLONE)
         self.assertIs(profiles.detect_one(0x0575, 'Gamepad'), profiles.G7_8K)
 
+    def test_tarantula_pid_variants_resolve_to_tarantula_profile(self):
+        self.assertIs(profiles.detect_one(0x103d, 'GameSir-Tarantula Pro'), profiles.TARANTULA_PRO_8K)
+        self.assertIs(profiles.detect_one(0x103c, 'GameSir-Tarantula 8K'), profiles.TARANTULA_PRO_8K)
+        self.assertIn(0x103c, profiles.TARANTULA_PRO_8K.usb_products)
+        self.assertIn(0x103c, profiles.TARANTULA_PRO_8K.wired_products)
+
 
 if __name__ == '__main__':
     unittest.main()
