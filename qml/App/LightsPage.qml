@@ -340,6 +340,32 @@ Item {
                         }
                     }
                 }
+                // some units light Home and Profile the other way round (#48);
+                // kept quiet, but here where someone with that unit will look
+                Row {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    visible: bridge.canSwapHomeProfile
+                    spacing: 10
+                    Text {
+                        text: "Home and Profile lights the wrong way round on your controller?"
+                        width: Math.min(implicitWidth, centerArea.width - 110)
+                        wrapMode: Text.WordWrap
+                        color: Theme.textDim; font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontS
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    ToggleSwitch {
+                        checked: bridge.homeProfileSwapped
+                        anchors.verticalCenter: parent.verticalCenter
+                        onToggled: function (on) { bridge.setHomeProfileSwapped(on) }
+                    }
+                    Text {
+                        text: "Swap"
+                        color: Theme.textDim; font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontS
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
             }
             }
         }

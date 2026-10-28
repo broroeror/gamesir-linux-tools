@@ -20,7 +20,7 @@ import threading
 import time
 from datetime import datetime
 
-from PySide6.QtCore import QObject, Signal, Property, Slot, QTimer
+from PySide6.QtCore import QObject, Signal, Property, Slot, QTimer, QSettings
 
 from gs_state import state, EXTRA_BTNS
 import vendors.gamesir.control as control
@@ -171,6 +171,7 @@ class GamesirBridge(QObject):
         self._status_sig = None
         self._controllers_sig = None
 
+        led.swap_home_profile = QSettings().value('lighting/swapHomeProfile', False, bool)
         # Per-zone display colors for the controller render. Driven by the Lights
         # page; seeded from each zone's factory default so the render looks lit.
         self._light_colors = [_hex(d) for d in led.light_defaults()]
@@ -1535,6 +1536,26 @@ class GamesirBridge(QObject):
         the Cyclone has four, the Kaleid two, so QML sizes its zone list off this
         rather than assuming a count."""
         return led.light_names()
+
+    @Property(bool, notify=controllerChanged)
+    def canSwapHomeProfile(self):
+        """Only the Cyclone's own light map has separate Home and Profile lights."""
+        return (_keyframe_lighting() and not self._prof.lighting_lights
+                and 'Home' in led.light_names())
+
+    @Property(bool, notify=lightsChanged)
+    def homeProfileSwapped(self):
+        return led.swap_home_profile
+
+    @Slot(bool)
+    def setHomeProfileSwapped(self, on):
+        """For units whose Home and Profile lights are wired the other way round
+        (#48). Re-reads what's loaded through the new map, so the page and any
+        staged edit show what the controller will actually light."""
+        led.swap_home_profile = bool(on)
+        QSettings().setValue('lighting/swapHomeProfile', bool(on))
+        self._lighting_ui_from_staged()
+        self.lightsChanged.emit()
 
     @Property('QVariantList', notify=lightsChanged)
     def lightColors(self):

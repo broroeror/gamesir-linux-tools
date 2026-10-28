@@ -8,6 +8,8 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
 ## [Unreleased]
 
 ### Added
+- A **Swap** setting on the Lights page for Cyclone 2 units whose Home and
+  Profile lights are wired the other way round (#48).
 - **macOS support (early).** Deadband runs on macOS from source; tested on
   Apple Silicon with a Cyclone 2, a Tarantula Pro 8K and a G502 X (remaps,
   live input, profiles, lighting, mouse pages). A Cyclone 2 dongle there leaves

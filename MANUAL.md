@@ -60,6 +60,10 @@ Play / Pause, and the confirmed **Restore default lighting** act straight away.
 Lighting is shared across the hardware profiles, so switching hardware profile keeps
 staged lighting edits.
 
+On some Cyclone 2 units the Home and Profile lights are wired the other way round, so
+the Home colour lights the small Profile light and the other way about. If yours does
+that, switch on **Swap** under the light names on the Lights page; Deadband remembers it.
+
 ### Config editor
 
 Tune how the sticks and triggers behave, per profile:

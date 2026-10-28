@@ -56,9 +56,22 @@ CYCLONE_LIGHTS = (
 )
 
 
+# Some Cyclone 2 units drive the Home and Profile lights from each other's
+# positions, on the same firmware as ours (#48). The bridge sets this from the
+# user's setting; it applies to the Cyclone's own map only.
+swap_home_profile = False
+
+
 def lights():
     """The active model's light map, as (name, default, positions) per light."""
-    return profiles.active().lighting_lights or CYCLONE_LIGHTS
+    own = profiles.active().lighting_lights
+    if own:
+        return own
+    if swap_home_profile:
+        pos = {name: p for name, _d, p in CYCLONE_LIGHTS}
+        swap = {'Profile': pos['Home'], 'Home': pos['Profile']}
+        return tuple((n, d, swap.get(n, p)) for n, d, p in CYCLONE_LIGHTS)
+    return CYCLONE_LIGHTS
 
 
 def light_names():
