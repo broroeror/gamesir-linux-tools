@@ -40,11 +40,14 @@ def parse_enhanced(d):
 
     extra_shoulders = prof is profiles.G7_8K
     is_tarantula = prof is profiles.TARANTULA_PRO_8K
-    # Confirmed on an Aimlabs 8K wireless controller (3537:10c6) and Tarantula
-    # Pro 8K. Physical bits for the 0x0204+ button blocks sit in byte 63.
+    # Confirmed on an Aimlabs 8K wireless controller (3537:10c6): L5/R5 sit in
+    # byte 63. On the Tarantula 8K, bytes 62/63 are raw LT/RT analog and the
+    # 7 extra programmable buttons (C1-C4, T1-T3) sit in byte 61 (pad_b, right
+    # after byte 60's Home/Share/L4/R4/M).
+    b61 = d[61] if len(d) > 61 else 0
     b63 = d[63] if len(d) > 63 else 0
     shoulders = b63 if extra_shoulders else 0
-    tar_extra = b63 if is_tarantula else 0
+    tar_extra = b61 if is_tarantula else 0
     has_battery = not profiles.is_recognized() or prof.has_battery
 
     return {

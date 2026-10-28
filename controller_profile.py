@@ -650,8 +650,8 @@ def _tar_motion(m):
 
 
 TARANTULA_PRO_8K = ControllerProfile(
-    name='GameSir Tarantula Pro 8K',
-    short='Tarantula Pro 8K',
+    name='GameSir Tarantula 8K',
+    short='Tarantula 8K',
     usb_products=(0x103d, 0x103c),
     wired_products=(0x103d, 0x103c),        # wired-only controller
     write_style='cyclone',                  # bare 0f03 writes (captures T3/T4/T7/T10)

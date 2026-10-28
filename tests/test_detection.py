@@ -96,7 +96,8 @@ class DetectionTests(unittest.TestCase):
             pkt[35] = 0x01
             pkt[36] = 42
             pkt[60] = 0x01 | 0x02 | 0x08 | 0x10 | 0x20
-            pkt[63] = 0x7f
+            pkt[61] = 0x7f
+            pkt[63] = 0xff  # RT analog (does not trigger C/T buttons)
             parsed = parse_enhanced(pkt)
             for k in ('home', 'share', 'l4', 'r4', 'm',
                       'c1', 'c2', 'c3', 'c4', 't1', 't2', 't3'):

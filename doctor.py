@@ -1206,7 +1206,7 @@ def _probe_buttons():
             except Exception:
                 pass
     if len(out) == 1:
-        out.append('- no Cyclone 2 / G7 Pro 8K / Tarantula Pro 8K connected')
+        out.append('- no Cyclone 2 / G7 Pro 8K / Tarantula 8K connected')
     return out
 
 

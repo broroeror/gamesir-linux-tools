@@ -49,7 +49,7 @@ Item {
 
     Rectangle {
         id: btn
-        readonly property int pad: root.canPick ? 62 : 38
+        readonly property int pad: root.canPick ? 62 : 46
         width: Math.min(210, Math.max(120, txt.implicitWidth + pad))
         height: 32; radius: 8
         color: (hov.hovered || menu.opened) ? Theme.cardHover : Theme.card
@@ -57,7 +57,9 @@ Item {
         Behavior on color { ColorAnimation { duration: 120 } }
         Row {
             anchors.verticalCenter: parent.verticalCenter
-            anchors.left: parent.left; anchors.leftMargin: 12
+            anchors.horizontalCenter: root.canPick ? undefined : parent.horizontalCenter
+            anchors.left: root.canPick ? parent.left : undefined
+            anchors.leftMargin: 12
             spacing: 8
             // mouse glyph when the mouse is the active device, else the controller's
             // wired/wireless indicator
@@ -76,6 +78,7 @@ Item {
             }
             Text {
                 id: txt
+                anchors.verticalCenter: parent.verticalCenter
                 text: root.mouseActive ? root.mouseName : root.labelFor(root.current)
                 color: Theme.text
                 width: Math.min(implicitWidth, btn.width - btn.pad)
