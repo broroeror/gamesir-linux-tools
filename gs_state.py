@@ -16,6 +16,8 @@ state = {
     'view': False, 'menu': False,
     'ls': False, 'rs': False,
     'l4': False, 'l5': False, 'r4': False, 'r5': False,
+    'c1': False, 'c2': False, 'c3': False, 'c4': False,
+    't1': False, 't2': False, 't3': False,
     'm': False, 'home': False, 'share': False,
     'battery': 0, 'charging': False,
     'profile': None,     # current profile 1-4 (from get-profile 0x0B -> 0x10 reply)
@@ -52,4 +54,5 @@ state = {
     'config_phase': '',
 }
 
-EXTRA_BTNS = ('l4', 'l5', 'r4', 'r5', 'm', 'home', 'share')
+EXTRA_BTNS = ('l4', 'l5', 'r4', 'r5', 'c1', 'c2', 'c3', 'c4',
+              't1', 't2', 't3', 'm', 'home', 'share')

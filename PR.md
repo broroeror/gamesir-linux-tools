@@ -1,26 +1,22 @@
-# feat(gamesir): add PID 0x103c for GameSir Tarantula 8K variant
+# feat(gamesir): full button support, battery display fix, and PID 0x103c for Tarantula 8K
 
 ## Summary
-Support USB product ID `0x103c` alongside `0x103d` for the GameSir Tarantula 8K controller (`3537:103c`).
+Provide complete button support, battery-less UI handling, and `0x103c` / `0x103d` detection for the GameSir Tarantula 8K controller:
 
-Previously, Deadband did not register `0x103c` as a supported profile and `doctor.py` flagged it as an unconfigurable "non-PC mode". In reality, the Tarantula 8K under this PID enumerates two HID interfaces on Linux:
-- Interface 0 (`/dev/hidraw15`): Gamepad input (`0x01`), pages `0xfff0/0xff00`, report IDs `0x43`, `0xa2`
-- Interface 1 (`/dev/hidraw16`): pages `0xfff0/0xff00`, vendor report IDs `0x10`, `0x12`, `0x0f`
+1. **In-App Battery Indicator Fix (`has_battery=False`):**
+   - The wired-only Tarantula 8K has no internal battery, so bytes 35 and 36 of the `0x12` input report do not carry battery percentage or charging state (previously causing the top bar to show a red `0%` / flickering `⚡`).
+   - Added `has_battery: bool = True` to `ControllerProfile` (`has_battery=False` on `TARANTULA_PRO_8K`), exposed `bridge.hasBattery`, suppressed battery/charging decoding in `parse_enhanced`, and hid the battery readout in `StatusPill.qml` when `bridge.hasBattery` is false.
 
-The vendor channel on interface 1 declares the standard family protocol reports (`0x0f` output commands, `0x10` responses, `0x12` live telemetry).
+2. **Full Button Support (`C1–C4`, `T1–T3`, `L4`, `R4`, `LT`, `RT`, `View`, `Menu`, `Share`, `Home`, `M`):**
+   - **Live Input Highlights:** Added `c1`–`c4` (`0x01`–`0x08`) and `t1`–`t3` (`0x10`–`0x40`) decoding from byte 63 of the `0x12` report in `vendors/gamesir/enhanced.py`, tracked them in `gs_state.py` (`state` and `EXTRA_BTNS`) and `bridge._poll_input`, and added live press highlights for the Tarantula's `Home` (`G`) and `M` buttons in `ControllerView.qml`.
+   - **Complete Remap Slots & Self-Code Defaults:** Added `LT` (`0x06ac`), `RT` (`0x06cc`), `View` (`0x009d`), `Menu` (`0x00a4`), and `Share` (`0x00ab`) to `TARANTULA_PRO_8K.REMAP_SLOTS` (all 26 remappable buttons). Added `REMAP_DEFAULTS` for the programmable button blocks and triggers (`L4=0x11`, `R4=0x12`, `LT=0x13`, `RT=0x14`, `C1–C4=0x1f–0x22`, `T1–T3=0x23–0x25`) so factory self-code records decode as `Default` (`-1`) instead of raw hex codes and resetting to `Default` restores `[0x01, self_code]`.
+   - **Motion Activation Buttons:** Added the Tarantula's full button set (`View`, `Menu`, `Share`, `L4`, `R4`, `C1–C4`, `T1–T3`) to `TARANTULA_PRO_8K.motion['buttons']`.
 
-## Changes
-- **`controller_profile.py`**: Added PID `0x103c` to `TARANTULA_PRO_8K.usb_products` and `wired_products`.
-- **`doctor.py`**: Removed the verdict warning that flagged `0x103c` as non-PC / unconfigurable. Devices under `0x103c` are now correctly recognized as configurable GameSir pads and report `GameSir device access: OK.`.
-- **`gs_common.py`**: Added `_declares_vendor_channel` check to ensure `pick_live_node` and `find_vendor_hidraw` route to the interface declaring the vendor command channel (`0x0f`/`0x10`/`0x12`) when multiple interfaces are present on a device.
-- **`bridge.py`**: Added model-specific `modeMessage` instructions for `TARANTULA_PRO_8K` (holding Home + X for 2 seconds to enter PC mode).
-- **`tests/test_detection.py`**: Added `test_tarantula_pid_variants_resolve_to_tarantula_profile` unit test.
+3. **PID `0x103c` Support & High-Rate Probe Fix:**
+   - Added `0x103c` alongside `0x103d` in `TARANTULA_PRO_8K`, ensured `find_vendor_hidraw` / `pick_live_node` select the interface declaring vendor report IDs (`0x0f`/`0x10`/`0x12`), added a Tarantula-specific `modeMessage` (`Home + X` for 2s), and fixed `doctor._ask` to only sleep when `dev.read(64)` returns empty so `--doctor --probe` does not overflow the hidraw queue on 1000–8000 Hz controllers.
 
 ## Verification
-- Unit tests: `python3 -m pytest tests/` passed (256/256 passed).
-- Smoke tests: `python3 smoke_test.py` passed with returncode 0.
-- Syntax: `python3 -m py_compile $(git ls-files '*.py')` compiled cleanly.
-- Diagnostic & Probe: `python3 deadband.py --doctor --probe` tested against the connected Tarantula 8K controller:
-  - Recognized as `GameSir 103c` / `Tarantula Pro 8K`.
-  - Vendor channel identified on `/dev/hidraw16` (`pages 0xfff0/0xff00, report ids 0x10 0x12 0x0f`).
-  - Probed under button records without being marked as unconfigurable.
+- Unit tests: `python3 -m pytest tests/` (258 passed)
+- Smoke tests: `python3 smoke_test.py` (PASS)
+- Syntax check: `python3 -m py_compile $(git ls-files '*.py')`
+- Live hardware diagnostic & probe: `python3 deadband.py --doctor --probe` (all 26 button records verified on `/dev/hidraw15`)

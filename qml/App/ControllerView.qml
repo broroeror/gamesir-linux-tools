@@ -71,6 +71,7 @@ Item {
             "T2": [0.5503, 0.0833],
             "View": [0.4441, 0.225],
             "Share": [0.4978, 0.2253],
+            "Screenshot": [0.4978, 0.2253],
             "Menu": [0.5516, 0.2253],
             "Dpad Up": [0.1996, 0.1757],
             "Dpad Down": [0.1998, 0.3851],
@@ -84,6 +85,7 @@ Item {
             "LS": [0.3465, 0.4802],
             "RS": [0.6535, 0.4802],
             "Home": [0.5, 0.4479],
+            "M": [0.5, 0.565],
             "LED": [0.5, 0.3351],
             "L4": [0.4146, 0.9351],
             "R4": [0.583, 0.9361]
@@ -395,15 +397,36 @@ Item {
               on: root.btn("share") }
 
     // ---- Tarantula-only parts ----
-    // The GameSir-logo Home button between the sticks (with its status LED above it).
+    // The GameSir-logo Home button between the sticks (with its status LED above it)
+    // and the M function button below it.
     Item {
         visible: root.isTar
+        property bool on: root.btn("home")
         x: root.width * root.at("Home")[0] - width / 2
         y: root.height * root.at("Home")[1] - height / 2
         width: root.width * root.lay.size.home; height: width
-        Rectangle { anchors.fill: parent; radius: width / 2; color: "#2A2E38"; border.color: "#3E4350"; border.width: Math.max(1, width * 0.06) }
-        Rectangle { anchors.centerIn: parent; width: parent.width * 0.62; height: width; radius: width / 2; color: "#1C1F27" }
-        Text { anchors.centerIn: parent; text: "G"; color: "#9AA0AC"; font.bold: true; font.pixelSize: parent.width * 0.4 }
+        Rectangle {
+            anchors.fill: parent; radius: width / 2
+            color: parent.on ? Theme.accent : "#2A2E38"
+            border.color: parent.on ? Qt.lighter(Theme.accent, 1.3) : "#3E4350"
+            border.width: Math.max(1, width * 0.06)
+            Behavior on color { ColorAnimation { duration: 80 } }
+        }
+        Rectangle {
+            anchors.centerIn: parent; width: parent.width * 0.62; height: width
+            radius: width / 2; color: parent.on ? Theme.accent : "#1C1F27"
+            Behavior on color { ColorAnimation { duration: 80 } }
+        }
+        Text {
+            anchors.centerIn: parent; text: "G"
+            color: parent.on ? Theme.textOnAccent : "#9AA0AC"
+            font.bold: true; font.pixelSize: parent.width * 0.4
+        }
+    }
+    MiniBtn {
+        visible: root.isTar
+        nx: root.at("M")[0]; ny: root.at("M")[1]
+        glyph: "M"; on: root.btn("m")
     }
     Rectangle {
         visible: root.isTar

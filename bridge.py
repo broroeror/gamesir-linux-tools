@@ -306,8 +306,7 @@ class GamesirBridge(QObject):
                state['a'], state['b'], state['x'], state['y'],
                state['lb'], state['rb'], state['ls'], state['rs'],
                state['view'], state['menu'],
-               state['l4'], state['l5'], state['r4'], state['r5'],
-               state['m'], state['home'], state['share'])
+               *(state[k] for k in EXTRA_BTNS))
         if sig != self._input_sig:
             self._input_sig = sig
             self.inputChanged.emit()
@@ -995,8 +994,13 @@ class GamesirBridge(QObject):
             rec = vals[addr]
             # store the raw target CODE (or -1 = unmapped) so keyboard/mouse
             # rebinds share one path; the UI resolves the label via targetLabel().
-            remap[name] = (g7se.decode_remap(rec, addr) if p is profiles.G7_SE else
-                           (rec[1] if len(rec) > 1 else 0) if rec[0] else -1)
+            if p is profiles.G7_SE:
+                code = g7se.decode_remap(rec, addr)
+            else:
+                code = (rec[1] if len(rec) > 1 else 0) if rec[0] else -1
+                if code >= 0 and p.REMAP_DEFAULTS.get(addr) == code:
+                    code = -1
+            remap[name] = code
         out['remap'] = remap
         if p.CONTINUOUS_TRIGGER_SLOTS:
             out['continuous_trigger'] = {
@@ -1372,6 +1376,12 @@ class GamesirBridge(QObject):
     @Property(bool, notify=controllerChanged)
     def hasMacros(self):
         return profiles.is_recognized() and profiles.active().has_macros
+
+    @Property(bool, notify=controllerChanged)
+    def hasBattery(self):
+        """False for wired-only controllers with no internal battery (e.g. the
+        Tarantula Pro 8K), so the status pill hides the battery percentage."""
+        return not profiles.is_recognized() or profiles.active().has_battery
 
     @Property('QVariantList', notify=controllersChanged)
     def controllers(self):
@@ -2669,12 +2679,16 @@ class GamesirBridge(QObject):
             return
         addr = self._remap_addr.get(source)
         if addr is not None:
+            if target == cfg.REMAP_NONE and addr in self._prof.REMAP_DEFAULTS:
+                self.setRemapCode(source, -1)
+                return
             self._queue(addr, cfg.remap_write_bytes(target), 'Remap ' + source, target)
 
     @Slot(str, int)
     def setRemapCode(self, source, code):
         """Rebind a source to any target CODE — gamepad, keyboard or mouse (they
-        all write [type=0x01, code]); code < 0 clears it to Default ([00 00])."""
+        all write [type=0x01, code]); code < 0 clears it to Default ([00 00] or
+        the slot's factory self-code if declared in REMAP_DEFAULTS)."""
         addr = self._remap_addr.get(source)
         if addr is None:
             return
@@ -2696,7 +2710,11 @@ class GamesirBridge(QObject):
                         cfg.REMAP_NONE if code == -1 else self.targetLabel(code), kind='se_remap')
             self._pending[(edit, addr)]['generation'] = self._config_generation
             return
-        data = [0x00, 0x00] if code < 0 else [0x01, code & 0xff]
+        if code < 0:
+            default_code = self._prof.REMAP_DEFAULTS.get(addr)
+            data = [0x01, default_code] if default_code is not None else [0x00, 0x00]
+        else:
+            data = [0x01, code & 0xff]
         label = cfg.REMAP_NONE if code < 0 else self.targetLabel(code)
         self._queue(addr, data, 'Rebind ' + source, label)
 
@@ -2815,8 +2833,13 @@ class GamesirBridge(QObject):
             self._config['poll'] = data[0]
         elif addr in self._addr_to_remap:
             rec = self._config.setdefault('remap', {})
-            rec[self._addr_to_remap[addr]] = (g7se.decode_remap(data, addr) if self._prof is profiles.G7_SE
-                else (data[1] if len(data) > 1 else 0) if data[0] else -1)
+            if self._prof is profiles.G7_SE:
+                code = g7se.decode_remap(data, addr)
+            else:
+                code = (data[1] if len(data) > 1 else 0) if data[0] else -1
+                if code >= 0 and self._prof.REMAP_DEFAULTS.get(addr) == code:
+                    code = -1
+            rec[self._addr_to_remap[addr]] = code
         elif addr in self._addr_to_continuous:
             self._config.setdefault('continuous_trigger', {})[
                 self._addr_to_continuous[addr]] = cfg.continuous_trigger_state(data)
