@@ -33,7 +33,10 @@ Item {
     Component.onCompleted: seed()
     Connections { target: bridge; function onMacroLoaded() { page.seed() } }
     onVisibleChanged: if (visible) seed()
-    onPadChanged: seed()
+    // not onPadChanged: that handler runs before the `paddle` binding updates, so
+    // seed() loaded the previous paddle's macro and the next edit wrote it onto
+    // this one (#51)
+    onPaddleChanged: seed()
 
     function commit() { bridge.setMacroEvents(paddle, events) }
     function touch() { events = events.slice() }     // re-trigger bindings

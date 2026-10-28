@@ -35,6 +35,9 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
   controllers instead of its orange product colours.
 
 ### Fixed
+- Switching paddles on the Macros tab showed the previous paddle's macro, and
+  the next edit then saved it onto the paddle you'd switched to, so one
+  paddle's macro could overwrite another's (#51).
 - The navigation, numpad and media keys in the remap and macro pickers sent
   different keys than their labels said (Delete came out as Page Down, for
   example). Every one has now been checked on a Cyclone 2 and an 8K, and
