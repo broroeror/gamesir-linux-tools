@@ -653,7 +653,8 @@ def collect():
     # the node's advertised EV_KEY bitmap -- nothing has to be pressed. This is
     # here because "X and Y are swapped" was open across two issues (#10, #17)
     # with no way to tell from a report which of the two layouts the reporter's
-    # pad used, and the answer is one ioctl away.
+    # pad used. A bitmap is only a hint: the G7 native identity advertises extra
+    # codes while physically following the standard mapping, verified in #17.
     try:
         import reader
         from gs_common import parse_devices, VENDOR_VID
@@ -677,7 +678,7 @@ def collect():
                 rep['evdev'].append({
                     'node': ev, 'name': d.get('name', ''), 'pid': d.get('product'),
                     'count': len(pad), 'btn_c': reader.BTN_C in keys,
-                    'layout': reader._key_map(keys)[1],
+                    'layout': reader._key_map(keys, d.get('product'))[1],
                 })
     except Exception:
         pass
@@ -958,8 +959,9 @@ def format_report(rep):
         L.append(f'- {n["node"]}  "{n["name"]}"  {n["count"]}/15 gamepad buttons'
                  f'  layout: {n["layout"].upper()}')
         if n['layout'] == 'sequential':
-            L.append('    advertises BTN_C, so the kernel numbered its buttons '
-                     'straight through and Deadband\'s button names may be wrong '
+            L.append('    advertises BTN_C, which may indicate sequential button '
+                     'numbering; capabilities alone do not confirm physical order. '
+                     'Deadband\'s button names may be wrong '
                      'for this pad. Please mention this on an issue.')
 
     for n in rep.get('usb_devices', []) + rep.get('g7se_devices', []):
@@ -1218,8 +1220,8 @@ def _probe_buttons():
 
 
 def _probe_g7_unconfirmed():
-    """G7 Pro editions Deadband recognises but doesn't configure yet (the Wuchang
-    dock 10a8, the Zenless 105e): does the config channel answer at all? Claims
+    """G7 Pro editions Deadband recognises but doesn't configure yet (the Zenless
+    105e): does the config channel answer at all? Claims
     interface 0 for a moment (so the pad leaves games for ~2 s), sends only
     heartbeats, the firmware and active-profile queries and one 16-byte read,
     prints the raw replies, and hands the interface back to xpad (issue #17)."""

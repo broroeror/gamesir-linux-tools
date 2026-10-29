@@ -124,8 +124,8 @@ can't positively identify. Fork it and customize it however you like.
 > hardware-tested by its owner, [@sinchrotron](https://github.com/sinchrotron): configuration reads, saved paddle remaps, Aim/Tilt register
 > round-trips, live gyro/accel readings, gyro aiming through the right stick,
 > input-range sensitivity, and independent tests of all four vibration motors.
-> The separate `3537:10a8` identity remains input-only: no configuration response
-> was confirmed. Wireless configuration is not enabled for this edition.
+> Wireless configuration is also verified on its `3537:10a8` receiver
+> (descriptor **5.18**, controller firmware **5.41**). Native `1022` remains input-only.
 > Deadband moves the transitional `3537:100a`
 > identity to a configuration one automatically; if the pad is showing
 > `3537:1022` instead, hold **SHARE + MENU (☰)** together — note this also resets the active profile's remaps and the Shift layer.
@@ -376,7 +376,7 @@ everything it does is **reversible** and stays **on your machine**. The specific
 - **Tested hardware.** Cyclone 2, G7 Pro (Amazon edition, wired `3537:10ba` and
   dongle `3537:10bb`), G7 Pro 8K PC (Nioh edition), Tarantula Pro 8K (`3537:103d`) and the G502 X
   are verified here. Other G7 Pro editions were verified by their owners: Shadow
-  Ember (`109b`/`109c`, [@brcly](https://github.com/brcly)), Wuchang (`10a7`,
+  Ember (`109b`/`109c`, [@brcly](https://github.com/brcly)), Wuchang (`10a7`/`10a8`,
   [@sinchrotron](https://github.com/sinchrotron)) and White Trimode (`1003`/`1004`).
   The G7 Pro 8K PC Royal2 and Championship editions were added by their owners.
   Zenless Zone Zero (`105e`) is recognised but not configured. Treat anything not

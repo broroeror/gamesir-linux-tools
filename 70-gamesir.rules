@@ -40,9 +40,10 @@ SUBSYSTEM=="input", ATTRS{idVendor}=="3537", TAG+="uaccess"
 # app only ever opens 1004 when the device names itself a G7 Pro.
 #
 # Editions Deadband recognises but does NOT configure yet (Zenless Zone Zero
-# 105e, the Wuchang's dock 10a8) are granted access only so that
+# 105e) are granted access only so that
 # `deadband --doctor --probe` can ask them, read-only, whether they answer.
 SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="105e", TAG+="uaccess"
+# Wuchang receiver: wireless configuration verified on descriptor 5.18.
 SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="10a8", TAG+="uaccess"
 SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="109b", TAG+="uaccess"
 SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="109c", TAG+="uaccess"

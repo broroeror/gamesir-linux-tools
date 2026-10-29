@@ -547,12 +547,10 @@ def _eviocgabs(code):
 #               contiguously and every name shifts. Our own Tarantula 8K does
 #               this (verified from its capabilities/key bitmap).
 #
-# No controller Deadband configures uses SEQUENTIAL today -- the Cyclone and 8K
-# read input over the vendor hidraw channel and never reach this path at all,
-# and the G7 Pro's 1022 node is STANDARD. That last one is not an assumption
-# either: under SEQUENTIAL, X would land on unmapped 0x132 and Y would still
-# read correctly, so #17 would have reported "X does nothing", not "X and Y are
-# swapped". The symptom identifies the layout.
+# Exception: the G7 Pro native 1022 advertises BTN_C too, but physical
+# A/B/X/Y, LB/RB, View/Menu and stick clicks emit the STANDARD codes below
+# (Wuchang owner-guided capture, 2026-10-29). Advertising unused codes does
+# not prove a shifted physical layout; diagnostics account for this PID.
 #
 # So SEQUENTIAL is deliberately NOT given a mapping here. Guessing one means
 # guessing the descriptor's button ORDER too, which varies by pad, and a wrong
@@ -584,9 +582,9 @@ def keybits(fd):
     return {i for i in range(nbytes * 8) if buf[i // 8] >> (i % 8) & 1}
 
 
-def _key_map(present):
-    """(mapping, layout) for a node, chosen from the codes it advertises."""
-    if BTN_C in present:
+def _key_map(present, pid=None):
+    """Diagnostic layout, accounting for verified physical-code exceptions."""
+    if BTN_C in present and pid != g7pro.PID_NATIVE:
         return _KEY_TO_STATE, 'sequential'
     return _KEY_TO_STATE, 'standard'
 
