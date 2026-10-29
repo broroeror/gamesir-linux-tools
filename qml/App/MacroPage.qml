@@ -184,14 +184,7 @@ Item {
                             clip: true; spacing: 6
                             boundsBehavior: Flickable.StopAtBounds
                             model: page.events.length
-                            // default wheel step is tiny; scroll a few rows per notch
-                            WheelHandler {
-                                onWheel: function (ev) {
-                                    var max = Math.max(0, eventList.contentHeight - eventList.height)
-                                    eventList.contentY = Math.max(0, Math.min(max,
-                                        eventList.contentY - ev.angleDelta.y))
-                                }
-                            }
+                            FastWheel { flick: eventList }
                             delegate: Rectangle {
                                 required property int index
                                 width: ListView.view.width; height: 34; radius: Theme.radius

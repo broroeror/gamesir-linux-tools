@@ -8,6 +8,7 @@ import QtQuick.Controls as QQC
 // natural height. Only the visible page's FitScroll drives the (global) vComp.
 QQC.ScrollView {
     id: scroller
+    FastWheel { flick: scroller.contentItem }
     property Item content: null
     property real floor: 0.45          // most-compressed vComp before it just scrolls
 

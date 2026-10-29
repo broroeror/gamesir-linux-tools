@@ -62,6 +62,7 @@ Item {
     // cards no longer fit — so nothing clips at small window sizes.
     QQC.ScrollView {
         id: scroller
+        FastWheel { flick: scroller.contentItem }
         anchors.fill: parent
         anchors.bottomMargin: pbar.height + 30   // reserve bar space always (no reflow)
         contentWidth: availableWidth

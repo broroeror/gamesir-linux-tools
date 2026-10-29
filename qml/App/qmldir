@@ -41,3 +41,4 @@ BackupPanel 1.0 BackupPanel.qml
 HelpIcon 1.0 HelpIcon.qml
 DiagnosticsWindow 1.0 DiagnosticsWindow.qml
 AxisSide 1.0 AxisSide.qml
+FastWheel 1.0 FastWheel.qml

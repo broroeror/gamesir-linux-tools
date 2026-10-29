@@ -169,4 +169,7 @@ QtObject {
     readonly property int fontL:         _compact ? 14 : _cozy ? 16 : 15
     readonly property int fontM:         _compact ? 12 : _cozy ? 14 : 13
     readonly property int fontS:         _compact ? 10 : _cozy ? 12 : 11
+
+    // Mouse-wheel distance per scroll "line" (see FastWheel).
+    property real wheelPixelsPerLine: 34
 }

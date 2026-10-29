@@ -934,6 +934,7 @@ Window {
                 QQC.ScrollView {
                     objectName: "settingsScroll"
                     id: scroller
+                    FastWheel { flick: scroller.contentItem }
                     Layout.fillWidth: true; Layout.fillHeight: true
                     clip: true
                     contentWidth: availableWidth

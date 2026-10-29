@@ -251,12 +251,7 @@ Item {
                         height: page.steps.length ? Math.min(9, page.steps.length) * 40 : 0
                         clip: true; spacing: 6; boundsBehavior: Flickable.StopAtBounds
                         model: page.steps.length
-                        WheelHandler {
-                            onWheel: function (ev) {
-                                var max = Math.max(0, stepList.contentHeight - stepList.height)
-                                stepList.contentY = Math.max(0, Math.min(max, stepList.contentY - ev.angleDelta.y))
-                            }
-                        }
+                        FastWheel { flick: stepList }
                         delegate: Rectangle {
                             required property int index
                             width: ListView.view.width; height: 34; radius: Theme.radius

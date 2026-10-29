@@ -64,8 +64,10 @@ Window {
             color: Theme.card; border.color: Theme.cardBorder; border.width: 1
 
             QQC.ScrollView {
+                id: diagScroll
                 anchors.fill: parent
                 anchors.margins: 12
+                FastWheel { flick: diagScroll.contentItem }
                 clip: true
                 contentWidth: availableWidth
                 QQC.TextArea {

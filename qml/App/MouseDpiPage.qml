@@ -37,6 +37,7 @@ Item {
     // ---------------------------------------------- connected: sensor settings
     QQC.ScrollView {
         id: scroll
+        FastWheel { flick: scroll.contentItem }
         visible: mouse.present && !mouse.needsProfileSetup
         anchors.top: parent.top; anchors.topMargin: 16
         anchors.left: parent.left; anchors.right: parent.right
