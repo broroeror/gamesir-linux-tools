@@ -499,7 +499,7 @@ G7_8K = ControllerProfile(
                                             #   dongle, both owner-verified (issue #23).
                                             #   NOT a consecutive pair: 10b8 was the
                                             #   guess, and it was wrong
-                  0x1034, 0x1035),          # Phantom Blade 0 edition: 1034 wired / 1035
+                  0x1034, 0x1035),          # newer plain black units: 1034 wired / 1035
                                             #   receiver (Windows hardware IDs, #29;
                                             #   probed on Linux, #44). 10b8 is its plain-
                                             #   HID fallback -> G7_8K_HID below
@@ -768,7 +768,7 @@ KALEID_OTHER = ControllerProfile(
 )
 
 
-# The Phantom Blade 0 8K's plain-HID mode (3537:10b8, wired and receiver alike).
+# The 1034/1035 8K's plain-HID mode (3537:10b8, wired and receiver alike).
 # Linux's first setup request makes its XInput identity (1034) fail with -71 and
 # fall back here -- the same as the G7 SE's 10a0 (#41), and the same cure: the
 # usbcore quirk `r` keeps it on 1034 (#44). Input only; no config channel.

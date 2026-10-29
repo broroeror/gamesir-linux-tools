@@ -259,7 +259,7 @@ ID. Known so far:
 
 | Controller | XInput ID that fails | Falls back to |
 | --- | --- | --- |
-| G7 Pro 8K PC, Phantom Blade 0 edition (wired) | `3537:1034` | `3537:10b8` |
+| G7 Pro 8K PC, newer plain black units (wired) | `3537:1034` | `3537:10b8` |
 | G7 SE, firmware 6.64 | `3537:10a0` | `3537:1082` |
 
 A kernel setting fixes it by making that first request the way Windows does. To
@@ -269,7 +269,8 @@ try it until the next reboot:
 echo '3537:1034:r' | sudo tee /sys/module/usbcore/parameters/quirks
 ```
 
-then unplug the controller, plug it back in and switch it to XInput. Use the ID
+then unplug the controller, plug it back in and switch it to XInput (on the G7 Pro
+8K: hold **View + Menu**; it may need this again after each reconnect). Use the ID
 from the table for your controller; for several, separate them with commas
 (`3537:1034:r,3537:10a0:r`).
 

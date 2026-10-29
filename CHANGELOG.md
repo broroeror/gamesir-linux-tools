@@ -22,7 +22,7 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
   template export to line the art up with the buttons. Thanks to
   [@sinchrotron](https://github.com/sinchrotron) for the idea (#42).
 
-- **G7 Pro 8K PC, Phantom Blade 0 edition** (`1034` wired, `1035` receiver),
+- **G7 Pro 8K PC, newer plain black units** (`1034` wired, `1035` receiver),
   from three owners' reports (#29, #44, #46). Its plain-HID mode (`10b8`) now
   says it needs a kernel setting to stay in XInput, and the Manual has a new
   troubleshooting entry for that (also covers the G7 SE's `10a0`, #41).

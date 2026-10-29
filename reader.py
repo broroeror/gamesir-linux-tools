@@ -416,13 +416,13 @@ def read_controller():
             time.sleep(0.3)
             continue
 
-        # G7 Pro 8K (Phantom Blade 0) in plain-HID mode: its XInput identity
+        # G7 Pro 8K (1034/1035 units) in plain-HID mode: its XInput identity
         # failed Linux's first setup request; a kernel setting keeps it there.
         if prof is profiles.G7_8K_HID:
             state['connected'] = True
             state['mode_ok'] = False
-            state['config_status'] = ('G7 Pro 8K in plain-HID mode: Linux needs a kernel '
-                                      'setting to keep it in XInput (Manual → Troubleshooting)')
+            state['config_status'] = ('G7 Pro 8K in plain-HID mode: hold View + Menu to switch to '
+                                      'XInput (needs a kernel setting; Manual → Troubleshooting)')
             state['config_phase'] = 'failed'
             read_session_evdev(sel['id'], force_wrong_mode=True)
             state['connected'] = False
