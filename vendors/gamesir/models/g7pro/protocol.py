@@ -48,6 +48,7 @@ PID_WT_WIRED = 0x1003
 PID_WT_DOCK = 0x1004
 # Wuchang Edition, identified and hardware-tested by its owner over USB.
 PID_WUCHANG_WIRED = 0x10A7
+PID_WUCHANG_DONGLE = 0x10A8
 PID_HID = 0x100A
 PID_NATIVE = 0x1022
 # THE BAR FOR THIS TUPLE: evidence from a real G7 Pro that config reads AND
@@ -78,8 +79,11 @@ PID_NATIVE = 0x1022
 #              restored byte-for-byte. Owner confirmed gyro-to-right-stick
 #              response, input-range sensitivity and all four individual motor
 #              tests. Configuration opens directly, without an identity switch.
+#   10a8       Wuchang receiver, descriptor 5.18 / pad 5.41, 2026-10-29:
+#              profile 1/2 grip-strength write/read/restore verified. Full
+#              six-bank comparison unchanged; xpad reattached on release.
 CONFIG_PIDS = (PID_WIRED, PID_DONGLE, PID_AMZ_WIRED, PID_AMZ_DONGLE,
-               PID_WT_WIRED, PID_WT_DOCK, PID_WUCHANG_WIRED)
+               PID_WT_WIRED, PID_WT_DOCK, PID_WUCHANG_WIRED, PID_WUCHANG_DONGLE)
 
 # Product ids belonging to OTHER GameSir devices, from mainline xpad. An id here
 # may appear in CONFIG_PIDS ONLY if it is also in SHARED_PIDS, i.e. is resolved
@@ -114,6 +118,7 @@ EDITIONS = {
     PID_WT_WIRED: 'White Trimode',
     PID_WT_DOCK: 'White Trimode (dock)',
     PID_WUCHANG_WIRED: 'Wuchang Edition (wired)',
+    PID_WUCHANG_DONGLE: 'Wuchang Edition (dongle)',
 }
 
 # Editions seen on a real G7 Pro but with no confirmation that config reads back
@@ -122,9 +127,6 @@ EDITIONS = {
 # the confirmation, a CONFIG_PIDS entry and a 70-gamesir.rules line in one commit.
 UNCONFIRMED_EDITIONS = {
     0x105E: 'Zenless Zone Zero (dongle)',
-    # Observed locally with standard xpad input. A bounded configuration
-    # query returned no data; keep this identity on the input-only path.
-    0x10A8: 'USB 10a8 (firmware 5.18)',
 }
 UNCONFIRMED_PIDS = tuple(UNCONFIRMED_EDITIONS)
 
@@ -419,7 +421,7 @@ def parse_input(report, state):
 # That is the third table in this project to drift from CONFIG_PIDS, hence the
 # check instead of the good intention.
 WIRED_PIDS = (PID_WIRED, PID_AMZ_WIRED, PID_WT_WIRED, PID_WUCHANG_WIRED)
-DONGLE_PIDS = (PID_DONGLE, PID_AMZ_DONGLE, PID_WT_DOCK)    # the dock is the wireless link
+DONGLE_PIDS = (PID_DONGLE, PID_AMZ_DONGLE, PID_WT_DOCK, PID_WUCHANG_DONGLE)
 
 
 def connection_kind(pid: int):

@@ -25,13 +25,31 @@ class DetectionTests(unittest.TestCase):
         state.clear()
         state.update(self.old_state)
 
-    def test_wuchang_wired_is_configurable_and_other_identity_is_input_only(self):
+    def test_wuchang_wired_and_dongle_are_configurable(self):
         self.assertIs(profiles.detect_one(0x10a7, 'GameSir-G7 Pro'), profiles.G7_PRO)
         self.assertEqual(g7.edition_name(0x10a7), 'Wuchang Edition (wired)')
         self.assertTrue(g7.connection_kind(0x10a7))
-        self.assertIs(profiles.detect_one(0x10a8, 'GameSir-G7 Pro'), profiles.G7_PRO_OTHER)
-        self.assertNotIn(0x10a8, g7.CONFIG_PIDS)
+        self.assertIs(profiles.detect_one(0x10a8, 'GameSir-G7 Pro'), profiles.G7_PRO)
+        self.assertEqual(g7.edition_name(0x10a8), 'Wuchang Edition (dongle)')
+        self.assertFalse(g7.connection_kind(0x10a8))
+        self.assertIn(0x10a8, g7.CONFIG_PIDS)
+        # Native mode and the unverified Zenless receiver retain their gates.
+        self.assertIs(profiles.detect_one(0x1022, 'GameSir-G7 Pro'), profiles.G7_NATIVE)
+        self.assertEqual(profiles.G7_NATIVE.write_style, 'none')
+        self.assertIs(profiles.detect_one(0x105e, 'GameSir-G7 Pro'), profiles.G7_PRO_OTHER)
         self.assertEqual(profiles.G7_PRO_OTHER.write_style, 'none')
+
+    def test_native_g7_button_order_matches_physical_presses(self):
+        # Owner pressed A/B/X/Y, LB/RB, View/Menu, LS/RS in native mode.
+        keys = set(range(0x130, 0x13f))  # descriptor also advertises unused BTN_C
+        mapping, layout = reader._key_map(keys, g7.PID_NATIVE)
+        measured = (0x130, 0x131, 0x133, 0x134, 0x136, 0x137,
+                    0x13a, 0x13b, 0x13d, 0x13e)
+        self.assertEqual([mapping[c] for c in measured],
+                         ['a', 'b', 'x', 'y', 'lb', 'rb', 'view', 'menu', 'ls', 'rs'])
+        self.assertEqual(layout, 'standard')
+        self.assertEqual(reader._key_map(keys)[1], 'sequential')
+        self.assertEqual(reader._key_map(keys, 0x1082)[1], 'sequential')
 
     def test_g7se_664_gip_configures_and_fallbacks_follow_the_product(self):
         product = 'GameSir-G7 SE Controller for Xbox'
@@ -44,7 +62,7 @@ class DetectionTests(unittest.TestCase):
         self.assertIs(profiles.detect_one(0x1082, None), profiles.KALEID_OTHER)
 
     def test_wired_controller_wins_over_input_only_receiver_without_hid_probe(self):
-        receiver = controller('receiver', 0x10a8)
+        receiver = controller('receiver', 0x105e)
         wired = controller('wired', 0x10a7)
         with patch.object(reader, 'has_live_pad') as probe:
             self.assertIs(reader._pick_selected([receiver, wired]), wired)

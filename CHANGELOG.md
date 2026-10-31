@@ -8,6 +8,7 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
 ## [Unreleased]
 
 ### Added
+- **G7 Pro Wuchang wireless configuration** on its `3537:10a8` receiver (#17).
 - A **Swap** setting on the Lights page for Cyclone 2 units whose Home and
   Profile lights are wired the other way round (#48).
 - **macOS support (early).** Deadband runs on macOS from source; tested on
@@ -37,6 +38,7 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
   controllers instead of its orange product colours.
 
 ### Fixed
+- G7 Pro native `1022`: correct the false sequential-button-layout warning (#17).
 - Switching paddles on the Macros tab showed the previous paddle's macro, and
   the next edit then saved it onto the paddle you'd switched to, so one
   paddle's macro could overwrite another's (#51).
