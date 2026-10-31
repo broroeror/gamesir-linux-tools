@@ -213,6 +213,7 @@ class GamesirBridge(QObject):
         self._diag_busy = False
         self._diagDone.connect(self._on_diag_done)
         self._backup_busy = False
+        self._trigger_rumble_session = None
         self.pendingChanged.connect(self._on_pending_changed)
 
         # 8K simple lighting (bank 0x20). Loaded once per connection and again
@@ -3283,6 +3284,31 @@ class GamesirBridge(QObject):
     @Slot()
     def rumbleTest(self):
         control.rumble_test(on_done=self.rumbleTestStatus.emit)
+
+    @Slot(int, int, int, int)
+    def rumbleTriggers(self, left, right, trigger_left, trigger_right):
+        """Refresh a bounded trigger preview; zero stops only its own session."""
+        left, right, trigger_left, trigger_right = (
+            max(0, min(255, v)) for v in (left, right, trigger_left, trigger_right))
+        if (not profiles.is_recognized() or not self.hasVibration
+                or profiles.active() is not self._prof
+                or not state.get('connected') or state.get('demo')
+                or (self.hasConfigSession and (not state.get('config_claimed')
+                                              or not state.get('config_wanted')))
+                or not state.get('driving')
+                or state.get('selected') != state.get('driving')):
+            left = right = trigger_left = trigger_right = 0
+        if not (left or right or trigger_left or trigger_right):
+            if self._trigger_rumble_session is not None:
+                gen, style = self._trigger_rumble_session
+                control.rumble(0, 0, gen=gen, write_style=style)
+                self._trigger_rumble_session = None
+            return
+        if self._trigger_rumble_session is None:
+            self._trigger_rumble_session = (control.generation(), self._prof.write_style)
+        gen, style = self._trigger_rumble_session
+        control.rumble(left, right, gen=gen, write_style=style,
+                       trigger_left=trigger_left, trigger_right=trigger_right)
 
     @Slot(str, int)
     def rumbleMotorTest(self, motor, strength):
