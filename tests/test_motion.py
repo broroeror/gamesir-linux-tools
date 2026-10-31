@@ -471,7 +471,8 @@ class MotionTests(unittest.TestCase):
         engine.deleteLater()
 
     def test_vibration_buttons_route_slider_strength_and_serialize_previews(self):
-        from PySide6.QtCore import QObject, QMetaObject
+        from PySide6.QtCore import QObject, QMetaObject, Qt
+        from PySide6.QtQuick import QQuickWindow
         self.bridge._config = {
             'vib_l': 21, 'vib_r': 42, 'vib_trigger_l': 63, 'vib_trigger_r': 84,
             'vib_force_l': False, 'vib_force_r': False,
@@ -506,6 +507,14 @@ class MotionTests(unittest.TestCase):
         state.update(connected=True, config_wanted=True, demo=False)
         self.bridge.statusChanged.emit()
         timer = page.findChild(QObject, 'triggerRumbleTimer')
+        self.assertEqual(timer.property('running'), self.app.applicationState() == Qt.ApplicationActive)
+        window = QQuickWindow()
+        page.setParentItem(window.contentItem())
+        window.show()
+        window.requestActivate()
+        self.app.processEvents()
+        self.addCleanup(window.deleteLater)
+        self.assertTrue(timer.property('running'))
         with patch.object(control, 'rumble') as rumble:
             for lt, rt, grips, left, right in ((128, 255, (27, 107), 81, 214),
                                                (255, 128, (54, 54), 161, 108)):

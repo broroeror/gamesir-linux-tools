@@ -19,7 +19,8 @@ Item {
     Timer {
         objectName: "triggerRumbleTimer"
         interval: 50; repeat: true
-        running: page.visible && bridge.connected && bridge.profile > 0
+        running: Qt.application.state === Qt.ApplicationActive
+                 && page.visible && bridge.connected && bridge.profile > 0
                  && bridge.hasVibration && (!bridge.hasConfigSession || bridge.configClaimed)
                  && !page.testRunning
         onTriggered: bridge.rumbleTriggers(
