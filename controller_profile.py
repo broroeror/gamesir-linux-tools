@@ -608,14 +608,15 @@ G7_8K = ControllerProfile(
 
 
 # --- registry + detection ----------------------------------------------------
-# --- Tarantula Pro 8K : GameSir Tarantula Pro 8K (3537:103d / 103c) ----------
+# --- Tarantula Pro 8K : GameSir Tarantula Pro 8K (3537:103d) -----------------
 # Wired-only PC pad. Decoded from Windows captures of GameSir Connect v1.16.7 and
 # a read-only dump of the project's own pad on Linux (2026-10-02); details in
 # Controller Testing/Tarantula Pro 8k/FINDINGS.md.
 #
 # IDENTITY: it auto-detects its host. In PC/XBOX mode it is 3537:103d (XInput on
-# iface 0 + the family channel on iface 1). It also connects as 3537:103c
-# (plain HID with the family channel on iface 1). Both are supported.
+# iface 0 + the family channel on iface 1) -- the mode this profile drives. On
+# Linux it can come up as 3537:103c instead (plain HID; the family channel is
+# declared there but never answers), so 103c is deliberately NOT listed.
 #
 # MAP: the 8K's, plus five more 0xa9-byte button blocks. The 8K has 4 extra-button
 # blocks (L4 R4 L5 R5); the Tarantula has 9 (L4 R4 C1 C2 C3 C4 T1 T2 T3), so every
@@ -652,8 +653,8 @@ def _tar_motion(m):
 TARANTULA_PRO_8K = ControllerProfile(
     name='GameSir Tarantula 8K',
     short='Tarantula 8K',
-    usb_products=(0x103d, 0x103c),
-    wired_products=(0x103d, 0x103c),        # wired-only controller
+    usb_products=(0x103d,),
+    wired_products=(0x103d,),               # wired-only controller
     write_style='cyclone',                  # bare 0f03 writes (captures T3/T4/T7/T10)
     input_style='cyclone_0x12',             # live 0x12 on the vendor hidraw
     profile_banks=(1, 2, 3, 4),             # the manual's four configurations; the
@@ -688,13 +689,12 @@ TARANTULA_PRO_8K = ControllerProfile(
         ('LT', _tar(0x035f)), ('RT', _tar(0x037f)),
         ('View', 0x009d), ('Menu', 0x00a4), ('Share', 0x00ab),
     ),
-    # Programmable button blocks and trigger slots store [0x01, self_code] when
-    # unmapped at factory defaults (L4/R4=11/12, LT/RT=13/14, C1-C4=1f-22, T1-T3=23-25).
+    # Programmable button blocks store [0x01, self_code] when unmapped at factory
+    # defaults (L4/R4=11/12, C1-C4=1f-22, T1-T3=23-25).
     REMAP_DEFAULTS={
         0x00b2: 0x11, 0x015b: 0x12,
         0x0204: 0x1f, 0x02ad: 0x20, 0x0356: 0x21, 0x03ff: 0x22,
         0x04a8: 0x23, 0x0551: 0x24, 0x05fa: 0x25,
-        _tar(0x035f): 0x13, _tar(0x037f): 0x14,
     },
     MACRO_SLOTS=(('L4', 0x00b2), ('R4', 0x015b),
                  ('C1', 0x0204), ('C2', 0x02ad), ('C3', 0x0356), ('C4', 0x03ff),

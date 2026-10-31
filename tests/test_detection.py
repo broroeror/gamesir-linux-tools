@@ -77,11 +77,11 @@ class DetectionTests(unittest.TestCase):
         self.assertIs(profiles.detect_one(0x0575, 'GameSir-Cyclone 2'), profiles.CYCLONE)
         self.assertIs(profiles.detect_one(0x0575, 'Gamepad'), profiles.G7_8K)
 
-    def test_tarantula_pid_variants_resolve_to_tarantula_profile(self):
+    def test_tarantula_profile_properties(self):
         self.assertIs(profiles.detect_one(0x103d, 'GameSir-Tarantula Pro'), profiles.TARANTULA_PRO_8K)
-        self.assertIs(profiles.detect_one(0x103c, 'GameSir-Tarantula 8K'), profiles.TARANTULA_PRO_8K)
-        self.assertIn(0x103c, profiles.TARANTULA_PRO_8K.usb_products)
-        self.assertIn(0x103c, profiles.TARANTULA_PRO_8K.wired_products)
+        self.assertIn(0x103d, profiles.TARANTULA_PRO_8K.usb_products)
+        self.assertIn(0x103d, profiles.TARANTULA_PRO_8K.wired_products)
+        self.assertNotIn(0x103c, profiles.TARANTULA_PRO_8K.usb_products)
         self.assertFalse(profiles.TARANTULA_PRO_8K.has_battery)
 
     def test_tarantula_enhanced_report_decodes_c_and_t_buttons_and_omits_battery(self):
@@ -139,6 +139,11 @@ class DetectionTests(unittest.TestCase):
             self.assertEqual(b._pending[(1, 0x0204)]['data'], [0x01, 0x1f])
             b.setRemapCode('A', -1)
             self.assertEqual(b._pending[(1, 0x007a)]['data'], [0x00, 0x00])
+            slot_map = dict(prof.REMAP_SLOTS)
+            b.setRemapCode('LT', -1)
+            self.assertEqual(b._pending[(1, slot_map['LT'])]['data'], [0x00, 0x00])
+            b.setRemapCode('RT', -1)
+            self.assertEqual(b._pending[(1, slot_map['RT'])]['data'], [0x00, 0x00])
         finally:
             profiles.set_active(old_prof)
 
