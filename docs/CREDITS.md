@@ -1,11 +1,11 @@
 # Credits
 
-Deadband is MIT-licensed (see [LICENSE](LICENSE)). It includes the following
+Deadband is MIT-licensed (see [LICENSE](../LICENSE)). It includes the following
 third-party asset, used under its own terms:
 
 ## G502 X mouse diagram silhouette
 
-The top-down G502 X outline in [`qml/App/MouseView.qml`](qml/App/MouseView.qml)
+The top-down G502 X outline in [`qml/App/MouseView.qml`](../qml/App/MouseView.qml)
 was traced from the 3D model **"Logitech G502 x lightspeed" by Okopchi**
 (<https://skfb.ly/p8PWQ>), licensed under
 **[Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/)**.

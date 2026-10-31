@@ -1,7 +1,7 @@
 # GameSir Cyclone 2 — input map (Linux / Xbox mode)
 
 What each physical control reports to Linux, captured live with
-[`gamesir_input_map.py`](gamesir_input_map.py) (a passive evdev reader — it just
+`gamesir_input_map.py` (a passive evdev reader — it just
 listens, it doesn't grab the device). Codes are from `linux/input-event-codes.h`.
 
 > Put the controller in **Xbox / XInput mode** first (use the Start / pause buttons).

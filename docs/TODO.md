@@ -1,8 +1,8 @@
 # Deadband — TODO / Roadmap
 
 Open bugs, proposed changes, and reverse-engineering questions. **Completed work
-moves to the [CHANGELOG](CHANGELOG.md)** (and the full history is in git), so this
-stays a forward-looking list. Linked from the [README](README.md). Hobby project —
+moves to the [CHANGELOG](../CHANGELOG.md)** (and the full history is in git), so this
+stays a forward-looking list. Linked from the [README](../README.md). Hobby project —
 **fork it and customize it however you like.**
 
 Keep entries short (a date helps). Tick items off (`- [x]`) as they land, then move
@@ -113,5 +113,5 @@ than mine. *(Full per-device findings in **[RESEARCH.md](RESEARCH.md)**.)*
 
 ---
 
-*GameSir controllers need Xbox / XInput mode; see [README.md](README.md) for setup
-and the [CHANGELOG](CHANGELOG.md) for what's shipped.*
+*GameSir controllers need Xbox / XInput mode; see [README.md](../README.md) for setup
+and the [CHANGELOG](../CHANGELOG.md) for what's shipped.*

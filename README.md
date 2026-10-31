@@ -78,10 +78,10 @@ and a [community NixOS flake](https://codeberg.org/Epaphroditus/gamesir-linux-to
 Tracks `main` (the AUR `-git` package builds from the latest commit); last tagged
 snapshot is `v0.6.0`.
 **Going deeper?** The **[Manual](MANUAL.md)** is the user guide — how to use each
-feature, troubleshooting & recovery, and an FAQ. **[RESEARCH.md](RESEARCH.md)** is the
+feature, troubleshooting & recovery, and an FAQ. **[RESEARCH.md](docs/RESEARCH.md)** is the
 developer side — protocol, architecture, the diagnostic tools, and per-controller
-findings. **[RELEASING.md](RELEASING.md)** is the release checklist. See also **[CONTROLLER_MAP.md](CONTROLLER_MAP.md)** (what each control
-reports to Linux) and **[TODO.md](TODO.md)** (roadmap + open questions).
+findings. **[RELEASING.md](docs/RELEASING.md)** is the release checklist. See also **[CONTROLLER_MAP.md](docs/CONTROLLER_MAP.md)** (what each control
+reports to Linux) and **[TODO.md](docs/TODO.md)** (roadmap + open questions).
 
 This is a spare-time project. I am one person, so fixes land when they land.
 It isn't careless with your hardware, though: every config write is backed up
@@ -395,15 +395,15 @@ read locally from either the USB descriptor or the G7's documented device-info
 query — never from the network.
 
 For what each control reports to Linux as a normal gamepad, see
-**[CONTROLLER_MAP.md](CONTROLLER_MAP.md)**. The full command set, the lighting/keyframe
+**[CONTROLLER_MAP.md](docs/CONTROLLER_MAP.md)**. The full command set, the lighting/keyframe
 register encoding, the app's architecture, and the per-controller findings (including
-the G7 Pro) live in **[RESEARCH.md](RESEARCH.md)**.
+the G7 Pro) live in **[RESEARCH.md](docs/RESEARCH.md)**.
 
 ## File layout
 
 The app is split into focused modules — the connect/read loop, the shared `state`,
 the command channel, and the lighting/config/backup domains. That structure and the
-`research/` diagnostic scripts are documented in **[RESEARCH.md](RESEARCH.md)**
+`research/` diagnostic scripts are documented in **[RESEARCH.md](docs/RESEARCH.md)**
 (Architecture + Methodology & tools). One-off probes and the pre-refactor monolith
 live in **`archive/`**.
 
@@ -495,7 +495,7 @@ see [Troubleshooting](MANUAL.md#troubleshooting--recovery) for the full picture.
 **The config register map** (banks, offsets, remap records, the inferred RT block)
 and the **open items** — verifying the RT block, some remap target codes,
 profile-switch sync, PS4/Switch input parsing — live in
-**[RESEARCH.md](RESEARCH.md)** and **[TODO.md](TODO.md)**.
+**[RESEARCH.md](docs/RESEARCH.md)** and **[TODO.md](docs/TODO.md)**.
 
 ## Support
 

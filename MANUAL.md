@@ -5,7 +5,7 @@ out of trouble, and the questions that tend to come up. It covers the supported
 GameSir controllers and the Logitech G502 X mouse. For
 install and a quick overview start with the [README](README.md); for the protocol,
 the app's architecture, and reverse-engineering findings, see
-[RESEARCH.md](RESEARCH.md).
+[RESEARCH.md](docs/RESEARCH.md).
 
 ## Contents
 
@@ -369,5 +369,5 @@ not affiliated with or endorsed by GameSir; trademarks belong to their owners.
 **How do I add support for another controller, or help reverse-engineer one?**
 Models are defined in `controller_profile.py`; capture the official app's USB
 traffic and decode it with the diagnostic scripts — all documented in
-**[RESEARCH.md](RESEARCH.md)** (Architecture, Methodology & tools, and the current
+**[RESEARCH.md](docs/RESEARCH.md)** (Architecture, Methodology & tools, and the current
 per-controller findings).

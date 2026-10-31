@@ -371,7 +371,7 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
   baseline to restore, so the button silently did nothing there.
 - **Documentation restructured** into a lean [README](README.md) (overview), a
   [Manual](MANUAL.md) (how to use each feature, troubleshooting, FAQ), and
-  [RESEARCH.md](RESEARCH.md) (protocol, architecture, and per-controller findings).
+  [RESEARCH.md](docs/RESEARCH.md) (protocol, architecture, and per-controller findings).
 
 ### Fixed
 - **Empty dongles no longer masquerade as controllers.** A dongle with nothing paired
