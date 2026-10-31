@@ -471,7 +471,8 @@ class MotionTests(unittest.TestCase):
         engine.deleteLater()
 
     def test_vibration_buttons_route_slider_strength_and_serialize_previews(self):
-        from PySide6.QtCore import QObject, QMetaObject
+        from PySide6.QtCore import QObject, QMetaObject, Qt
+        from PySide6.QtQuick import QQuickWindow
         self.bridge._config = {
             'vib_l': 21, 'vib_r': 42, 'vib_trigger_l': 63, 'vib_trigger_r': 84,
             'vib_force_l': False, 'vib_force_r': False,
@@ -503,6 +504,33 @@ class MotionTests(unittest.TestCase):
                 test.call_args.kwargs['on_done'](True, '')
                 self.assertFalse(page.property('testRunning'))
             write.assert_not_called()
+        state.update(connected=True, config_wanted=True, demo=False)
+        self.bridge.statusChanged.emit()
+        timer = page.findChild(QObject, 'triggerRumbleTimer')
+        self.assertEqual(timer.property('running'), self.app.applicationState() == Qt.ApplicationActive)
+        window = QQuickWindow()
+        page.setParentItem(window.contentItem())
+        window.show()
+        window.requestActivate()
+        self.app.processEvents()
+        self.addCleanup(window.deleteLater)
+        self.assertTrue(timer.property('running'))
+        with patch.object(control, 'rumble') as rumble:
+            for lt, rt, grips, left, right in ((128, 255, (27, 107), 81, 214),
+                                               (255, 128, (54, 54), 161, 108)):
+                state.update(lt=lt, rt=rt)
+                QMetaObject.invokeMethod(timer, 'triggered')
+                self.assertEqual(rumble.call_args.args, grips)
+                self.assertEqual(rumble.call_args.kwargs['trigger_left'], left)
+                self.assertEqual(rumble.call_args.kwargs['trigger_right'], right)
+            state.update(lt=0, rt=0)
+            QMetaObject.invokeMethod(timer, 'triggered')
+            self.assertNotIn('trigger_left', rumble.call_args.kwargs)
+            state.update(lt=255, rt=255)
+            QMetaObject.invokeMethod(timer, 'triggered')
+            page.setProperty('visible', False)
+            self.assertFalse(timer.property('running'))
+            self.assertNotIn('trigger_left', rumble.call_args.kwargs)
         self.assertEqual(self.bridge._pending, {})
         self.bridge.rumbleTestStatus.emit(False, 'Controller disconnected')
         self.assertEqual(page.property('testError'), 'Controller disconnected')

@@ -15,6 +15,23 @@ Item {
     property string testError: ""
     property bool testRunning: false
 
+    // GIP pulses expire after 400 ms, so held triggers need periodic refreshes.
+    Timer {
+        objectName: "triggerRumbleTimer"
+        interval: 50; repeat: true
+        running: Qt.application.state === Qt.ApplicationActive
+                 && page.visible && bridge.connected && bridge.profile > 0
+                 && bridge.hasVibration && (!bridge.hasConfigSession || bridge.configClaimed)
+                 && !page.testRunning
+        onTriggered: bridge.rumbleTriggers(
+            Math.round(bridge.leftTrigger * vibL.value * 255 / 100),
+            Math.round(bridge.rightTrigger * vibR.value * 255 / 100),
+            bridge.g7Layout ? Math.round(bridge.leftTrigger * trigLSlider.value * 255 / 100) : 0,
+            bridge.g7Layout ? Math.round(bridge.rightTrigger * trigRSlider.value * 255 / 100) : 0)
+        onRunningChanged: if (!running) bridge.rumbleTriggers(0, 0, 0, 0)
+    }
+    Component.onDestruction: bridge.rumbleTriggers(0, 0, 0, 0)
+
     function testMotor(motor, strength) {
         testError = ""
         testRunning = true
@@ -69,6 +86,11 @@ Item {
 
             Card {
                 title: "Vibration strength"; Layout.fillWidth: true
+                Text {
+                    width: parent.width; wrapMode: Text.WordWrap
+                    text: "Hold LT or RT to test the motors on that side. Pull further for stronger vibration, up to the strength below."
+                    color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                }
                 Row {
                     width: parent.width
                     Text { text: "Left"; color: Theme.textDim
