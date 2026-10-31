@@ -38,6 +38,9 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
   controllers instead of its orange product colours.
 
 ### Fixed
+- Scrolling with a high-resolution mouse wheel, such as the G502 X's, crawled
+  along at a few pixels per notch. Every scrolling page now moves at a normal
+  desktop pace, and touchpads still follow your fingers.
 - G7 Pro native `1022`: correct the false sequential-button-layout warning (#17).
 - Switching paddles on the Macros tab showed the previous paddle's macro, and
   the next edit then saved it onto the paddle you'd switched to, so one
