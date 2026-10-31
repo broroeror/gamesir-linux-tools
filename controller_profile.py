@@ -87,6 +87,7 @@ class ControllerProfile:
                                     # 'cyclone' (also the 8K/G7 Pro) or 'tarantula'
     has_motion: bool = False        # gyro Aim/Tilt config (8K)
     has_macros: bool = False        # per-paddle macro editor
+    has_battery: bool = True        # False for wired-only pads with no battery
     supports_hair_thresholds: bool = True
     device_settings_style: str = 'none'
 
@@ -154,6 +155,7 @@ class ControllerProfile:
     CURVE_BLOCKS: tuple = tuple(CURVE_BLOCKS)
     REMAP_TARGETS: tuple = tuple(REMAP_TARGETS)
     REMAP_SLOTS: tuple = ()                 # (name, addr) source-button records
+    REMAP_DEFAULTS: dict = field(default_factory=dict)  # addr -> default self-code
     CONTINUOUS_TRIGGER_SLOTS: tuple = ()    # independently verified per model
     MACRO_SLOTS: tuple = ()                 # (name, addr) paddles that hold macros
     macro_max: int = 32                     # max macro steps (paddle-block dependent)
@@ -606,15 +608,14 @@ G7_8K = ControllerProfile(
 
 
 # --- registry + detection ----------------------------------------------------
-# --- Tarantula Pro 8K : GameSir Tarantula Pro 8K (3537:103d) -----------------
+# --- Tarantula Pro 8K : GameSir Tarantula Pro 8K (3537:103d / 103c) ----------
 # Wired-only PC pad. Decoded from Windows captures of GameSir Connect v1.16.7 and
 # a read-only dump of the project's own pad on Linux (2026-10-02); details in
 # Controller Testing/Tarantula Pro 8k/FINDINGS.md.
 #
 # IDENTITY: it auto-detects its host. In PC/XBOX mode it is 3537:103d (XInput on
-# iface 0 + the family channel on iface 1) -- the mode this profile drives. On
-# Linux it can come up as 3537:103c instead (plain HID; the family channel is
-# declared there but never answers), so 103c is deliberately NOT listed.
+# iface 0 + the family channel on iface 1). It also connects as 3537:103c
+# (plain HID with the family channel on iface 1). Both are supported.
 #
 # MAP: the 8K's, plus five more 0xa9-byte button blocks. The 8K has 4 extra-button
 # blocks (L4 R4 L5 R5); the Tarantula has 9 (L4 R4 C1 C2 C3 C4 T1 T2 T3), so every
@@ -649,10 +650,10 @@ def _tar_motion(m):
 
 
 TARANTULA_PRO_8K = ControllerProfile(
-    name='GameSir Tarantula Pro 8K',
-    short='Tarantula Pro 8K',
-    usb_products=(0x103d,),
-    wired_products=(0x103d,),               # wired-only controller
+    name='GameSir Tarantula 8K',
+    short='Tarantula 8K',
+    usb_products=(0x103d, 0x103c),
+    wired_products=(0x103d, 0x103c),        # wired-only controller
     write_style='cyclone',                  # bare 0f03 writes (captures T3/T4/T7/T10)
     input_style='cyclone_0x12',             # live 0x12 on the vendor hidraw
     profile_banks=(1, 2, 3, 4),             # the manual's four configurations; the
@@ -664,6 +665,7 @@ TARANTULA_PRO_8K = ControllerProfile(
                                             # mapped (bank 0x20); no Lights tab yet
     has_motion=True,                        # Aim/Tilt gyro, the 8K's block shifted
     has_macros=True,                        # 9 programmable buttons, 32 steps each
+    has_battery=False,                      # wired-only esports pad; no battery
     macro_max=32,                           # 9-byte header + 32 x 5 = 0xa9 exactly
     POLL_RATE=_cy.POLL_RATE,                # 0x002e; codes 0..5 (T7: 0=250 2=1000
     POLL_RATES=('250 Hz', '500 Hz', '1000 Hz',   # 4=4000 5=8000 observed; 1/3 by the
@@ -677,12 +679,23 @@ TARANTULA_PRO_8K = ControllerProfile(
     ST_ADZ_MIN=_tar(0x039b), ST_ADZ_MAX=_tar(0x039d),
     ST_CURVE=_tar(0x03a0), RS_OFFSET=0x24,
     # standard 12 + L4 as the Cyclone/8K, then the other 8 programmable buttons
-    # (block addresses mapped by capture R1, one button at a time).
+    # (block addresses mapped by capture R1, one button at a time), plus triggers
+    # and the top-row View/Menu/Share slots.
     REMAP_SLOTS=tuple(_cy.REMAP_SLOTS[:13]) + (
         ('R4', 0x015b),
         ('C1', 0x0204), ('C2', 0x02ad), ('C3', 0x0356), ('C4', 0x03ff),
         ('T1', 0x04a8), ('T2', 0x0551), ('T3', 0x05fa),
+        ('LT', _tar(0x035f)), ('RT', _tar(0x037f)),
+        ('View', 0x009d), ('Menu', 0x00a4), ('Share', 0x00ab),
     ),
+    # Programmable button blocks and trigger slots store [0x01, self_code] when
+    # unmapped at factory defaults (L4/R4=11/12, LT/RT=13/14, C1-C4=1f-22, T1-T3=23-25).
+    REMAP_DEFAULTS={
+        0x00b2: 0x11, 0x015b: 0x12,
+        0x0204: 0x1f, 0x02ad: 0x20, 0x0356: 0x21, 0x03ff: 0x22,
+        0x04a8: 0x23, 0x0551: 0x24, 0x05fa: 0x25,
+        _tar(0x035f): 0x13, _tar(0x037f): 0x14,
+    },
     MACRO_SLOTS=(('L4', 0x00b2), ('R4', 0x015b),
                  ('C1', 0x0204), ('C2', 0x02ad), ('C3', 0x0356), ('C4', 0x03ff),
                  ('T1', 0x04a8), ('T2', 0x0551), ('T3', 0x05fa)),
@@ -692,7 +705,15 @@ TARANTULA_PRO_8K = ControllerProfile(
     REMAP_TARGETS=tuple((n, c) for n, c in REMAP_TARGETS if c != 0xff) + (
         ('View', 0x0e), ('Menu', 0x0f), ('Screenshot', 0x10),
     ) + tuple((n, c) for n, c in REMAP_TARGETS if c == 0xff),
-    motion=_tar_motion(G7_8K.motion),
+    motion={
+        **_tar_motion(G7_8K.motion),
+        'buttons': tuple((n, c) for n, c in REMAP_TARGETS if c != 0xff) + (
+            ('View', 0x0e), ('Menu', 0x0f), ('Share', 0x10),
+            ('L4', 0x11), ('R4', 0x12),
+            ('C1', 0x1f), ('C2', 0x20), ('C3', 0x21), ('C4', 0x22),
+            ('T1', 0x23), ('T2', 0x24), ('T3', 0x25),
+        ),
+    },
 )
 
 

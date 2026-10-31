@@ -394,6 +394,32 @@ def has_live_pad(devnodes):
     return any(_streams_live_data(n) for n in (devnodes or []))
 
 
+def _declares_vendor_channel(devnode):
+    """Does this hidraw node declare the family vendor report IDs (0x0f/0x10/0x12)?"""
+    name = os.path.basename(devnode)
+    path = os.path.join('/sys/class/hidraw', name, 'device', 'report_descriptor')
+    try:
+        with open(path, 'rb') as f:
+            desc = f.read()
+    except OSError:
+        return False
+    vendor, i = False, 0
+    while i < len(desc):
+        b = desc[i]
+        if b == 0xFE:
+            i += 3 + (desc[i + 1] if i + 1 < len(desc) else 0)
+            continue
+        size = (b & 0x03) if (b & 0x03) != 3 else 4
+        val = int.from_bytes(desc[i + 1:i + 1 + size], 'little')
+        if (b & 0xFC) == 0x04:
+            vendor = val >= 0xFF00
+        elif (b & 0xFC) == 0x84 and vendor:
+            if val in (0x0F, 0x10, 0x12):
+                return True
+        i += 1 + size
+    return False
+
+
 def pick_live_node(devnodes):
     """From ONE controller's candidate /dev/hidraw* nodes, return the one that
     carries live enhanced data, or the first if we can't tell. A wired Cyclone
@@ -405,6 +431,9 @@ def pick_live_node(devnodes):
         return devnodes[0]
     for n in devnodes:
         if _streams_live_data(n):
+            return n
+    for n in devnodes:
+        if _declares_vendor_channel(n):
             return n
     return devnodes[0]
 
@@ -424,5 +453,8 @@ def find_vendor_hidraw():
         return nodes[0]
     for node in nodes:
         if _streams_live_data(node[0]):
+            return node
+    for node in nodes:
+        if _declares_vendor_channel(node[0]):
             return node
     return nodes[0]

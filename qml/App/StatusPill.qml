@@ -24,9 +24,9 @@ Row {
         }
     }
 
-    // Battery
+    // Battery (hidden on wired-only controllers with no battery)
     Text {
-        visible: bridge.connected
+        visible: bridge.connected && bridge.hasBattery
         anchors.verticalCenter: parent.verticalCenter
         text: (bridge.charging ? "⚡ " : "") + bridge.battery + "%"
         color: bridge.battery <= 15 && !bridge.charging ? Theme.accent : Theme.textDim

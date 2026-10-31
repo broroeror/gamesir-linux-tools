@@ -742,15 +742,6 @@ def collect():
 
     # ---- overall verdicts, most-specific first ----
     gsnodes = [n for n in rep['nodes'] if n['vid'] == 0x3537]
-    # Tarantula Pro 8K in its non-PC mode. It auto-detects its host; config only
-    # works in PC/XBOX mode (3537:103d). As 103c its vendor channel is declared
-    # but never answers, so say what that means rather than list an unknown pad.
-    if any(n['pid'] == 0x103C for n in gsnodes):
-        rep['verdict'].append(
-            'GameSir Tarantula (3537:103c) found in its non-PC mode, where it can\'t be '
-            'configured. Configuration needs its PC/XBOX mode (3537:103d). GameSir\'s '
-            'manual: hold Home + X for 2 seconds (the light turns green); holding Home '
-            'for 10 seconds restores automatic mode detection.')
     if not gsnodes and not rep['usb_devices'] and not rep['g7se_devices']:
         others = _platform_mode_devices()
         if others:
@@ -1162,9 +1153,11 @@ def _ask(dev, cmd, want, wait=0.6):
     end = time.time() + wait
     while time.time() < end:
         r = dev.read(64)
-        if r and bytes(r[:len(want)]) == bytes(want):
+        if not r:
+            time.sleep(0.001)
+            continue
+        if bytes(r[:len(want)]) == bytes(want):
             return bytes(r)
-        time.sleep(0.005)
     return None
 
 
@@ -1215,7 +1208,7 @@ def _probe_buttons():
             except Exception:
                 pass
     if len(out) == 1:
-        out.append('- no Cyclone 2 / G7 Pro 8K / Tarantula Pro 8K connected')
+        out.append('- no Cyclone 2 / G7 Pro 8K / Tarantula 8K connected')
     return out
 
 

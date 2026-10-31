@@ -129,7 +129,8 @@ Item {
 
                     ControllerView {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        width: Math.min(implicitWidth, centerArea.width - 24)
+                        width: Math.min(implicitWidth, centerArea.width - 24,
+                                        Math.max(280, (centerArea.height - 56) * aspect))
                         height: width / aspect
                         highlightSource: page.canRemap ? page.sel : ""
                         highlightTarget: page.canRemap ? page.targetLabel(page.sel) : ""

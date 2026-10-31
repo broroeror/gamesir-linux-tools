@@ -95,6 +95,71 @@ class DetectionTests(unittest.TestCase):
         self.assertIs(profiles.detect_one(0x0575, 'GameSir-Cyclone 2'), profiles.CYCLONE)
         self.assertIs(profiles.detect_one(0x0575, 'Gamepad'), profiles.G7_8K)
 
+    def test_tarantula_pid_variants_resolve_to_tarantula_profile(self):
+        self.assertIs(profiles.detect_one(0x103d, 'GameSir-Tarantula Pro'), profiles.TARANTULA_PRO_8K)
+        self.assertIs(profiles.detect_one(0x103c, 'GameSir-Tarantula 8K'), profiles.TARANTULA_PRO_8K)
+        self.assertIn(0x103c, profiles.TARANTULA_PRO_8K.usb_products)
+        self.assertIn(0x103c, profiles.TARANTULA_PRO_8K.wired_products)
+        self.assertFalse(profiles.TARANTULA_PRO_8K.has_battery)
+
+    def test_tarantula_enhanced_report_decodes_c_and_t_buttons_and_omits_battery(self):
+        from vendors.gamesir.enhanced import parse_enhanced
+        old_prof = profiles.active() if profiles.is_recognized() else None
+        try:
+            profiles.set_active(profiles.TARANTULA_PRO_8K)
+            pkt = [0] * 64
+            pkt[0] = 0x12
+            pkt[1:5] = [128, 128, 128, 128]
+            pkt[5] = 0x0f
+            pkt[35] = 0x01
+            pkt[36] = 42
+            pkt[60] = 0x01 | 0x02 | 0x08 | 0x10 | 0x20
+            pkt[61] = 0x7f
+            pkt[63] = 0xff  # RT analog (does not trigger C/T buttons)
+            parsed = parse_enhanced(pkt)
+            for k in ('home', 'share', 'l4', 'r4', 'm',
+                      'c1', 'c2', 'c3', 'c4', 't1', 't2', 't3'):
+                self.assertTrue(parsed[k], k)
+            self.assertFalse(parsed['l5'])
+            self.assertFalse(parsed['r5'])
+            self.assertEqual(parsed['battery'], 0)
+            self.assertFalse(parsed['charging'])
+        finally:
+            profiles.set_active(old_prof)
+
+    def test_tarantula_remap_slots_and_defaults_cover_all_buttons(self):
+        from bridge import GamesirBridge
+        prof = profiles.TARANTULA_PRO_8K
+        names = [n for n, _a in prof.REMAP_SLOTS]
+        for expected in ('Dpad Up', 'Dpad Down', 'Dpad Left', 'Dpad Right',
+                         'LB', 'RB', 'LS', 'RS', 'A', 'B', 'X', 'Y',
+                         'L4', 'R4', 'C1', 'C2', 'C3', 'C4',
+                         'T1', 'T2', 'T3', 'LT', 'RT', 'View', 'Menu', 'Share'):
+            self.assertIn(expected, names)
+        old_prof = profiles.active() if profiles.is_recognized() else None
+        try:
+            profiles.set_active(prof)
+            state.update(connected=True, profile=1, edit_profile=1,
+                         selected='tar', driving='tar', controller=prof.short)
+            b = GamesirBridge()
+            b._apply_profile(prof)
+            self.assertFalse(b.hasBattery)
+            vals = {addr: [0] * ln for addr, ln in prof.read_fields()}
+            for _n, addr in prof.REMAP_SLOTS:
+                def_code = prof.REMAP_DEFAULTS.get(addr)
+                vals[addr] = [0x01, def_code] if def_code is not None else [0x00, 0x00]
+            cfg_out = b._build_config(vals)
+            for n in names:
+                self.assertEqual(cfg_out['remap'][n], -1, f'{n} factory self-code should decode as Default (-1)')
+            b.setRemapCode('T1', -1)
+            self.assertEqual(b._pending[(1, 0x04a8)]['data'], [0x01, 0x23])
+            b.setRemapCode('C1', -1)
+            self.assertEqual(b._pending[(1, 0x0204)]['data'], [0x01, 0x1f])
+            b.setRemapCode('A', -1)
+            self.assertEqual(b._pending[(1, 0x007a)]['data'], [0x00, 0x00])
+        finally:
+            profiles.set_active(old_prof)
+
 
 if __name__ == '__main__':
     unittest.main()
