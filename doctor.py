@@ -92,6 +92,7 @@ try:
     from vendors.gamesir.models.g7se import protocol as _se
     USB_IDENTITIES.update({
         _se.PID_XINPUT_664: 'G7 SE 6.64 XInput mode (input only)',
+        _se.PID_GIP_ALT_664: 'G7 SE 6.64 Xbox mode, not tested for configuration yet',
     })
 except Exception:                      # partial install -- report what we can
     _se = None
@@ -684,6 +685,7 @@ def collect():
         pass
 
     try:
+        import controller_profile as profiles
         from gs_common import find_controllers
         for dev in find_controllers():
             if _se and dev.get('pid') in _se.LAYOUT_PIDS:
@@ -716,6 +718,19 @@ def collect():
                         else ' USB access is missing; install the G7 SE udev rule and reconnect.'))
                 continue
             if dev.get('pid') not in USB_IDENTITIES:
+                # An identity Deadband doesn't know and that has no hidraw node
+                # (so the HID section can't show it): list it with its interfaces,
+                # which is what a report about a new mode needs (#41, 108f).
+                if not dev.get('nodes') and profiles.detect_one(
+                        dev.get('pid'), dev.get('product')) is None:
+                    meta = dev.get('usb') or {}
+                    node = '/dev/bus/usb/%03d/%03d' % (meta.get('bus', 0), meta.get('address', 0))
+                    rep['usb_devices'].append({
+                        'pid': dev['pid'], 'identity': 'not recognised', 'g7se': False,
+                        'product': dev.get('product', ''), 'port': dev['port'],
+                        'node': node, 'access': os.access(node, os.R_OK | os.W_OK),
+                        'interfaces': _interfaces(meta.get('sysfs')),
+                    })
                 continue
             # 3537:1004 is shared with the T4 Kaleid (mainline xpad); only report
             # it as a G7 Pro identity when the device names itself one.
@@ -751,6 +766,17 @@ def collect():
             'configured. Configuration needs its PC/XBOX mode (3537:103d). GameSir\'s '
             'manual: hold Home + X for 2 seconds (the light turns green); holding Home '
             'for 10 seconds restores automatic mode detection.')
+    for n in rep['usb_devices']:
+        if _se and n['pid'] == _se.PID_GIP_ALT_664:
+            rep['verdict'].append(
+                'G7 SE (3537:108f) found in an Xbox mode Deadband hasn\'t been tested with '
+                'yet. Input works through the kernel\'s xpad driver; configuration is '
+                'tested on 3537:1069 only.')
+        elif n['identity'] == 'not recognised':
+            rep['verdict'].append(
+                f'GameSir 3537:{n["pid"]:04x} found, an identity Deadband doesn\'t recognise '
+                'yet. Its interfaces are listed under Devices; please share this report '
+                'in an issue so it can be added.')
     if not gsnodes and not rep['usb_devices'] and not rep['g7se_devices']:
         others = _platform_mode_devices()
         if others:
@@ -1151,7 +1177,8 @@ def _probe_gamesir():
             except Exception:
                 pass
     if not asked:
-        out.append('- none connected (every GameSir device present can be configured)')
+        out.append('- none to ask (no GameSir HID config channel that Deadband '
+                   'can\'t already use)')
     return out
 
 

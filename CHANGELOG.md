@@ -18,6 +18,9 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
   directly (PyUSB + libusb-package). `--doctor` gives a Mac-specific report.
   Press-to-select, and configuring the G7 Pro / Kaleid / G7 SE, stay
   Linux-only for now. Setup: [docs/macos.md](docs/macos.md).
+- `--doctor` now lists GameSir USB identities it doesn't recognise, with their
+  interfaces, instead of reporting no device. It also names the G7 SE's
+  `108f` Xbox mode, seen on firmware 6.64 (#41).
 - **Controller picture**: Settings → Appearance can swap the drawn controller
   for your own image (per controller model, kept on your computer), with a
   template export to line the art up with the buttons. Thanks to

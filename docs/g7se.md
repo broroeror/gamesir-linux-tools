@@ -15,6 +15,13 @@ it, reboot, plug it in at the boot menu (Dell: F12), then boot Linux. A kernel
 quirk for `10a0` is under review upstream
 ([linux-usb](https://lore.kernel.org/linux-usb/20261002-master-v2-1-24b05d8792b5@gmail.com/)).
 
+One owner's pad came up as a fourth identity, `108f`, when plugged in at the
+motherboard logo (#41). Like `1069` it is Xbox GIP on both interfaces with no
+HID interface, but configuration hasn't been tried on it, so Deadband only
+names it in `--doctor`. On `10a0` (hot-plugged with the `r` quirk) the same
+pad declared its vendor channel but answered none of `--probe`'s read
+questions, which fits `10a0` being input-only.
+
 On `1069` the startup, GIP authentication and register channel are the 6.30
 ones, except that replies carry the pad's own sequence counter. The 421-byte
 profile banks follow the **G7 Pro register map**. The editable fields are

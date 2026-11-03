@@ -21,6 +21,9 @@ CONFIGURATION_VERIFIED = True  # Firmware 0630: authenticated reads and remap ro
 PID_GIP_664 = 0x1069
 PID_XINPUT_664 = 0x10a0
 PID_HID_664 = 0x1082
+# Seen once from a pad plugged in at the motherboard logo (#41): Xbox GIP on both
+# interfaces like 1069, no HID. Not tried for configuration yet.
+PID_GIP_ALT_664 = 0x108f
 
 
 def is_g7se_product(product):
