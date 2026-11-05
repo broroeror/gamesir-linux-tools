@@ -3,7 +3,7 @@ from collections import deque
 import threading
 import time
 
-from gs_state import state
+from gs_state import state, EXTRA_BTNS
 
 _lock = threading.Lock()
 _events = deque(maxlen=4096)
@@ -15,9 +15,13 @@ _overflow = False
 
 def _buttons():
     values = {k: bool(state[k]) for k in
-              ('a', 'b', 'x', 'y', 'lb', 'rb')}
+              ('a', 'b', 'x', 'y', 'lb', 'rb', 'ls', 'rs', 'view', 'menu') + EXTRA_BTNS}
     values.update({'dpad_' + k: k in state['dpad'].split('-')
                    for k in ('up', 'down', 'left', 'right')})
+    # Hysteresis avoids counting analog jitter; 0/255 hard-stop reports use
+    # the same path. Press at 10%, release below 5% of the reported range.
+    values.update({k: state[k] > 12 if _last.get(k, False) else state[k] >= 26
+                   for k in ('lt', 'rt')})
     return values
 
 

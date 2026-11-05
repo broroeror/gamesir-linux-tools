@@ -73,7 +73,7 @@ Window {
         anchors.fill: parent; anchors.margins: 20; spacing: 14
         Text {
             Layout.fillWidth: true; wrapMode: Text.WordWrap
-            text: "ABXY · D-pad · LB/RB. Each new press adds 1. Hold a button to check its timer and short interruptions."
+            text: "Buttons, paddles, D-pad and LT/RT. Each new press adds 1. Hold a control to check its timer and short interruptions."
             color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
         }
         RowLayout {
@@ -133,7 +133,7 @@ Window {
         }
         Text {
             Layout.fillWidth: true; wrapMode: Text.WordWrap
-            text: "A release → press gap up to 20 ms is flagged and counted as a short break. Firmware may hide bounce."
+            text: "A release → press gap up to 20 ms is flagged. LT/RT press at 10%, release below 5%. Firmware may hide bounce."
             color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
         }
     }

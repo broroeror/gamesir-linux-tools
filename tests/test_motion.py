@@ -626,7 +626,7 @@ class MotionTests(unittest.TestCase):
         self.assertEqual(counts['a']['count'], 102)
         self.assertFalse(counts['a']['rapid'])
         self.assertEqual((counts['dpad_up']['count'], counts['dpad_right']['count']), (1, 1))
-        self.assertNotIn('ls', counts)
+        self.assertEqual(counts['ls']['count'], 1)
         for down, when in ((True, 25000), (True, 25500), (False, 26250)):
             state['x'] = down
             button_capture.record('test', when)
@@ -638,6 +638,16 @@ class MotionTests(unittest.TestCase):
         self.bridge._poll_input()
         x = tester.property('records').toVariant()['x']
         self.assertEqual((x['count'], x['held'], x['breaks'], x['gap']), (2, True, 1, 16))
+        state.update(l4=True, r4=True, l5=True, r5=True)
+        for value, when in ((255, 27000), (20, 27005), (0, 27010), (255, 27026)):
+            state.update(lt=value, rt=value)
+            button_capture.record('test', when)
+        self.bridge._poll_input()
+        counts = tester.property('records').toVariant()
+        for key in ('l4', 'r4', 'l5', 'r5'):
+            self.assertEqual(counts[key]['count'], 1)
+        for key in ('lt', 'rt'):
+            self.assertEqual((counts[key]['count'], counts[key]['rapid'], counts[key]['gap']), (2, True, 16))
         tester.hide()
         self.assertTrue(tester.property('records').toVariant()['x']['paused'])
         state['b'] = True
