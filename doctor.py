@@ -204,6 +204,14 @@ def _vendor_channel(hidraw_sysfs):
             + (', report ids ' + ' '.join(f'{r:#04x}' for r in ids) if ids else ''))
 
 
+def _media_keys_dropped(desc):
+    """Does this report descriptor carry the consumer range Linux can't read? A
+    1-byte Usage Minimum with a 4-byte Usage Maximum puts the range on usage page
+    0, so media keys never arrive (#47). The hid-bpf fixup rewrites these bytes,
+    so a fixed pad no longer matches."""
+    return len(desc) == 214 and desc[76:83] == bytes.fromhex('19002bffff0000')
+
+
 def _sysfs_nodes():
     """Every /dev/hidrawN owned by a vendor we care about, from sysfs (needs no
     permissions — the same enumeration the app's detection uses).
@@ -854,6 +862,18 @@ def collect():
         rep['verdict'].append(msg)
     elif any(n['verdict'] == 'ok' for n in gsnodes):
         rep['verdict'].append('GameSir device access: OK.')
+    for n in gsnodes:
+        try:
+            with open(f'/sys/class/hidraw/{os.path.basename(n["node"])}/device/'
+                      'report_descriptor', 'rb') as f:
+                dropped = _media_keys_dropped(f.read())
+        except OSError:
+            continue
+        if dropped:
+            rep['verdict'].append(
+                'Linux drops media keys (volume, play/pause) from this controller. '
+                'A small system fix corrects that; see Manual → Troubleshooting.')
+            break
     if rep['usb_devices']:
         # Sourced from protocol.CONFIG_PIDS, never hand-listed: this line used to
         # read (0x109B, 0x109C) and so told Amazon-edition owners their working

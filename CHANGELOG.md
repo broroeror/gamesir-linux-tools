@@ -9,6 +9,10 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
 
 ### Added
 - **G7 Pro Wuchang wireless configuration** on its `3537:10a8` receiver (#17).
+- **Volume and media keys on the Cyclone 2 and G7 Pro.** A small `udev-hid-bpf`
+  fix, shipped with Deadband, corrects how these pads describe media keys to Linux
+  (#47). `--doctor` tells you if yours needs it; steps are in the Manual. The
+  G7 Pro's key picker now offers media, navigation and arrow keys too.
 - **G7 Pro Zenless Zone Zero configuration**, wired (`3537:105d`) and on its
   dongle (`3537:105e`), tested by its owner (#56). The udev rule gains `105d`.
 - **G7 Pro 8K PC, plain white units** (`0913` wired, `0914` dongle), tested by

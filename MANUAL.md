@@ -282,6 +282,27 @@ in `/etc/default/grub` (then `sudo grub-mkconfig -o /boot/grub/grub.cfg`), for
 systemd-boot the `options` line in your entry under `/boot/loader/entries/`. Your
 distribution's documentation on kernel parameters covers the rest.
 
+### Volume and media keys do nothing (Cyclone 2, G7 Pro)
+
+The Cyclone 2 and the G7 Pro send media keys, but they describe them to Linux in a
+way the kernel can't read, so the keys are dropped. `deadband --doctor` says so if
+yours is affected. The G7 Pro 8K PC and Tarantula Pro 8K aren't affected.
+
+A small fix corrects that description every time the controller connects. It needs
+`udev-hid-bpf`, from your distro's packages:
+
+```sh
+sudo pacman -S udev-hid-bpf
+sudo udev-hid-bpf install /usr/share/deadband/hid-bpf/0010-GameSir__Cyclone-2.bpf.o
+```
+
+From a git clone, the file is in `packaging/hid-bpf/` instead. Unplug the
+controller and plug it back in, and the keys work from then on, including after a
+reboot. Bind them from the **Numpad** tab of the key picker. Only the description
+changes: nothing is written to the controller.
+
+The install prints the two files it added, and removing those undoes it.
+
 ### Settings don't stick, or a restore reports unconfirmed blocks
 
 The controller **silently drops a command sent right after another**, so a naïve

@@ -200,16 +200,6 @@ MOUSE_TARGETS = (
     ('Mouse 5', 0xCB), ('Mouse 4', 0xCC),
     ('Scroll Up', 0xCD), ('Scroll Down', 0xCE),
 )
-NUMPAD_ROWS = (
-    (('Num /', 0x85, 1), ('Num *', 0x86, 1), ('Num -', 0x87, 1),
-     ('Num +', 0x88, 1)),
-    (('Num 7', 0x92, 1), ('Num 8', 0x93, 1), ('Num 9', 0x94, 1),
-     ('Num Enter', 0x8A, 1.5)),
-    (('Num 4', 0x8F, 1), ('Num 5', 0x90, 1), ('Num 6', 0x91, 1)),
-    (('Num 1', 0x8C, 1), ('Num 2', 0x8D, 1), ('Num 3', 0x8E, 1)),
-    (('Num 0', 0x8B, 2), ('Num .', 0x89, 1)),
-)
-NUMPAD_TARGETS = tuple((name, code) for row in NUMPAD_ROWS for name, code, _w in row)
 
 # Safe live-suffix lengths for the firmware's long-form writes.
 LONG_SUFFIX = {

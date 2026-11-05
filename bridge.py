@@ -2138,7 +2138,7 @@ class GamesirBridge(QObject):
     def targetLabel(self, code):
         if self._prof is profiles.G7_PRO:
             items = (list(g7pro.GAMEPAD_TARGETS) + list(cfg.KEYBOARD_TARGETS)
-                     + list(g7pro.NUMPAD_TARGETS) + list(g7pro.MOUSE_TARGETS))
+                     + list(cfg.NUMPAD_TARGETS) + list(g7pro.MOUSE_TARGETS))
             return dict((c, n) for n, c in items).get(code, '0x%02x' % code)
         own = dict((c, n) for n, c in self._prof.REMAP_TARGETS)
         if self._prof is profiles.G7_SE:
@@ -2153,9 +2153,6 @@ class GamesirBridge(QObject):
     @Property('QVariantList', notify=controllerChanged)
     def numpadRows(self):
         """Rows of {name, code, w} for the numpad/media/nav picker."""
-        if self._prof is profiles.G7_PRO:
-            return [[{'name': n, 'code': c, 'w': w} for n, c, w in row]
-                    for row in g7pro.NUMPAD_ROWS]
         return cfg.numpad_rows()
 
     @Property('QVariantList', notify=controllerChanged)

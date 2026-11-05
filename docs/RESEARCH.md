@@ -444,8 +444,14 @@ fields, e.g. `02 e9 00 00 00` = Volume up). **On the Cyclone's `100b` identity
 Linux drops them:** its descriptor declares the consumer range as Usage Minimum
 `0x00` and a 4-byte Usage Maximum `0x0000FFFF`, which the kernel reads as an
 extended usage on page 0, so the range is empty and no Consumer Control device
-is created. Windows handles it. The 8K's descriptor works and its media keys
-arrive. A descriptor fixup (HID-BPF) should fix the Cyclone; untried.
+is created. Windows handles it. The G7 Pro's `100a` identity has the same bytes at
+the same offset. The 8K and Tarantula descriptors list each usage by name and work.
+
+`packaging/hid-bpf/` rewrites the 4-byte Usage Maximum (bytes 78–82) as a 2-byte
+`0x03ff`, with Push/Pop filling the spare bytes so the length stays 214. Verified
+on a Cyclone 2 (`1053`) and a G7 Pro (`100a`): volume keys work after a replug and
+a reboot. `100b` has the same fault but was not retested with the fixup. In GIP
+modes the G7 Pro has no HID interface, so this doesn't apply there.
 
 Paddle macros on the 8K: the firmware plays past the stored step count until an
 empty step, and each paddle block's last byte (`+0xa8`, `0x0a` on every paddle)
