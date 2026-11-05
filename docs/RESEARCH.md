@@ -16,7 +16,7 @@ re-tread them. This is a hobby RE effort; corrections and additions welcome.
 | Device | USB IDs | Input on Linux | Config editor on Linux | Verdict |
 |---|---|---|---|---|
 | **Cyclone 2** *(GameSir, VID 0x3537)* | `0575` / `100b` / `1053` | ✅ vendor `0x12` | ✅ full | **Fully supported** |
-| **G7 Pro** *(Shadow Ember, Amazon)* | `109b` (wired config) · `109c` (dongle config) · `10ba` / `10bb` (Amazon wired / dongle config) · `100a` (transition) · `1022` (native/GIP) · `1003` / `1004` (White Trimode wired / dock; 1004 shared with the T4 Kaleid) · `105e` (recognised, detect-only) | ✅ evdev or claimed USB telemetry | ✅ four profiles + core/extras | **Writes on 109b/109c/10ba/10bb/1003/1004** — 109b/109c contributed and verified by [@brcly](https://github.com/brcly); 10ba/10bb write round-trip verified on my own pad; 1003/1004 confirmed by an owner (#9) |
+| **G7 Pro** *(Shadow Ember, Amazon)* | `109b` (wired config) · `109c` (dongle config) · `10ba` / `10bb` (Amazon wired / dongle config) · `100a` (transition) · `1022` (native/GIP) · `1003` / `1004` (White Trimode wired / dock; 1004 shared with the T4 Kaleid) · `105d` / `105e` (Zenless Zone Zero wired / dongle) | ✅ evdev or claimed USB telemetry | ✅ four profiles + core/extras | **Writes on 109b/109c/10ba/10bb/1003/1004/105d/105e** — 109b/109c contributed and verified by [@brcly](https://github.com/brcly); 10ba/10bb write round-trip verified on my own pad; 1003/1004 confirmed by an owner (#9); 105d/105e tested by their owner (#56) |
 | **Kaleid** *(Xbox-licensed)* | `1012` (Xbox/GIP, configurable) · `1082` (DirectInput) · `1086` (XInput) — cycled with `M + Xbox` | ✅ mainline `xpad` (matches by interface class, no PID quirk) | ✅ lighting only — full keyframe editor; profile banks read-confirmed, not written | **Supported for lighting**, write round-trip verified by @bloodrizer on their pad |
 | **G7 SE** | `1010` | ✅ mainline `xpad` / claimed USB | ✅ L4/R4 gamepad remaps + 250/500/1000 Hz rate | **Verified on descriptor 6.30**, [protocol notes](g7se.md) |
 | **G7 Pro 8K PC** | `10c5`–`10c8` + `1032`/`1033` (Royal2) edition pairs | ✅ vendor `0x12` | ✅ full incl. motion/macros/lights | **Fully supported** |
@@ -527,10 +527,9 @@ steps per typed character.
 
 ## To be tested
 
-- **Zenless Zone Zero (`105e`).** Recognised and named, no write path yet: no
-  owner has confirmed config reads back correctly on it. The register map is now
-  confirmed on Shadow Ember, Amazon and White Trimode, so it is likely — but an
-  edition earns a write path through evidence from a real pad, not resemblance.
+- **G7 Pro sleep timer.** On a Zenless Zone Zero pad (#56) bank `0x20` `0x01F7`
+  sits where the 8K's sleep timer does relative to auto and brightness; the owner
+  set 5 and 25 and the pad switched off after that many minutes. Not in the app yet.
 - **White Trimode writes.** `1003`/`1004` are enabled on an owner's report that
   every value read back exactly as set on Windows (#9). Nobody has yet watched a
   write land on one the way `10ba` was tested.

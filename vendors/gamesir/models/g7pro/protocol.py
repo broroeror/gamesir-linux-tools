@@ -49,6 +49,9 @@ PID_WT_DOCK = 0x1004
 # Wuchang Edition, identified and hardware-tested by its owner over USB.
 PID_WUCHANG_WIRED = 0x10A7
 PID_WUCHANG_DONGLE = 0x10A8
+# Zenless Zone Zero edition, identified and hardware-tested by its owner (#56).
+PID_ZZZ_WIRED = 0x105D
+PID_ZZZ_DONGLE = 0x105E
 PID_HID = 0x100A
 PID_NATIVE = 0x1022
 # THE BAR FOR THIS TUPLE: evidence from a real G7 Pro that config reads AND
@@ -82,8 +85,13 @@ PID_NATIVE = 0x1022
 #   10a8       Wuchang receiver, descriptor 5.18 / pad 5.41, 2026-10-29:
 #              profile 1/2 grip-strength write/read/restore verified. Full
 #              six-bank comparison unchanged; xpad reattached on release.
+#   105d/105e  Zenless Zone Zero, pad 6.31 / dongle 6.11, 2026-11-04 (#56): all 46
+#              chunks read identically on two passes and over both links; one-byte
+#              writes on each identity changed only that byte in a full dump and
+#              restored. The owner then ran the app on both from a local branch.
 CONFIG_PIDS = (PID_WIRED, PID_DONGLE, PID_AMZ_WIRED, PID_AMZ_DONGLE,
-               PID_WT_WIRED, PID_WT_DOCK, PID_WUCHANG_WIRED, PID_WUCHANG_DONGLE)
+               PID_WT_WIRED, PID_WT_DOCK, PID_WUCHANG_WIRED, PID_WUCHANG_DONGLE,
+               PID_ZZZ_WIRED, PID_ZZZ_DONGLE)
 
 # Product ids belonging to OTHER GameSir devices, from mainline xpad. An id here
 # may appear in CONFIG_PIDS ONLY if it is also in SHARED_PIDS, i.e. is resolved
@@ -119,15 +127,15 @@ EDITIONS = {
     PID_WT_DOCK: 'White Trimode (dock)',
     PID_WUCHANG_WIRED: 'Wuchang Edition (wired)',
     PID_WUCHANG_DONGLE: 'Wuchang Edition (dongle)',
+    PID_ZZZ_WIRED: 'Zenless Zone Zero (wired)',
+    PID_ZZZ_DONGLE: 'Zenless Zone Zero (dongle)',
 }
 
 # Editions seen on a real G7 Pro but with no confirmation that config reads back
 # correctly. They get input plus an honest "not supported yet" instead of a bare
 # hex id, and no udev grant, since Deadband never opens them. Promoting one means
 # the confirmation, a CONFIG_PIDS entry and a 70-gamesir.rules line in one commit.
-UNCONFIRMED_EDITIONS = {
-    0x105E: 'Zenless Zone Zero (dongle)',
-}
+UNCONFIRMED_EDITIONS = {}
 UNCONFIRMED_PIDS = tuple(UNCONFIRMED_EDITIONS)
 
 
@@ -420,8 +428,8 @@ def parse_input(report, state):
 # added, so Amazon-edition owners got a blank wired/wireless hint (issue #10).
 # That is the third table in this project to drift from CONFIG_PIDS, hence the
 # check instead of the good intention.
-WIRED_PIDS = (PID_WIRED, PID_AMZ_WIRED, PID_WT_WIRED, PID_WUCHANG_WIRED)
-DONGLE_PIDS = (PID_DONGLE, PID_AMZ_DONGLE, PID_WT_DOCK, PID_WUCHANG_DONGLE)
+WIRED_PIDS = (PID_WIRED, PID_AMZ_WIRED, PID_WT_WIRED, PID_WUCHANG_WIRED, PID_ZZZ_WIRED)
+DONGLE_PIDS = (PID_DONGLE, PID_AMZ_DONGLE, PID_WT_DOCK, PID_WUCHANG_DONGLE, PID_ZZZ_DONGLE)
 
 
 def connection_kind(pid: int):

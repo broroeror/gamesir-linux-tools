@@ -1249,8 +1249,8 @@ def _probe_buttons():
 
 
 def _probe_g7_unconfirmed():
-    """G7 Pro editions Deadband recognises but doesn't configure yet (the Zenless
-    105e): does the config channel answer at all? Claims
+    """G7 Pro editions Deadband recognises but doesn't configure yet (any in
+    UNCONFIRMED_EDITIONS): does the config channel answer at all? Claims
     interface 0 for a moment (so the pad leaves games for ~2 s), sends only
     heartbeats, the firmware and active-profile queries and one 16-byte read,
     prints the raw replies, and hands the interface back to xpad (issue #17)."""

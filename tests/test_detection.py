@@ -33,11 +33,30 @@ class DetectionTests(unittest.TestCase):
         self.assertEqual(g7.edition_name(0x10a8), 'Wuchang Edition (dongle)')
         self.assertFalse(g7.connection_kind(0x10a8))
         self.assertIn(0x10a8, g7.CONFIG_PIDS)
-        # Native mode and the unverified Zenless receiver retain their gates.
+        # Native mode keeps its gate.
         self.assertIs(profiles.detect_one(0x1022, 'GameSir-G7 Pro'), profiles.G7_NATIVE)
         self.assertEqual(profiles.G7_NATIVE.write_style, 'none')
-        self.assertIs(profiles.detect_one(0x105e, 'GameSir-G7 Pro'), profiles.G7_PRO_OTHER)
-        self.assertEqual(profiles.G7_PRO_OTHER.write_style, 'none')
+
+    def test_zenless_wired_and_dongle_are_configurable(self):
+        for pid, wired in ((0x105d, True), (0x105e, False)):
+            self.assertIs(profiles.detect_one(pid, 'GameSir-G7 Pro'), profiles.G7_PRO)
+            self.assertIn(pid, g7.CONFIG_PIDS)
+            self.assertEqual(g7.connection_kind(pid), wired)
+        self.assertEqual(g7.edition_name(0x105d), 'Zenless Zone Zero (wired)')
+        self.assertEqual(g7.UNCONFIRMED_PIDS, ())
+
+    def test_plain_white_8k_is_recognised(self):
+        name = 'Xbox 360 Controller for Windows'
+        self.assertIs(profiles.detect_one(0x0913, name), profiles.G7_8K)
+        self.assertIs(profiles.detect_one(0x0914, name), profiles.G7_8K)
+        self.assertIn(0x0913, profiles.G7_8K.wired_products)
+        self.assertNotIn(0x0914, profiles.G7_8K.wired_products)
+
+    def test_8k_paddle_self_codes_read_as_default(self):
+        slots = dict(profiles.G7_8K.REMAP_SLOTS)
+        self.assertEqual({n: profiles.G7_8K.REMAP_DEFAULTS[slots[n]] for n in ('R4', 'L5', 'R5')},
+                         {'R4': 0x12, 'L5': 0x1f, 'R5': 0x20})
+        self.assertEqual(profiles.G7_8K.REMAP_DEFAULTS[slots['L4']], 0x11)
 
     def test_native_g7_button_order_matches_physical_presses(self):
         # Owner pressed A/B/X/Y, LB/RB, View/Menu, LS/RS in native mode.
@@ -62,7 +81,7 @@ class DetectionTests(unittest.TestCase):
         self.assertIs(profiles.detect_one(0x1082, None), profiles.KALEID_OTHER)
 
     def test_wired_controller_wins_over_input_only_receiver_without_hid_probe(self):
-        receiver = controller('receiver', 0x105e)
+        receiver = controller('receiver', 0x1022)
         wired = controller('wired', 0x10a7)
         with patch.object(reader, 'has_live_pad') as probe:
             self.assertIs(reader._pick_selected([receiver, wired]), wired)

@@ -501,11 +501,13 @@ G7_8K = ControllerProfile(
                                             #   dongle, both owner-verified (issue #23).
                                             #   NOT a consecutive pair: 10b8 was the
                                             #   guess, and it was wrong
-                  0x1034, 0x1035),          # newer plain black units: 1034 wired / 1035
+                  0x1034, 0x1035,           # newer plain black units: 1034 wired / 1035
                                             #   receiver (Windows hardware IDs, #29;
                                             #   probed on Linux, #44). 10b8 is its plain-
                                             #   HID fallback -> G7_8K_HID below
-    wired_products=(0x10c7, 0x10c5, 0x1032, 0x10b7, 0x1034),
+                  0x0913, 0x0914),          # plain white units: 0913 wired / 0914 dongle,
+                                            #   reads and writes owner-tested (#57)
+    wired_products=(0x10c7, 0x10c5, 0x1032, 0x10b7, 0x1034, 0x0913),
     write_style='cyclone',                  # bare 0f03 writes (NOT the g7 envelope)
     input_style='cyclone_0x12',             # live 0x12 on the vendor hidraw
     profile_banks=(1, 2, 3, 4),             # 4 profiles, confirmed via the app
@@ -544,6 +546,8 @@ G7_8K = ControllerProfile(
         ('R5', 0x02ad),
         ('Share', 0x00ab),                  # the Cyclone's Capture slot (#50)
     ),
+    # Paddles store [0x01, self_code] when unmapped at factory defaults (#57).
+    REMAP_DEFAULTS={0x00b2: 0x11, 0x015b: 0x12, 0x0204: 0x1f, 0x02ad: 0x20},
     MACRO_SLOTS=(('L4', 0x00b2), ('R4', 0x015b),   # 8K has 4 back paddles
                  ('L5', 0x0204), ('R5', 0x02ad)),
     # 8K motion block (caps 14/15/27) — full feature set: 5-point curve, 16-bit

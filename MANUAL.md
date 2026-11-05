@@ -240,6 +240,8 @@ udev rule isn't applying, or the compositor grabbed the sticks. Start here.
 - **Headless / no local seat?** `uaccess` only grants to a logged-in *local*
   desktop seat. On a remote box, swap it for a group rule
   (`MODE="0660", GROUP="input"`) and add yourself to that group.
+- **Using USBGuard?** Each USB identity needs its own allow rule, so a controller
+  can seem to vanish when it changes mode. Allow every ID it uses.
 - **Last resort:** run with `sudo` (root owns the nodes by default) — but then
   backups default to `/root/`, so prefer the udev rule.
 
@@ -292,6 +294,8 @@ pass/fail. If a restore says some blocks are unconfirmed:
   each profile in turn (and back to yours at the end), confirming every switch.
   If it says the controller **didn't switch to profile N**, nothing was written to
   that profile: select it on the controller yourself, then click Restore again.
+- **Charging on its dock?** A G7 Pro 8K PC may refuse Apply there with "no register
+  reply". Take it off the dock and try again (#57).
 - Still failing on the same blocks? Unplug and replug the controller (or the
   dongle) and try once more; if it persists, open an issue with the diagnostics
   report.

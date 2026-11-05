@@ -97,7 +97,7 @@ can't positively identify. Fork it and customize it however you like.
 > The **G7 Pro 8K PC** comes in several editions that are the same controller under
 > different USB ids: **Nioh** (`3537:10c7` wired, `3537:10c8` dongle — my own pad),
 > **Royal2** (`1032`/`1033`, added by its owner [@kakxem](https://github.com/kakxem)),
-> **Championship** (`10b7` wired, `10b9` dongle, verified by its owner), **Aimlabs** (`10c5`/`10c6`, recognised from a user report) and the newer **plain black units** (`1034` wired, `1035` receiver, from owners' reports; earlier thought to be the Phantom Blade 0 edition). Those need a kernel setting on Linux to stay in XInput mode; see the [Manual](MANUAL.md#the-controller-drops-out-of-xinput-mode-as-soon-as-it-connects).
+> **Championship** (`10b7` wired, `10b9` dongle, verified by its owner), **Aimlabs** (`10c5`/`10c6`, recognised from a user report) and the newer **plain black units** (`1034` wired, `1035` receiver, from owners' reports; earlier thought to be the Phantom Blade 0 edition). Those need a kernel setting on Linux to stay in XInput mode; see the [Manual](MANUAL.md#the-controller-drops-out-of-xinput-mode-as-soon-as-it-connects). The **plain white units** (`0913` wired, `0914` dongle, tested by their owner) stay in XInput on their own.
 >
 > The **G7 SE** (`3537:1010`, firmware descriptor 6.30) supports L4/R4 gamepad
 > remapping in three profiles and controller-wide 250/500/1000 Hz report-rate
@@ -159,8 +159,8 @@ can't positively identify. Fork it and customize it however you like.
 > the note below.
 >
 > The G7 Pro ships in editions that differ only by USB product ID. The
-> **Zenless Zone Zero** edition (`3537:105e`) is recognised but not configured
-> yet; input works and the app says so rather than failing silently.
+> **Zenless Zone Zero** edition (`3537:105d` wired, `3537:105e` dongle) was
+> verified by its owner.
 >
 > **White Trimode on its dock shows up as a "T4 Kaleid".** `3537:1004` is also
 > the T4 Kaleid's ID in the Linux kernel's `xpad` driver, so the kernel names the
@@ -377,10 +377,10 @@ everything it does is **reversible** and stays **on your machine**. The specific
   dongle `3537:10bb`), G7 Pro 8K PC (Nioh edition), Tarantula Pro 8K (`3537:103d`) and the G502 X
   are verified here. Other G7 Pro editions were verified by their owners: Shadow
   Ember (`109b`/`109c`, [@brcly](https://github.com/brcly)), Wuchang (`10a7`/`10a8`,
-  [@sinchrotron](https://github.com/sinchrotron)) and White Trimode (`1003`/`1004`).
+  [@sinchrotron](https://github.com/sinchrotron)), White Trimode (`1003`/`1004`) and
+  Zenless Zone Zero (`105d`/`105e`, [@henryford](https://github.com/henryford)).
   The G7 Pro 8K PC Royal2 and Championship editions were added by their owners.
-  Zenless Zone Zero (`105e`) is recognised but not configured. Treat anything not
-  listed as unproven and use it at your own risk.
+  Treat anything not listed as unproven and use it at your own risk.
 
 ## How it works
 

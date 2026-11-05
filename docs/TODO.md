@@ -85,7 +85,7 @@ than mine. *(Full per-device findings in **[RESEARCH.md](RESEARCH.md)**.)*
       bases may differ) and that it accepts the writes.
 - [x] **Confirm the G7 Pro register map on a second edition.** Done: Amazon
       (`10ba`/`10bb`, round-tripped here) and White Trimode (`1003`/`1004`, owner-
-      confirmed on #9). Zenless (`105e`) still recognised without a write path.
+      confirmed on #9). Zenless Zone Zero (`105d`/`105e`) owner-tested on #56.
 - [ ] **Upstream an xpad fix for `3537:1004`.** Its T4 Kaleid table entry
       (`XTYPE_XBOX360`) captures the White Trimode's GIP dock identity, which then
       gets no input (#14).
