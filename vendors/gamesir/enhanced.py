@@ -36,12 +36,19 @@ DPAD = {
 def parse_enhanced(d):
     """Parse a 64-byte 0x12 report into a state dict."""
     b5, b6, b60 = d[5], d[6], d[60]
+    prof = profiles.active()
 
-    extra_shoulders = profiles.active() is profiles.G7_8K
-    # Confirmed on an Aimlabs 8K wireless controller (3537:10c6). These
-    # physical bits remain independent of mapped output in byte 5/6. Keep
-    # decoding model-specific: byte 63 is not established on other models.
-    shoulders = d[63] if extra_shoulders and len(d) > 63 else 0
+    extra_shoulders = prof is profiles.G7_8K
+    is_tarantula = prof is profiles.TARANTULA_PRO_8K
+    # Confirmed on an Aimlabs 8K wireless controller (3537:10c6): L5/R5 sit in
+    # byte 63. On the Tarantula 8K, bytes 62/63 are raw LT/RT analog and the
+    # 7 extra programmable buttons (C1-C4, T1-T3) sit in byte 61 (pad_b, right
+    # after byte 60's Home/Share/L4/R4/M).
+    b61 = d[61] if len(d) > 61 else 0
+    b63 = d[63] if len(d) > 63 else 0
+    shoulders = b63 if extra_shoulders else 0
+    tar_extra = b61 if is_tarantula else 0
+    has_battery = not profiles.is_recognized() or prof.has_battery
 
     return {
         'lx': d[1], 'ly': d[2], 'rx': d[3], 'ry': d[4],
@@ -61,17 +68,25 @@ def parse_enhanced(d):
         'menu': bool(b6 & 0x20),
         'ls':   bool(b6 & 0x40),
         'rs':   bool(b6 & 0x80),
-        # extra buttons (byte 60)
+        # extra buttons (byte 60 + byte 63)
         'home':  bool(b60 & 0x01),
         'share': bool(b60 & 0x02),
         'l4':    bool(b60 & 0x08),
         'r4':    bool(b60 & 0x10),
         'l5':    bool(shoulders & 0x01),
         'r5':    bool(shoulders & 0x02),
+        'c1':    bool(tar_extra & 0x01),
+        'c2':    bool(tar_extra & 0x02),
+        'c3':    bool(tar_extra & 0x04),
+        'c4':    bool(tar_extra & 0x08),
+        't1':    bool(tar_extra & 0x10),
+        't2':    bool(tar_extra & 0x20),
+        't3':    bool(tar_extra & 0x40),
         'm':     bool(b60 & 0x20),
-        # battery: byte 36 = percent (confirmed), byte 35 bit 0 = charging/cable
-        'battery': d[36],
-        'charging': bool(d[35] & 0x01),
+        # battery: byte 36 = percent (confirmed), byte 35 bit 0 = charging/cable.
+        # Wired-only pads without a battery (Tarantula 8K) don't populate this.
+        'battery': d[36] if has_battery else 0,
+        'charging': bool(d[35] & 0x01) if has_battery else False,
         # raw IMU bytes for display/debug
         'imu': list(d[14:25]),
     }

@@ -1189,9 +1189,11 @@ def _ask(dev, cmd, want, wait=0.6):
     end = time.time() + wait
     while time.time() < end:
         r = dev.read(64)
-        if r and bytes(r[:len(want)]) == bytes(want):
+        if not r:
+            time.sleep(0.001)
+            continue
+        if bytes(r[:len(want)]) == bytes(want):
             return bytes(r)
-        time.sleep(0.005)
     return None
 
 
@@ -1242,7 +1244,7 @@ def _probe_buttons():
             except Exception:
                 pass
     if len(out) == 1:
-        out.append('- no Cyclone 2 / G7 Pro 8K / Tarantula Pro 8K connected')
+        out.append('- no Cyclone 2 / G7 Pro 8K / Tarantula 8K connected')
     return out
 
 
