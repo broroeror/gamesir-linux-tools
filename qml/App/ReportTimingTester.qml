@@ -8,9 +8,16 @@ Window {
     minimumWidth: 600; minimumHeight: 550
     color: Theme.bg
     property var results: ({})
+    property string restoreController: ""
     readonly property bool claimed: bridge.hasConfigSession && bridge.configClaimed
     function refresh() { results = bridge.reportTimingSnapshot() }
     onActiveChanged: if (!active) bridge.stopReportTiming()
+    onClosing: {
+        bridge.stopReportTiming()
+        if (restoreController && restoreController === bridge.selectedController && bridge.connected)
+            bridge.setConfigClaimed(true)
+        restoreController = ""
+    }
     onVisibleChanged: {
         if (visible) refresh()
         else bridge.stopReportTiming()
@@ -33,7 +40,18 @@ Window {
             PillButton {
                 visible: tester.claimed
                 label: "Release to game input"; enabled: !tester.results.running
-                onClicked: bridge.setConfigClaimed(false)
+                onClicked: {
+                    tester.restoreController = bridge.selectedController
+                    bridge.setConfigClaimed(false)
+                }
+            }
+            PillButton {
+                visible: bridge.hasConfigSession && !tester.claimed
+                label: "Configure controller"; enabled: !tester.results.running
+                onClicked: {
+                    bridge.setConfigClaimed(true)
+                    tester.restoreController = ""
+                }
             }
             PillButton {
                 label: "Start · 10 s"
