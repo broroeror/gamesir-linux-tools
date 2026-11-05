@@ -541,6 +541,112 @@ class MotionTests(unittest.TestCase):
         page.deleteLater()
         engine.deleteLater()
 
+    def test_stick_tester_measures_reported_input_without_writing_settings(self):
+        from PySide6.QtCore import QMetaObject, Q_ARG
+        state.update(connected=True, mode_ok=True, lx=128, ly=128, rx=128, ry=128)
+        engine = QQmlApplicationEngine()
+        root = Path(__file__).resolve().parents[1]
+        engine.addImportPath(str(root / 'qml'))
+        engine.rootContext().setContextProperty('bridge', self.bridge)
+        errors = []
+        engine.warnings.connect(lambda warnings: errors.extend(w.toString() for w in warnings))
+        engine.load(QUrl.fromLocalFile(str(root / 'qml/App/StickTester.qml')))
+        self.assertTrue(engine.rootObjects(), errors)
+        tester = engine.rootObjects()[0]
+        invoke = lambda method: QMetaObject.invokeMethod(tester, method)
+        with patch.object(control, 'write_reg') as write, patch.object(control, 'send_cmd') as send:
+            QMetaObject.invokeMethod(tester, 'start', Q_ARG('QVariant', 'travel'))
+            for x, y in ((0, 128), (255, 128), (128, 0), (128, 255)):
+                state.update(lx=x, ly=y)
+                self.bridge.inputChanged.emit()
+                invoke('sample')
+            QMetaObject.invokeMethod(tester, 'start', Q_ARG('QVariant', 'rest'))
+            for x in (141, 115) * 20:
+                state.update(lx=x, ly=128)
+                self.bridge.inputChanged.emit()
+                invoke('sample')
+            tester.setProperty('deadline', 0)
+            state['lx'] = 128
+            self.bridge.inputChanged.emit()
+            invoke('sample')
+            left, right = tester.property('readings').toVariant()
+            self.assertTrue(tester.property('measured'))
+            self.assertAlmostEqual(left['x'], 0)
+            self.assertAlmostEqual(left['peak'], 13 / 127)
+            self.assertAlmostEqual((left['m2'] / left['n']) ** 0.5, (40 / 41) ** 0.5 * 13 / 127)
+            self.assertEqual((left['minX'], left['maxX'], left['minY'], left['maxY']), (-1, 1, -1, 1))
+            self.assertEqual(right['peak'], 0)
+            state['connected'] = False
+            self.bridge.statusChanged.emit()
+            self.assertFalse(tester.property('measured'))
+            self.assertEqual(tester.property('phase'), '')
+            write.assert_not_called(); send.assert_not_called()
+        self.assertEqual(errors, [])
+        self.assertEqual(self.bridge._pending, {})
+        tester.deleteLater()
+        engine.deleteLater()
+
+    def test_button_tester_counts_edges_between_gui_frames(self):
+        from PySide6.QtQuick import QQuickWindow
+        import button_capture
+        self.addCleanup(button_capture.enable, False)
+        state.update(connected=True, mode_ok=True, a=False, b=False, x=False, y=False,
+                     lb=False, rb=False, dpad='neutral')
+        engine = QQmlApplicationEngine()
+        root = Path(__file__).resolve().parents[1]
+        engine.addImportPath(str(root / 'qml'))
+        engine.rootContext().setContextProperty('bridge', self.bridge)
+        errors = []
+        engine.warnings.connect(lambda warnings: errors.extend(w.toString() for w in warnings))
+        engine.load(QUrl.fromLocalFile(str(root / 'qml/App/ButtonTester.qml')))
+        self.assertTrue(engine.rootObjects(), errors)
+        tester = engine.rootObjects()[0]
+        tester.show(); tester.requestActivate(); self.app.processEvents()
+        self.assertTrue(tester.property('capturing'))
+        for down, when in ((True, 1000), (True, 1001), (False, 1005), (True, 1009), (False, 1012)):
+            state['a'] = down
+            button_capture.record('test', when)
+        self.bridge._poll_input()  # both presses happened before a GUI refresh
+        a = tester.property('records').toVariant()['a']
+        self.assertEqual((a['count'], a['rapid'], a['gap']), (2, True, 4))
+        for down, when in ((True, 1100), (False, 1110), (True, 1158), (False, 1170)):
+            state['b'] = down
+            button_capture.record('test', when)
+        self.bridge._poll_input()
+        b = tester.property('records').toVariant()['b']
+        self.assertEqual((b['count'], b['rapid'], b['gap']), (2, False, 48))
+        for i in range(100):
+            for down, when in ((True, 2000 + i * 200), (False, 2050 + i * 200)):
+                state['a'] = down
+                button_capture.record('test', when)
+        state.update(dpad='up-right', ls=True)
+        button_capture.record('test', 23000)
+        self.bridge._poll_input()
+        counts = tester.property('records').toVariant()
+        self.assertEqual(counts['a']['count'], 102)
+        self.assertFalse(counts['a']['rapid'])
+        self.assertEqual((counts['dpad_up']['count'], counts['dpad_right']['count']), (1, 1))
+        self.assertNotIn('ls', counts)
+        for down, when in ((True, 25000), (True, 25500), (False, 26250)):
+            state['x'] = down
+            button_capture.record('test', when)
+        self.bridge._poll_input()
+        x = tester.property('records').toVariant()['x']
+        self.assertEqual((x['count'], x['held'], x['holdMs']), (1, False, 1250))
+        state['x'] = True
+        button_capture.record('test', 26266)
+        self.bridge._poll_input()
+        x = tester.property('records').toVariant()['x']
+        self.assertEqual((x['count'], x['held'], x['breaks'], x['gap']), (2, True, 1, 16))
+        tester.hide()
+        self.assertTrue(tester.property('records').toVariant()['x']['paused'])
+        state['b'] = True
+        button_capture.record('test', 24000)
+        self.assertEqual(button_capture.drain(), ([], False))
+        self.assertEqual(errors, [])
+        self.assertEqual(self.bridge._pending, {})
+        tester.deleteLater(); engine.deleteLater()
+
     def test_range_drag_stages_before_curve_change_section_switch_and_discard(self):
         from PySide6.QtCore import QObject, QMetaObject, Q_ARG
         engine = QQmlApplicationEngine()

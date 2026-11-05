@@ -14,6 +14,7 @@ Item {
     property var localContinuous: ({})
     property bool dpadSwap: false
     property bool dpadLock: false
+    ButtonTester { id: buttonTester }
     readonly property bool canRemap: bridge.profileCount > 0 && bridge.profile > 0
                                      && bridge.remapSources.length > 0
     Component.onCompleted: {
@@ -127,6 +128,12 @@ Item {
                     width: parent.width
                     y: Math.max(0, (parent.height - implicitHeight) / 2)
                     spacing: 12
+
+                    PillButton {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        label: "Test double clicks"
+                        onClicked: { buttonTester.show(); buttonTester.raise(); buttonTester.requestActivate() }
+                    }
 
                     ControllerView {
                         anchors.horizontalCenter: parent.horizontalCenter
