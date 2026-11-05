@@ -37,6 +37,7 @@ import kwin
 import vendors.gamesir.models.cyclone2.factory as factory
 import backup
 import register_transaction
+import button_capture
 
 from PySide6.QtCore import QUrl
 
@@ -135,6 +136,8 @@ def _resample_points(pts, n):
 class GamesirBridge(QObject):
     # --- change signals (one per property group QML binds to) ---------------
     inputChanged = Signal()
+    buttonTransition = Signal(str, bool, float)
+    buttonCaptureOverflow = Signal()
     statusChanged = Signal()
     lightsChanged = Signal()
     lightingLoaded = Signal()       # fired when a slot's lighting is read back
@@ -302,6 +305,11 @@ class GamesirBridge(QObject):
 
     # ------------------------------------------------------------------ polls
     def _poll_input(self):
+        events, overflow = button_capture.drain()
+        for key, down, when in events:
+            self.buttonTransition.emit(key, down, when)
+        if overflow:
+            self.buttonCaptureOverflow.emit()
         sig = (state['lx'], state['ly'], state['rx'], state['ry'],
                state['lt'], state['rt'], state['dpad'],
                state['a'], state['b'], state['x'], state['y'],
@@ -3303,6 +3311,10 @@ class GamesirBridge(QObject):
                                   else 'Releasing controller to games…')
         state['config_phase'] = 'claiming' if claimed else 'releasing'
         self.statusChanged.emit()
+
+    @Slot(bool)
+    def setButtonCapture(self, enabled):
+        button_capture.enable(enabled)
 
     @Slot()
     def rumbleTest(self):

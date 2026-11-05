@@ -23,6 +23,7 @@ from gs_common import (find_controllers, pick_live_node, firmware_version,
                        device_bcd, evdev_port, has_live_pad)
 from vendors.gamesir.enhanced import parse_enhanced
 from gs_state import state
+import button_capture
 import vendors.gamesir.control as control
 import controller_profile as profiles
 from vendors.gamesir.models.g7pro import protocol as g7pro
@@ -233,6 +234,7 @@ def read_session(device, driving_id):
                 continue
             state['mode_ok'] = True
             state.update(parse_enhanced(data))
+            button_capture.record(driving_id)
     except Exception as exc:
         # The session ends either way (unplug, EIO, a short report); say why
         # instead of the pad just blinking out and back with nothing logged.
@@ -701,7 +703,7 @@ def read_session_evdev(driving_id, force_wrong_mode=False):
                 except OSError:
                     return                               # node vanished
                 for i in range(0, len(data) - _EV_SIZE + 1, _EV_SIZE):
-                    _, _, etype, code, value = struct.unpack(_EV_FMT, data[i:i + _EV_SIZE])
+                    sec, usec, etype, code, value = struct.unpack(_EV_FMT, data[i:i + _EV_SIZE])
                     if etype == _EV_KEY:
                         k = _KEY_TO_STATE.get(code)
                         if k:
@@ -718,6 +720,8 @@ def read_session_evdev(driving_id, force_wrong_mode=False):
                         elif code == 17:                 # ABS_HAT0Y
                             hat['y'] = (value > 0) - (value < 0)
                             state['dpad'] = _HAT.get((hat['x'], hat['y']), 'neutral')
+                    if etype in (_EV_KEY, _EV_ABS):
+                        button_capture.record(driving_id, sec * 1000 + usec / 1000)
     except Exception:
         pass
     finally:
@@ -881,6 +885,7 @@ def read_session_seusb(ctrl):
                 values = g7se_input.decode(report)
                 if values is not None:
                     state.update(values)
+                    button_capture.record(ctrl['id'])
     except Exception as exc:
         state['config_status'] = 'G7 SE configuration ended: ' + str(exc)
         state['config_phase'] = 'failed'
@@ -979,6 +984,7 @@ def read_session_g7usb(ctrl):
                     and report[3] == g7pro.RESPONSE_MARKER:
                 saw_vendor = True
             if g7pro.parse_input(report, state):
+                button_capture.record(ctrl['id'])
                 continue
             if len(report) >= 9 and report[0] == 0x10 and report[3] == 0x3C:
                 if report[4] == 0x05:
