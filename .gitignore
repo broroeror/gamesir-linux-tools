@@ -5,6 +5,10 @@ __pycache__/
 .venv/
 venv/
 
+# Packaging output (AppImage builds)
+build/
+dist/
+
 # OS / editor cruft
 .DS_Store
 *.swp
