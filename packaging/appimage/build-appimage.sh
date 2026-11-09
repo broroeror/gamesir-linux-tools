@@ -9,9 +9,10 @@
 # Python or Qt installed. It still uses the host's graphics stack (X11/Wayland,
 # OpenGL) and the kernel's hidraw interface.
 #
-# Build prerequisites: curl, tar, zstd, and a network connection. We pin the
-# Python/PySide6/hidapi versions below; override them with the matching
-# environment variables when updating the bundle.
+# Build prerequisites: curl, tar, zstd, git, and a network connection. We pin
+# the Python/PySide6/hidapi versions below; override them with the matching
+# environment variables when updating the bundle. Downloads are verified
+# against pinned SHA-256 checksums (or the Anaconda API for conda-forge).
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -31,7 +32,7 @@ APPIMAGETOOL_VERSION="${APPIMAGETOOL_VERSION:-1.9.1}"
 # libkrb5 needs keyutils + OpenSSL 3. Conda-forge builds these against a very
 # old glibc, so bundling them does not raise the AppImage's floor.
 KRB5_VERSION="${KRB5_VERSION:-1.21.3}"
-KEYUTILS_VERSION="${KEYUTILS_VERSION:-1.6.1}"
+KEYUTILS_VERSION="${KEYUTILS_VERSION:-1.6.3}"
 OPENSSL_VERSION="${OPENSSL_VERSION:-3.4.8}"
 
 ARCH="${ARCH:-$(uname -m)}"
@@ -49,9 +50,9 @@ case "$ARCH" in
     PBS_ARCH="aarch64"
     CONDA_SUBDIR="linux-aarch64"
     APPIMAGE_ARCH="aarch64"
-    # No checksums pinned for arm64; the downloads are still HTTPS + pinned.
-    PYTHON_SHA256="${PYTHON_SHA256:-}"
-    APPIMAGETOOL_SHA256="${APPIMAGETOOL_SHA256:-}"
+    # Checksums for the pinned arm64 inputs.
+    PYTHON_SHA256="${PYTHON_SHA256:-bb4b6392670c5d3f93876996fcaa19858a4a413a0c7720144c18b0d6f1f0db2d}"
+    APPIMAGETOOL_SHA256="${APPIMAGETOOL_SHA256:-f0837e7448a0c1e4e650a93bb3e85802546e60654ef287576f46c71c126a9158}"
     ;;
   *)
     echo "Unsupported architecture: $ARCH (AppImage builds are x86_64 or aarch64)" >&2
@@ -71,6 +72,10 @@ VERSION="$(sed -n "s/^__version__ = '\(.*\)'/\1/p" "$HERE/version.py")"
 [ -n "$VERSION" ] || { echo "Could not read the version from version.py" >&2; exit 1; }
 
 mkdir -p "$BUILD_DIR" "$CACHE_DIR" "$TOOLS_DIR" "$OUT_DIR"
+command -v git >/dev/null || {
+  echo "git is required to list the tracked application files" >&2
+  exit 1
+}
 
 download() {
   local url="$1" out="$2" sha="${3:-}"
@@ -89,8 +94,8 @@ download() {
 # it into $BUILD_DIR/conda/<name>.
 fetch_conda() {
   local name="$1" version="$2"
-  local url file dest="$BUILD_DIR/conda/$name"
-  url="$(curl -fsSL "https://api.anaconda.org/package/conda-forge/$name" \
+  local info url sha file dest="$BUILD_DIR/conda/$name"
+  info="$(curl -fsSL "https://api.anaconda.org/package/conda-forge/$name" \
     | "$PY" -c '
 import json, sys
 version, subdir = sys.argv[1], sys.argv[2]
@@ -102,11 +107,17 @@ if not files:
     sys.exit(f"conda-forge has no {version} build for {subdir}")
 files.sort(key=lambda f: f.get("upload_time") or "")
 # "basename" is the path within the channel (e.g. linux-64/foo.conda).
-print("https://conda.anaconda.org/conda-forge/%s"
-      % files[-1]["basename"])
+f = files[-1]
+print("https://conda.anaconda.org/conda-forge/%s" % f["basename"])
+print(f.get("sha256") or "")
 ' "$version" "$CONDA_SUBDIR")"
+  { read -r url; read -r sha; } <<< "$info"
+  [ -n "$sha" ] || {
+    echo "The Anaconda API did not report a SHA-256 for conda-forge/$name $version ($CONDA_SUBDIR)" >&2
+    exit 1
+  }
   file="$CACHE_DIR/$(basename "$url")"
-  download "$url" "$file"
+  download "$url" "$file" "$sha"
 
   rm -rf "$dest"
   mkdir -p "$dest"
@@ -160,10 +171,22 @@ mkdir -p "$PIP_CACHE"
 echo "==> Installing the application"
 SHARE="$APPDIR/usr/share/$APP_ID"
 mkdir -p "$SHARE"
-cp "$HERE"/*.py "$SHARE"/
-# Dev-only test scripts, same set the PKGBUILD drops.
-rm -f "$SHARE/smoke_test.py" "$SHARE/continuous_trigger_tests.py" \
-      "$SHARE/continuous_trigger_ui_test.py" "$SHARE/macro_page_ui_test.py"
+# Copy the tracked top-level modules only, so untracked local scripts do not
+# end up in the AppImage. The four dev-only test scripts are the same set the
+# PKGBUILD drops.
+APP_PY_LIST="$BUILD_DIR/app-py.list"
+git -C "$HERE" ls-files -z -- ':(glob)*.py' \
+  ':(exclude,glob)smoke_test.py' \
+  ':(exclude,glob)continuous_trigger_tests.py' \
+  ':(exclude,glob)continuous_trigger_ui_test.py' \
+  ':(exclude,glob)macro_page_ui_test.py' > "$APP_PY_LIST"
+[ -s "$APP_PY_LIST" ] || {
+  echo "No tracked Python modules found; is $HERE a git checkout?" >&2
+  exit 1
+}
+while IFS= read -r -d '' py; do
+  cp "$HERE/$py" "$SHARE/"
+done < "$APP_PY_LIST"
 cp -r "$HERE/vendors" "$HERE/qml" "$HERE/assets" "$HERE/completions" "$SHARE"/
 cp "$HERE/70-gamesir.rules" "$SHARE"/
 mkdir -p "$SHARE/packaging/udev"
@@ -190,8 +213,8 @@ ln -sf libkrb5support.so.0.1 "$LIB/libkrb5support.so.0"
 ln -sf libcom_err.so.3.0    "$LIB/libcom_err.so.3"
 ln -sf libverto.so.0.0      "$LIB/libverto.so.0"
 
-cp -L "$BUILD_DIR/conda/keyutils/lib/libkeyutils.so.1.9" "$LIB/"
-ln -sf libkeyutils.so.1.9 "$LIB/libkeyutils.so.1"
+cp -L "$BUILD_DIR/conda/keyutils/lib/libkeyutils.so.1.10" "$LIB/"
+ln -sf libkeyutils.so.1.10 "$LIB/libkeyutils.so.1"
 cp -L "$BUILD_DIR/conda/openssl/lib/libssl.so.3" "$LIB/"
 cp -L "$BUILD_DIR/conda/openssl/lib/libcrypto.so.3" "$LIB/"
 

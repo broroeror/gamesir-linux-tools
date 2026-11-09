@@ -12,10 +12,13 @@ Python nor Qt installed. The host still supplies the graphics stack (X11 or
 Wayland, OpenGL) and the kernel's hidraw interface.
 
 The build is offline after the first run: downloads are cached in
-`build/appimage/cache/`. Build prerequisites are `curl`, `tar`, `zstd` and a
-network connection. The pinned Python, PySide6 and hidapi versions are at the
-top of the script; override them with the matching environment variables when
-updating the bundle.
+`build/appimage/cache/`. Build prerequisites are `curl`, `tar`, `zstd`, `git`
+and a network connection. The pinned Python, PySide6 and hidapi versions are at
+the top of the script; override them with the matching environment variables
+when updating the bundle. Downloads are checked against pinned SHA-256
+checksums, and conda-forge packages against the SHA-256 reported by the
+Anaconda API. The application modules are taken from `git ls-files`, so
+untracked local scripts are not bundled.
 
 Running the AppImage does not install the controller access rule. As with a
 source install, do that once:
