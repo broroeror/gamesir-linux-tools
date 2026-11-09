@@ -43,4 +43,5 @@ DiagnosticsWindow 1.0 DiagnosticsWindow.qml
 AxisSide 1.0 AxisSide.qml
 StickTester 1.0 StickTester.qml
 ButtonTester 1.0 ButtonTester.qml
+ReportTimingTester 1.0 ReportTimingTester.qml
 FastWheel 1.0 FastWheel.qml

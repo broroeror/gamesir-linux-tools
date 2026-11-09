@@ -38,6 +38,7 @@ import vendors.gamesir.models.cyclone2.factory as factory
 import backup
 import register_transaction
 import button_capture
+import report_timing
 
 from PySide6.QtCore import QUrl
 
@@ -217,6 +218,7 @@ class GamesirBridge(QObject):
         self._diagDone.connect(self._on_diag_done)
         self._backup_busy = False
         self._trigger_rumble_session = None
+        self._report_timing = report_timing.TimingTest()
         self.pendingChanged.connect(self._on_pending_changed)
 
         # 8K simple lighting (bank 0x20). Loaded once per connection and again
@@ -3323,6 +3325,18 @@ class GamesirBridge(QObject):
     @Slot(bool)
     def setButtonCapture(self, enabled):
         button_capture.enable(enabled)
+
+    @Slot()
+    def startReportTiming(self):
+        self._report_timing.start(state.get('selected'))
+
+    @Slot()
+    def stopReportTiming(self):
+        self._report_timing.stop()
+
+    @Slot(result='QVariantMap')
+    def reportTimingSnapshot(self):
+        return self._report_timing.snapshot()
 
     @Slot()
     def rumbleTest(self):

@@ -432,6 +432,48 @@ class MotionTests(unittest.TestCase):
         page.deleteLater()
         engine.deleteLater()
 
+    def test_timing_window_restores_only_the_session_it_released(self):
+        from PySide6.QtCore import QObject, QMetaObject
+        from PySide6.QtQuick import QQuickWindow
+        state.update(connected=True, config_claimed=True, config_wanted=True)
+        engine = QQmlApplicationEngine()
+        root = Path(__file__).resolve().parents[1]
+        engine.addImportPath(str(root / 'qml'))
+        engine.rootContext().setContextProperty('bridge', self.bridge)
+        engine.load(QUrl.fromLocalFile(str(root / 'qml/App/ReportTimingTester.qml')))
+        self.assertTrue(engine.rootObjects())
+        window = engine.rootObjects()[0]
+        buttons = {o.property('label'): o for o in window.findChildren(QObject) if o.property('label')}
+        window.show()
+        QMetaObject.invokeMethod(buttons['Release to game input'], 'clicked')
+        self.assertFalse(state['config_wanted'])
+        self.bridge._report_timing._update(running=True)
+        with patch.object(self.bridge._report_timing, 'stop') as stop:
+            window.close()  # close during capture, without pressing Stop
+            stop.assert_called()
+        self.assertTrue(state['config_wanted'])
+        self.bridge._report_timing._update(running=False)
+        state.update(config_claimed=False, config_wanted=False)
+        self.bridge.statusChanged.emit()
+        window.show(); window.close()  # already released before opening
+        self.assertFalse(state['config_wanted'])
+        state['config_claimed'] = True
+        self.bridge.statusChanged.emit()
+        window.show()
+        QMetaObject.invokeMethod(buttons['Release to game input'], 'clicked')
+        state['selected'] = 'other'
+        window.close()
+        self.assertFalse(state['config_wanted'])  # never claim a different pad
+        state['config_claimed'] = False
+        self.bridge.statusChanged.emit()
+        window.show()
+        self.assertTrue(buttons['Configure controller'].property('visible'))
+        self.assertTrue(buttons['Configure controller'].property('enabled'))
+        self.assertTrue(QMetaObject.invokeMethod(buttons['Configure controller'], 'clicked'))
+        self.assertTrue(state['config_wanted'])
+        self.assertEqual(window.property('restoreController'), '')
+        window.close(); window.deleteLater(); engine.deleteLater()
+
     def test_sensitivity_slider_updates_range_without_writing_or_crossing_sections(self):
         from PySide6.QtCore import QObject, QMetaObject, Q_ARG
         self.bridge._m['Aim']['output'] = 1
