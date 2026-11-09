@@ -65,6 +65,11 @@ except Exception:                      # partial install -- report what we can
     G7_NEEDS_USB = frozenset((0x109B, 0x109C, 0x10BA, 0x10BB, 0x100A))
 G7_IDENTITIES.update({pid: f'{name} (not configurable)'
                       for pid, name in G7_UNCONFIRMED.items()})
+try:
+    G7_IDENTITIES.update({pid: f'{mode} (not configurable; hold {combo} to switch back)'
+                          for pid, (mode, combo) in _g7.LOCKED_MODES.items()})
+except NameError:                      # partial install, no protocol module
+    pass
 
 # The Kaleid, which also configures over raw USB rather than hidraw. Its three
 # identities are all worth naming in a report: a reader who sees only "3537:1082"

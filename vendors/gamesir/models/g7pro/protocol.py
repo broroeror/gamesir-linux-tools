@@ -49,6 +49,10 @@ PID_WT_DOCK = 0x1004
 # Wuchang Edition, identified and hardware-tested by its owner over USB.
 PID_WUCHANG_WIRED = 0x10A7
 PID_WUCHANG_DONGLE = 0x10A8
+# After a 1000 Hz report rate is saved and Deadband closes, the Wuchang receiver
+# comes back as 10a9, which answers no configuration request (#17). Holding
+# Home + Share on the pad returns it to 10a8 at 500 Hz.
+PID_WUCHANG_FAST = 0x10A9
 # Zenless Zone Zero edition, identified and hardware-tested by its owner (#56).
 PID_ZZZ_WIRED = 0x105D
 PID_ZZZ_DONGLE = 0x105E
@@ -137,6 +141,13 @@ EDITIONS = {
 # the confirmation, a CONFIG_PIDS entry and a 70-gamesir.rules line in one commit.
 UNCONFIRMED_EDITIONS = {}
 UNCONFIRMED_PIDS = tuple(UNCONFIRMED_EDITIONS)
+
+# Modes of a configurable edition that can't be configured themselves, with the
+# button combo that leaves them. Input works; Deadband says how to get back.
+LOCKED_MODES = {
+    PID_WUCHANG_FAST: ('Wuchang receiver at 1000 Hz', 'Home + Share'),
+}
+LOCKED_PIDS = tuple(LOCKED_MODES)
 
 
 def edition_name(pid):

@@ -37,6 +37,12 @@ class DetectionTests(unittest.TestCase):
         self.assertIs(profiles.detect_one(0x1022, 'GameSir-G7 Pro'), profiles.G7_NATIVE)
         self.assertEqual(profiles.G7_NATIVE.write_style, 'none')
 
+    def test_wuchang_1000hz_receiver_is_named_not_configured(self):
+        self.assertIs(profiles.detect_one(0x10a9, 'GameSir-G7 Pro'), profiles.G7_PRO_LOCKED)
+        self.assertEqual(profiles.G7_PRO_LOCKED.write_style, 'none')
+        self.assertNotIn(0x10a9, g7.CONFIG_PIDS)
+        self.assertEqual(g7.LOCKED_MODES[0x10a9][1], 'Home + Share')
+
     def test_zenless_wired_and_dongle_are_configurable(self):
         for pid, wired in ((0x105d, True), (0x105e, False)):
             self.assertIs(profiles.detect_one(pid, 'GameSir-G7 Pro'), profiles.G7_PRO)

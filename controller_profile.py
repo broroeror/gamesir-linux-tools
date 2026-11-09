@@ -409,6 +409,17 @@ G7_PRO_OTHER = ControllerProfile(
     profile_banks=(),
 )
 
+# A configurable edition in a mode that answers no configuration request
+# (protocol.LOCKED_MODES). Detection only, so the app can say how to get back.
+G7_PRO_LOCKED = ControllerProfile(
+    name='GameSir G7 Pro',
+    short='G7 Pro',
+    usb_products=_g7.LOCKED_PIDS,
+    write_style='none',
+    input_style='evdev',
+    profile_banks=(),
+)
+
 # G7 SE: verified rear-button records and controller-wide report rate.
 # Configuration is gated by the tested firmware descriptor.
 G7_SE = ControllerProfile(
@@ -807,7 +818,7 @@ G7_8K_HID = ControllerProfile(
 )
 
 
-ALL = (CYCLONE, G7_PRO, G7_NATIVE, G7_PRO_OTHER, G7_SE, G7_SE_OTHER, G7_8K,
+ALL = (CYCLONE, G7_PRO, G7_NATIVE, G7_PRO_OTHER, G7_PRO_LOCKED, G7_SE, G7_SE_OTHER, G7_8K,
        G7_8K_HID, TARANTULA_PRO_8K, KALEID, KALEID_OTHER)
 DEFAULT = CYCLONE
 

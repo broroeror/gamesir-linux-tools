@@ -173,7 +173,8 @@ def _pick_selected(controllers):
     # initial selection away from a controller this app can configure.
     return next((c for c in live
                  if profiles.detect_one(c['pid'], c.get('product'))
-                 not in (None, profiles.G7_NATIVE, profiles.G7_PRO_OTHER, profiles.G7_SE,
+                 not in (None, profiles.G7_NATIVE, profiles.G7_PRO_OTHER,
+                         profiles.G7_PRO_LOCKED, profiles.G7_SE,
                          profiles.G7_SE_OTHER, profiles.G7_8K_HID)),
                 (live or controllers)[0])
 
@@ -454,6 +455,19 @@ def read_controller():
                 f'G7 Pro ({edition}) — config isn\'t supported for this edition '
                 f'yet; input works. An issue naming {g7pro.VID:04x}:'
                 f'{sel["pid"]:04x} would help get it added.')
+            state['config_phase'] = 'failed'
+            read_session_evdev(sel['id'], force_wrong_mode=True)
+            state['connected'] = False
+            time.sleep(0.3)
+            continue
+
+        # A configurable G7 Pro in a mode that won't answer: say how to leave it.
+        if prof is profiles.G7_PRO_LOCKED:
+            mode, combo = g7pro.LOCKED_MODES[sel['pid']]
+            state['connected'] = True
+            state['mode_ok'] = False
+            state['config_status'] = (f'G7 Pro {mode} can\'t be configured: hold {combo} '
+                                      'on the controller to switch back (#17)')
             state['config_phase'] = 'failed'
             read_session_evdev(sel['id'], force_wrong_mode=True)
             state['connected'] = False

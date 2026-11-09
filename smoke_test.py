@@ -177,6 +177,7 @@ def _doctor_identity_gaps():
     except Exception:
         return []
     known = set(g7.CONFIG_PIDS) | set(g7.TRANSITION_PIDS) | set(g7.UNCONFIRMED_PIDS) \
+        | set(g7.LOCKED_PIDS) \
         | {g7.PID_NATIVE} | set(kal.ALL_PIDS)
     return [f'3537:{pid:04x} is invisible to the diagnostics'
             for pid in sorted(known) if pid not in doctor.USB_IDENTITIES]
