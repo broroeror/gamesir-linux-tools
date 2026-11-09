@@ -1238,6 +1238,35 @@ Window {
 
                         Divider {}
 
+                        // ------------------------------------------ Controller tests
+                        SectionHeader { text: "Controller tests" }
+                        Text {
+                            width: parent.width; wrapMode: Text.WordWrap
+                            text: "Check for stick drift, double-clicking buttons and uneven "
+                                + "input timing. The tests only watch input; nothing is changed "
+                                + "on the controller."
+                            color: Theme.textDim
+                            font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                        }
+                        Flow {
+                            width: parent.width
+                            spacing: 8
+                            PillButton {
+                                label: "Sticks…"
+                                onClicked: { win.settingsOpen = false; stickTester.show(); stickTester.raise(); stickTester.requestActivate() }
+                            }
+                            PillButton {
+                                label: "Buttons…"
+                                onClicked: { win.settingsOpen = false; buttonTester.show(); buttonTester.raise(); buttonTester.requestActivate() }
+                            }
+                            PillButton {
+                                label: "Input timing…"
+                                onClicked: { win.settingsOpen = false; timingTester.show(); timingTester.raise(); timingTester.requestActivate() }
+                            }
+                        }
+
+                        Divider {}
+
                         // ------------------------------------------ Diagnostics
                         SectionHeader { text: "Help & Diagnostics" }
                         Text {
@@ -1262,6 +1291,10 @@ Window {
     // Diagnostics window (Settings → Help & Diagnostics, or the access banner).
     // A separate top-level window; hidden until shown, auto-runs on first open.
     DiagnosticsWindow { id: diagWin }
+    // Controller tests (Settings → Controller tests): separate windows, input only.
+    StickTester { id: stickTester }
+    ButtonTester { id: buttonTester }
+    ReportTimingTester { id: timingTester }
 
     // Transient toast: read-back result of the last "Save to Profile" (Apply).
     // Confirms an edit actually landed on the hardware (vs. a silently-dropped

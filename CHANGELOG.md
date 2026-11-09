@@ -8,6 +8,10 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
 ## [Unreleased]
 
 ### Added
+- **Controller tests** in Settings: a stick test (rest drift, noise, travel and a
+  suggested deadzone), a button test (press counts, holds and double-click
+  gaps) and a game-input timing test. They only watch input. Thanks to
+  [@sinchrotron](https://github.com/sinchrotron) (#59, #60).
 - **G7 Pro Wuchang wireless configuration** on its `3537:10a8` receiver (#17).
 - **Volume and media keys on the Cyclone 2 and G7 Pro.** A small `udev-hid-bpf`
   fix, shipped with Deadband, corrects how these pads describe media keys to Linux

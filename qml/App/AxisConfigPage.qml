@@ -13,8 +13,6 @@ Item {
     property var sideKeys: [["Left Stick", "st"], ["Right Stick", "rs"]]
     property bool isStick: true
 
-    StickTester { id: stickTester }
-
     // Cards keep their contents full-size but COMPRESS their vertical padding to
     // fit the window (FitScroll drives Theme.vComp); once maximally compressed it
     // scrolls. The bottom margin permanently reserves the pending-bar's height so
@@ -30,12 +28,6 @@ Item {
             id: fitBox
             width: scroller.availableWidth
             spacing: Math.max(6, Math.round(14 * Theme.vComp))
-
-            PillButton {
-                visible: page.isStick
-                label: "Test sticks"
-                onClicked: { stickTester.show(); stickTester.raise(); stickTester.requestActivate() }
-            }
 
             // ---- no-profile hint -------------------------------------------------
             Card {
