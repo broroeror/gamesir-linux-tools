@@ -18,5 +18,16 @@ class NumpadTargetTests(unittest.TestCase):
             self.assertEqual(label[code], name)
 
 
+class RemapRecordTests(unittest.TestCase):
+    def test_rebind_clears_combo_keys_but_not_the_macro_switch(self):
+        # udbue's L4 after rebinding over a combo: 01 9a 68 81 (#47)
+        record = cfg.full_remap_record([0x01, 0x9a])
+        self.assertEqual(record, [0x01, 0x9a, 0x00, 0x00, 0x00])
+        self.assertEqual(len(record), 5)    # byte 5 of a paddle block is its macro switch
+
+    def test_default_clears_combo_keys_too(self):
+        self.assertEqual(cfg.full_remap_record(cfg.remap_write_bytes(cfg.REMAP_NONE)), [0] * 5)
+
+
 if __name__ == '__main__':
     unittest.main()

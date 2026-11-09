@@ -394,6 +394,19 @@ def remap_write_bytes(target_name):
     return [0x00, 0x00]
 
 
+# A button record is [type, target, key2, key3, key4]: the three bytes after the
+# target hold the extra keys of a key combo set in GameSir's app (01 74 68 81 =
+# LCtrl+LShift+Down, #47). On a paddle, byte 5 switches its macro on. A 2-byte
+# write left an old combo's keys behind, so rebinding sent the leftovers too.
+COMBO_KEYS = 3
+
+
+def full_remap_record(data):
+    """[type, target] padded with cleared combo keys, so a rebind replaces any
+    combo GameSir's app stored there rather than adding to it."""
+    return list(data[:2]) + [0x00] * COMBO_KEYS
+
+
 def field_name(addr):
     """Human-readable label for a config/remap address, for readable backups.
     Falls back to the bare hex address if we haven't named it."""

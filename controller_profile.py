@@ -156,6 +156,8 @@ class ControllerProfile:
     REMAP_TARGETS: tuple = tuple(REMAP_TARGETS)
     REMAP_SLOTS: tuple = ()                 # (name, addr) source-button records
     REMAP_DEFAULTS: dict = field(default_factory=dict)  # addr -> default self-code
+    REMAP_SHORT: frozenset = frozenset()    # slots whose bytes after [type, target]
+                                            # are unmapped: rebinds write 2 bytes only
     CONTINUOUS_TRIGGER_SLOTS: tuple = ()    # independently verified per model
     MACRO_SLOTS: tuple = ()                 # (name, addr) paddles that hold macros
     macro_max: int = 32                     # max macro steps (paddle-block dependent)
@@ -700,6 +702,8 @@ TARANTULA_PRO_8K = ControllerProfile(
         0x0204: 0x1f, 0x02ad: 0x20, 0x0356: 0x21, 0x03ff: 0x22,
         0x04a8: 0x23, 0x0551: 0x24, 0x05fa: 0x25,
     },
+    # LT/RT sit in the 8K's trigger region, whose following bytes aren't mapped yet.
+    REMAP_SHORT=frozenset((_tar(0x035f), _tar(0x037f))),
     MACRO_SLOTS=(('L4', 0x00b2), ('R4', 0x015b),
                  ('C1', 0x0204), ('C2', 0x02ad), ('C3', 0x0356), ('C4', 0x03ff),
                  ('T1', 0x04a8), ('T2', 0x0551), ('T3', 0x05fa)),

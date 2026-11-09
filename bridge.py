@@ -2680,7 +2680,8 @@ class GamesirBridge(QObject):
             if target == cfg.REMAP_NONE and addr in self._prof.REMAP_DEFAULTS:
                 self.setRemapCode(source, -1)
                 return
-            self._queue(addr, cfg.remap_write_bytes(target), 'Remap ' + source, target)
+            self._queue(addr, self._remap_record(addr, cfg.remap_write_bytes(target)),
+                        'Remap ' + source, target)
 
     @Slot(str, int)
     def setRemapCode(self, source, code):
@@ -2714,7 +2715,14 @@ class GamesirBridge(QObject):
         else:
             data = [0x01, code & 0xff]
         label = cfg.REMAP_NONE if code < 0 else self.targetLabel(code)
-        self._queue(addr, data, 'Rebind ' + source, label)
+        self._queue(addr, self._remap_record(addr, data), 'Rebind ' + source, label)
+
+    def _remap_record(self, addr, data):
+        """The bytes a rebind writes. Cyclone-protocol pads also get their combo
+        keys cleared (cfg.full_remap_record); the G7 Pro's records differ."""
+        if self._prof.write_style == 'cyclone' and addr not in self._prof.REMAP_SHORT:
+            return cfg.full_remap_record(data)
+        return data
 
     _SE_EXTRAS = ('st_sensitivity', 'rs_sensitivity', 'st_invert_x', 'st_invert_y',
                   'rs_invert_x', 'rs_invert_y', 'vib_trigger_l', 'vib_trigger_r')

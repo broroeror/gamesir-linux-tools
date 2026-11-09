@@ -50,6 +50,9 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
   controllers instead of its orange product colours.
 
 ### Fixed
+- **Rebinding a button replaces a key combo set in GameSir's app.** Deadband
+  wrote only the new target, so the combo's other keys stayed stored and were
+  sent too: a paddle set to Vol− kept sending LShift + Down (#47).
 - Scrolling with a high-resolution mouse wheel, such as the G502 X's, crawled
   along at a few pixels per notch. Every scrolling page now moves at a normal
   desktop pace, and touchpads still follow your fingers.
