@@ -52,6 +52,13 @@ class Nova2LiteTests(unittest.TestCase):
             self.assertTrue(reader._probe_live(ctrl, profiles.NOVA_2_LITE))
             stream_probe.assert_not_called()
 
+    def test_pick_vendor_node_requires_ff7a_page(self):
+        with patch.object(n2l, 'is_vendor_node', side_effect=lambda n: n.endswith('hidraw9')):
+            self.assertEqual(n2l.pick_vendor_node(['/dev/hidraw8', '/dev/hidraw9']), '/dev/hidraw9')
+            self.assertIsNone(n2l.pick_vendor_node(['/dev/hidraw8']))
+        self.assertIsNone(n2l.pick_vendor_node([]))
+        self.assertIsNone(n2l.pick_vendor_node(None))
+
     def test_packet_framing_and_checksum(self):
         pkt = n2l.frame_packet([0x23, 0x04, 0x06, 0x00, 0x00], 6)
         self.assertEqual(len(pkt), 65)

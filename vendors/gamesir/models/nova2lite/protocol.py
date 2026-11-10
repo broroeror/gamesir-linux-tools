@@ -1,14 +1,16 @@
 """
 GameSir Nova 2 Lite (T4N2) — vendor HID protocol (0xFF7A)
 =========================================================
-Reverse-engineered from GameSir Connect's `sapjoyuniapis_t4n2_x86_v2604013.dll`
-and hardware-verified on a physical Nova 2 Lite (3537:100f wired, fw 1.82).
+Observed on the wire with a physical Nova 2 Lite (3537:100f wired, 3537:1098
+2.4 GHz wireless dongle, firmware 1.82).
 
 Transport & Node Selection
 --------------------------
 The Nova 2 Lite enumerates as:
   * 3537:100f — wired USB ("GameSir-Nova 2 Lite")
-  * 3537:1098 — 2.4 GHz wireless dongle ("GameSir-Nova 2 Lite Dongle")
+  * 3537:1098 — 2.4 GHz wireless dongle ("GameSir-Nova 2 Lite Dongle" /
+    "2.4G XBOX 360 For Windows"; idles as 3537:2106 "Zikway HID zk" while the
+    controller is off)
 
 On Linux it exposes multiple HID interfaces; the vendor command and live-input
 channel is the interface whose HID report descriptor declares Usage Page 0xFF7A
@@ -17,7 +19,7 @@ declares no Report IDs:
   * Output writes via hidapi take a leading 0x00 report-ID byte + 64 payload
     bytes (65 bytes total).
   * Input reads via hidapi/hidraw return 64 bytes starting directly at byte 0
-    (the command opcode), shifted by -1 relative to Windows ReadFile buffers.
+    (the command opcode).
 
 Checksum
 --------
@@ -83,7 +85,7 @@ GAMEPAD_TARGETS = tuple(_cy.REMAP_TARGETS[:-1]) + (
     _cy.REMAP_TARGETS[-1],      # ('Disabled', 0xFF)
 )
 
-# T4N2 hardware button codes used by 0xF1 (Get/SetGamepadKeyMapping)
+# T4N2 hardware button codes used by 0xF1 remap packets
 _SLOT_TO_HW_KEY = {
     'Dpad Up':    0xB0,
     'Dpad Down':  0xB1,
@@ -168,12 +170,10 @@ def is_vendor_node(devnode: str) -> bool:
 
 def pick_vendor_node(devnodes):
     """Return the 0xFF7A vendor hidraw node from a controller's node list."""
-    if not devnodes:
-        return None
-    for n in devnodes:
+    for n in devnodes or ():
         if is_vendor_node(n):
             return n
-    return devnodes[0]
+    return None
 
 
 def frame_packet(prefix_bytes, total_len: int) -> bytes:
@@ -186,17 +186,17 @@ def frame_packet(prefix_bytes, total_len: int) -> bytes:
 
 
 def device_info_packet() -> bytes:
-    """GetDeviceInfo query (`01 01 00`)."""
+    """Device-info query (`01 01 00`)."""
     return bytes([0x00, 0x01, 0x01, 0x00] + [0x00] * (REPORT_LEN - 3))
 
 
 def enable_stream_packet() -> bytes:
-    """SetGamepadStateReport(Mapped): enables live 0xF4 input reports."""
+    """Enable live 0xF4 input reports on the 0xFF7A vendor interface (`f3 01 05 02`)."""
     return frame_packet([0xF3, 0x01, 0x05, 0x02], 5)
 
 
 def disable_stream_packet() -> bytes:
-    """SetGamepadStateReport(Original): restores normal HID reporting."""
+    """Disable live 0xF4 input reports on the 0xFF7A vendor interface (`f3 01 05 00`)."""
     return frame_packet([0xF3, 0x01, 0x05, 0x00], 5)
 
 
@@ -247,7 +247,7 @@ def streams_live_data(devnode: str, secs: float = 0.5) -> bool:
 
 
 def parse_device_info(data) -> dict:
-    """Decode a 0x01 GetDeviceInfo reply into firmware/battery/charging fields."""
+    """Decode a 0x01 device-info reply into firmware/battery/charging fields."""
     if not data or len(data) < 18 or data[0] != 0x01 or data[1] == 0x00:
         return {}
     out = {}
@@ -402,7 +402,7 @@ def match_read_reply(data, bank: int, addr: int, length: int):
     if not data or len(data) < 6:
         return None
 
-    # 0x25: GetVibrateLevel reply (data[3] == 0x00 for read, 0x01 for write ACK)
+    # 0x25: grip vibration reply (data[3] == 0x00 for read, 0x01 for write ACK)
     if addr in (VIB_L, VIB_R):
         if data[0] != 0x25 or data[1] != 0x01 or data[3] != 0x00 or len(data) < 13:
             return None
@@ -411,21 +411,21 @@ def match_read_reply(data, bank: int, addr: int, length: int):
         val = data[4] if addr == VIB_L else data[8]
         return [val][:length]
 
-    # 0x23: GetCrossKeyOption / GetStickTrajectoryMode (data[3] == 0x00 for read)
+    # 0x23: D-pad option / stick trajectory reply (data[3] == 0x00 for read)
     if addr in (DPAD_SWAP, DPAD_LOCK, ST_TRAJ, RS_TRAJ):
         sub = {DPAD_LOCK: 0x01, DPAD_SWAP: 0x04, ST_TRAJ: 0x10, RS_TRAJ: 0x11}[addr]
         if data[0] != 0x23 or data[1] != sub or data[3] != 0x00:
             return None
         return [data[4]][:length]
 
-    # 0x07: GetTriggerDeadZone (data[3] == 0x00 for read)
+    # 0x07: trigger deadzone reply (data[3] == 0x00 for read)
     if addr in (LT_DZ_MIN, LT_DZ_MAX, RT_DZ_MIN, RT_DZ_MAX):
         sub = {LT_DZ_MIN: 0x05, RT_DZ_MIN: 0x06, LT_DZ_MAX: 0x07, RT_DZ_MAX: 0x08}[addr]
         if data[0] != 0x07 or data[1] != sub or data[3] != 0x00:
             return None
         return [data[4]][:length]
 
-    # 0x21: GetQuickTrigger (data[1] == 0x00 for read, 0x01 for write ACK)
+    # 0x21: hair-trigger reply (data[1] == 0x00 for read, 0x01 for write ACK)
     if addr in (LT_HAIR, RT_HAIR):
         if data[0] != 0x21 or data[1] != 0x00:
             return None
@@ -441,7 +441,7 @@ def match_read_reply(data, bank: int, addr: int, length: int):
         _hair_ui_cache[addr] = cached
         return cached[:length]
 
-    # 0xF0: GetStickDeadZoneAndCurve (data[1] == 0x00 for read, 0x01 for write ACK)
+    # 0xF0: stick deadzone and curve reply (data[1] == 0x00 for read, 0x01 for write ACK)
     stick_id, off = _stick_id_for_addr(addr)
     if stick_id in (1, 2):
         if data[0] != 0xF0 or data[1] != 0x00 or data[3] != stick_id or len(data) < 17:
@@ -461,7 +461,7 @@ def match_read_reply(data, bank: int, addr: int, length: int):
             return _decode_stick_curve(stick_id, raw12)[:length]
         return None
 
-    # 0xF1: GetGamepadKeyMapping (data[1] == 0x00 for read)
+    # 0xF1: button remap reply (data[1] == 0x00 for read)
     if addr in _ADDR_TO_HW_KEY:
         hw_key = _ADDR_TO_HW_KEY[addr]
         if data[0] != 0xF1 or data[1] != 0x00 or data[3] != hw_key or len(data) < 9:

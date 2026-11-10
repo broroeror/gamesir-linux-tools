@@ -1103,7 +1103,7 @@ class GamesirBridge(QObject):
         a missing property as undefined, so the Reset-profile button just never
         appeared, and resetProfileToDefault() would have raised on its own guard.
         smoke_test now checks every bridge.<name> the QML uses exists."""
-        return profiles.is_recognized() and self._prof.input_style in ('cyclone_0x12', 't4n2_0xf4')
+        return profiles.is_recognized() and self._prof.input_style == 'cyclone_0x12'
 
     @Property(int, notify=controllerChanged)
     def profileCount(self):

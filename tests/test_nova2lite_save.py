@@ -89,6 +89,7 @@ class Nova2LiteSaveTests(unittest.TestCase):
         return self.bridge.applyStatus
 
     def test_save_normalizes_both_motors_before_verified_transaction(self):
+        self.assertFalse(self.bridge.profileResetSupported)
         self.bridge.setScalar('vib_l', 32)
         self.bridge.setScalar('vib_r', 64)
         self.assertEqual(self.pad.writes, [])
