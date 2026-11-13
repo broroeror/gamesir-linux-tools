@@ -36,7 +36,7 @@ Item {
             }
             Text {
                 text: (root.currentIndex >= 0 && root.currentIndex < root.model.length)
-                      ? root.model[root.currentIndex] : root.placeholderText
+                      ? qsTranslate("UI", root.model[root.currentIndex]) : root.placeholderText
                 color: Theme.text
                 font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
                 font.weight: Font.DemiBold
@@ -75,7 +75,7 @@ Item {
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
                         anchors.left: parent.left; anchors.leftMargin: 10
-                        text: modelData
+                        text: qsTranslate("UI", modelData)
                         color: parent.sel ? Theme.textOnAccent : Theme.text
                         font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
                         font.weight: parent.sel ? Font.DemiBold : Font.Normal

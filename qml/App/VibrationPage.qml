@@ -69,10 +69,10 @@ Item {
             visible: !bridge.profile
             Layout.alignment: Qt.AlignHCenter
             Layout.preferredWidth: 460
-            title: "No profile selected"
+            title: qsTranslate("UI", "No profile selected")
             Text {
                 width: parent.width; wrapMode: Text.WordWrap
-                text: "Pick a profile (1–4) in the top bar to read and edit its settings."
+                text: qsTranslate("UI", "Pick a profile (1–4) in the top bar to read and edit its settings.")
                 color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
             }
         }
@@ -85,15 +85,15 @@ Item {
             spacing: 16
 
             Card {
-                title: "Vibration strength"; Layout.fillWidth: true
+                title: qsTranslate("UI", "Vibration strength"); Layout.fillWidth: true
                 Text {
                     width: parent.width; wrapMode: Text.WordWrap
-                    text: "Hold LT or RT to test the motors on that side. Pull further for stronger vibration, up to the strength below."
+                    text: qsTranslate("UI", "Hold LT or RT to test the motors on that side. Pull further for stronger vibration, up to the strength below.")
                     color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                 }
                 Row {
                     width: parent.width
-                    Text { text: "Left"; color: Theme.textDim
+                    Text { text: qsTranslate("UI", "Left"); color: Theme.textDim
                            font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                     Item { width: parent.width - 70; height: 1 }
                     Text { text: vibL.value + "%"; color: Theme.text
@@ -105,14 +105,14 @@ Item {
                 }
                 PillButton {
                     objectName: "testLeftGrip"
-                    label: "Test left grip (heavy motor)"
+                    label: qsTranslate("UI", "Test left grip (heavy motor)")
                     enabled: !page.testRunning && vibL.value > 0
                              && (!bridge.g7Layout || bridge.configClaimed)
                     onClicked: page.testMotor("left", vibL.value)
                 }
                 Row {
                     width: parent.width
-                    Text { text: "Right"; color: Theme.textDim
+                    Text { text: qsTranslate("UI", "Right"); color: Theme.textDim
                            font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                     Item { width: parent.width - 70; height: 1 }
                     Text { text: vibR.value + "%"; color: Theme.text
@@ -124,7 +124,7 @@ Item {
                 }
                 PillButton {
                     objectName: "testRightGrip"
-                    label: "Test right grip (light motor)"
+                    label: qsTranslate("UI", "Test right grip (light motor)")
                     enabled: !page.testRunning && vibR.value > 0
                              && (!bridge.g7Layout || bridge.configClaimed)
                     onClicked: page.testMotor("right", vibR.value)
@@ -135,11 +135,11 @@ Item {
                 // the missing "big right" and "small left".
                 Text {
                     width: parent.width; wrapMode: Text.WordWrap
-                    text: "Each grip has one motor: a heavy one on the left and a light one on the right."
+                    text: qsTranslate("UI", "Each grip has one motor: a heavy one on the left and a light one on the right.")
                     color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                 }
                 PillButton {
-                    label: "Test both grip motors"
+                    label: qsTranslate("UI", "Test both grip motors")
                     enabled: !page.testRunning && (!bridge.g7Layout || bridge.configClaimed)
                     onClicked: {
                         page.testError = ""; page.testRunning = true
@@ -149,14 +149,14 @@ Item {
             }
 
             Card {
-                visible: bridge.g7Layout; title: "Trigger motors"; Layout.fillWidth: true
+                visible: bridge.g7Layout; title: qsTranslate("UI", "Trigger motors"); Layout.fillWidth: true
                 // GameSir doesn't document what Force and Sync do, so say only what
                 // was observed: with Force on, a trigger's test stays silent
                 // (Amazon edition, 2026-10-06) -- it read as a broken test.
                 Text {
                     visible: !bridge.seFullView
                     width: parent.width; wrapMode: Text.WordWrap
-                    text: "A trigger's test can stay silent while its Force option is on."
+                    text: qsTranslate("UI", "A trigger's test can stay silent while its Force option is on.")
                     color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                 }
                 // Sliders, like the grip motors above and every other controller's
@@ -166,7 +166,7 @@ Item {
                     width: parent.width; spacing: 6
                     Row {
                         width: parent.width
-                        Text { text: "Left trigger"; color: Theme.textDim
+                        Text { text: qsTranslate("UI", "Left trigger"); color: Theme.textDim
                                font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                         Item { width: parent.width - 130; height: 1 }
                         Text { text: trigLSlider.value + "%"; color: Theme.text
@@ -178,18 +178,18 @@ Item {
                     }
                     PillButton {
                         objectName: "testLeftTrigger"
-                        label: "Test left trigger"
+                        label: qsTranslate("UI", "Test left trigger")
                         enabled: bridge.configClaimed && !page.testRunning && trigLSlider.value > 0
                         onClicked: page.testMotor("left_trigger", trigLSlider.value)
                     }
                     Row {
                         visible: !bridge.seFullView     // Force/Sync unmapped on the G7 SE
                         spacing: 16
-                        Row { spacing: 6; Text { text: "Force"; color: Theme.textDim }
+                        Row { spacing: 6; Text { text: qsTranslate("UI", "Force"); color: Theme.textDim }
                             ToggleSwitch { checked: page.forceL
                                 onToggled: { page.forceL = checked
                                              bridge.setG7Extra("vib_force_l", checked ? 1 : 0) } } }
-                        Row { spacing: 6; Text { text: "Sync"; color: Theme.textDim }
+                        Row { spacing: 6; Text { text: qsTranslate("UI", "Sync"); color: Theme.textDim }
                             ToggleSwitch { checked: page.syncL
                                 onToggled: { page.syncL = checked
                                              bridge.setG7Extra("vib_sync_l", checked ? 1 : 0) } } }
@@ -199,7 +199,7 @@ Item {
                     width: parent.width; spacing: 6
                     Row {
                         width: parent.width
-                        Text { text: "Right trigger"; color: Theme.textDim
+                        Text { text: qsTranslate("UI", "Right trigger"); color: Theme.textDim
                                font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                         Item { width: parent.width - 130; height: 1 }
                         Text { text: trigRSlider.value + "%"; color: Theme.text
@@ -211,18 +211,18 @@ Item {
                     }
                     PillButton {
                         objectName: "testRightTrigger"
-                        label: "Test right trigger"
+                        label: qsTranslate("UI", "Test right trigger")
                         enabled: bridge.configClaimed && !page.testRunning && trigRSlider.value > 0
                         onClicked: page.testMotor("right_trigger", trigRSlider.value)
                     }
                     Row {
                         visible: !bridge.seFullView     // Force/Sync unmapped on the G7 SE
                         spacing: 16
-                        Row { spacing: 6; Text { text: "Force"; color: Theme.textDim }
+                        Row { spacing: 6; Text { text: qsTranslate("UI", "Force"); color: Theme.textDim }
                             ToggleSwitch { checked: page.forceR
                                 onToggled: { page.forceR = checked
                                              bridge.setG7Extra("vib_force_r", checked ? 1 : 0) } } }
-                        Row { spacing: 6; Text { text: "Sync"; color: Theme.textDim }
+                        Row { spacing: 6; Text { text: qsTranslate("UI", "Sync"); color: Theme.textDim }
                             ToggleSwitch { checked: page.syncR
                                 onToggled: { page.syncR = checked
                                              bridge.setG7Extra("vib_sync_r", checked ? 1 : 0) } } }
@@ -233,7 +233,7 @@ Item {
             Text {
                 Layout.fillWidth: true
                 visible: page.testRunning || page.testError.length > 0
-                text: page.testRunning ? "Testing…" : page.testError
+                text: page.testRunning ? qsTranslate("UI", "Testing…") : page.testError
                 wrapMode: Text.WordWrap
                 color: Theme.textDim
                 font.family: Theme.fontFamily; font.pixelSize: Theme.fontS

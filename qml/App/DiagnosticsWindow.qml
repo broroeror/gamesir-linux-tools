@@ -11,7 +11,7 @@ import App 1.0
 // for pasting straight into a GitHub issue — so users never need a terminal.
 Window {
     id: win
-    title: "Deadband — Diagnostics"
+    title: qsTranslate("UI", "Deadband — Diagnostics")
     width: 720; height: 560
     minimumWidth: 520; minimumHeight: 360
     color: Theme.bg
@@ -29,7 +29,7 @@ Window {
             width: parent.width; height: 34
             Text {
                 anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
-                text: "Device diagnostics"
+                text: qsTranslate("UI", "Device diagnostics")
                 color: Theme.text; font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontL; font.weight: Font.DemiBold
             }
@@ -37,12 +37,12 @@ Window {
                 anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                 spacing: 8
                 PillButton {
-                    label: bridge.diagBusy ? "Running…" : "↺ Re-run"
+                    label: bridge.diagBusy ? qsTranslate("UI", "Running…") : qsTranslate("UI", "↺ Re-run")
                     enabled: !bridge.diagBusy
                     onClicked: { win.copied = false; bridge.runDiagnostics() }
                 }
                 PillButton {
-                    label: win.copied ? "✓ Copied" : "Copy report"
+                    label: win.copied ? qsTranslate("UI", "✓ Copied") : qsTranslate("UI", "Copy report")
                     highlight: !win.copied
                     enabled: bridge.diagReport.length > 0
                     onClicked: { bridge.copyText(bridge.diagReport); win.copied = true }
@@ -51,8 +51,7 @@ Window {
         }
         Text {
             width: parent.width; wrapMode: Text.WordWrap
-            text: "Checks whether Deadband can actually open your devices — and if not, "
-                + "why. Paste the report into a GitHub issue when asking for help."
+            text: qsTranslate("UI", "Checks whether Deadband can actually open your devices — and if not, why. Paste the report into a GitHub issue when asking for help.")
             color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
         }
 
@@ -74,7 +73,7 @@ Window {
                     readOnly: true
                     wrapMode: TextEdit.WrapAnywhere
                     text: bridge.diagBusy && bridge.diagReport.length === 0
-                          ? "Collecting…" : bridge.diagReport
+                          ? qsTranslate("UI", "Collecting…") : bridge.diagReport
                     color: Theme.text
                     font.family: "monospace"; font.pixelSize: Theme.fontS
                     background: null

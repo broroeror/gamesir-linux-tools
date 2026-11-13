@@ -23,7 +23,7 @@ Row {
             readonly property int n: index + 1
             readonly property bool sel: bridge.profile === n
             readonly property bool act: bridge.activeProfile === n
-            width: root.compact ? 40 : 92; height: 32; radius: 8
+            width: root.compact ? 40 : Math.max(92, profileText.implicitWidth + 28); height: 32; radius: 8
             color: sel ? Theme.accent
                        : (hov.hovered ? Theme.cardHover : Theme.card)
             border.color: sel ? Qt.lighter(Theme.accent, 1.2) : Theme.cardBorder
@@ -44,7 +44,8 @@ Row {
                 }
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: root.compact ? ("P" + pill.n) : ("Profile " + pill.n)
+                    id: profileText
+                    text: root.compact ? ("P" + pill.n) : qsTranslate("UI", "Profile %1").arg(pill.n)
                     color: pill.sel ? Theme.textOnAccent : Theme.textDim
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontM

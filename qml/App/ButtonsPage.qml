@@ -28,7 +28,7 @@ Item {
     }
     function targetLabel(src) {
         var c = targetCode(src)
-        return c < 0 ? "Default" : bridge.targetLabel(c)
+        return c < 0 ? qsTranslate("UI", "Default") : bridge.targetLabel(c)
     }
     function assignCode(src, code) {
         var m = Object.assign({}, localRemap); m[src] = code; localRemap = m
@@ -88,7 +88,7 @@ Item {
                 spacing: 14
 
                 Card {
-                    title: "Button Mapping"
+                    title: qsTranslate("UI", "Button Mapping")
                     Layout.fillWidth: true; Layout.fillHeight: true
                     Grid {
                         width: parent.width; columns: 2; spacing: 6
@@ -140,7 +140,7 @@ Item {
                     Card {
                         visible: bridge.remapOnly
                         width: parent.width
-                        title: "Live input"
+                        title: qsTranslate("UI", "Live input")
                         Grid {
                             width: parent.width
                             columns: 2; spacing: 8
@@ -148,9 +148,9 @@ Item {
                                 model: [
                                     "LT  " + Math.round(bridge.leftTrigger * 100) + "%",
                                     "RT  " + Math.round(bridge.rightTrigger * 100) + "%",
-                                    "Left stick  X " + bridge.leftStickX.toFixed(2)
+                                    qsTranslate("UI", "Left stick  X ") + bridge.leftStickX.toFixed(2)
                                         + "  Y " + bridge.leftStickY.toFixed(2),
-                                    "Right stick  X " + bridge.rightStickX.toFixed(2)
+                                    qsTranslate("UI", "Right stick  X ") + bridge.rightStickX.toFixed(2)
                                         + "  Y " + bridge.rightStickY.toFixed(2)
                                 ]
                                 delegate: Text {
@@ -184,7 +184,7 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                             }
                             Text {
-                                text: page.targetCode(page.sel) < 0 ? "unmapped" : page.targetLabel(page.sel)
+                                text: page.targetCode(page.sel) < 0 ? qsTranslate("UI", "unmapped") : page.targetLabel(page.sel)
                                 color: page.targetCode(page.sel) < 0 ? Theme.textDim : Theme.accent
                                 font.bold: page.targetCode(page.sel) >= 0
                                 font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
@@ -200,9 +200,8 @@ Item {
                         width: Math.min(implicitWidth, centerArea.width - 24)
                         horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap
                         text: bridge.profileCount > 0
-                              ? "Select a profile above to remap buttons."
-                              : "Button remapping is unavailable for " + bridge.controllerName
-                                + " in this app. Configuration is disabled."
+                              ? qsTranslate("UI", "Select a profile above to remap buttons.")
+                              : qsTranslate("UI", "Button remapping is unavailable for %1 in this app. Configuration is disabled.").arg(bridge.controllerName)
                         color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
                     }
                 }
@@ -221,11 +220,11 @@ Item {
 
                 Card {
                     visible: bridge.hasContinuousTrigger
-                    title: "Continuous Trigger"; Layout.fillWidth: true
+                    title: qsTranslate("UI", "Continuous Trigger"); Layout.fillWidth: true
                     RowLayout {
                         width: parent.width
                         Text {
-                            text: "Tap to hold / release"
+                            text: qsTranslate("UI", "Tap to hold / release")
                             Layout.fillWidth: true; wrapMode: Text.WordWrap
                             color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                         }
@@ -247,20 +246,20 @@ Item {
                     Text {
                         width: parent.width; wrapMode: Text.WordWrap
                         text: page.continuousState(page.sel) < 0
-                              ? "Waiting for a supported setting from the controller."
+                              ? qsTranslate("UI", "Waiting for a supported setting from the controller.")
                               : !page.macroAllowsToggle(page.sel)
-                                ? "Use a normal mapping for this paddle; disable its macro first."
-                                : "After Save, tap " + page.sel + " to hold its output, then tap again to release. Saved in this profile; works after Deadband closes."
+                                ? qsTranslate("UI", "Use a normal mapping for this paddle; disable its macro first.")
+                                : qsTranslate("UI", "After Save, tap %1 to hold its output, then tap again to release. Saved in this profile; works after Deadband closes.").arg(page.sel)
                         color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                     }
                 }
 
                 Card {
-                    title: "Assign — " + page.sel; Layout.fillWidth: true
+                    title: qsTranslate("UI", "Assign — ") + page.sel; Layout.fillWidth: true
                     Flow {
                         width: parent.width; spacing: 6
                         PillButton {
-                            label: "Default"
+                            label: qsTranslate("UI", "Default")
                             highlight: page.targetCode(page.sel) < 0
                             onClicked: page.assignCode(page.sel, -1)
                         }
@@ -274,21 +273,21 @@ Item {
                             }
                         }
                     }
-                    Text { visible: !bridge.remapOnly; text: "Keyboard & mouse"; color: Theme.textDim; topPadding: 6
+                    Text { visible: !bridge.remapOnly; text: qsTranslate("UI", "Keyboard & mouse"); color: Theme.textDim; topPadding: 6
                            font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                     Flow {
                         visible: !bridge.remapOnly
                         width: parent.width; spacing: 6
-                        PillButton { label: "⌨ Keyboard"; onClicked: rebindPicker.open("keyboard") }
-                        PillButton { label: "🖱 Mouse";    onClicked: rebindPicker.open("mouse") }
+                        PillButton { label: qsTranslate("UI", "⌨ Keyboard"); onClicked: rebindPicker.open("keyboard") }
+                        PillButton { label: qsTranslate("UI", "🖱 Mouse");    onClicked: rebindPicker.open("mouse") }
                     }
                 }
 
                 Card {
-                    visible: bridge.isG7Pro; title: "D-pad options"; Layout.fillWidth: true
+                    visible: bridge.isG7Pro; title: qsTranslate("UI", "D-pad options"); Layout.fillWidth: true
                     Row {
                         width: parent.width
-                        Text { text: "Swap left stick / D-pad"; color: Theme.textDim }
+                        Text { text: qsTranslate("UI", "Swap left stick / D-pad"); color: Theme.textDim }
                         Item { width: parent.width - 190; height: 1 }
                         ToggleSwitch { checked: page.dpadSwap
                             onToggled: { page.dpadSwap = checked
@@ -296,7 +295,7 @@ Item {
                     }
                     Row {
                         width: parent.width
-                        Text { text: "Diagonal lock"; color: Theme.textDim }
+                        Text { text: qsTranslate("UI", "Diagonal lock"); color: Theme.textDim }
                         Item { width: parent.width - 120; height: 1 }
                         ToggleSwitch { checked: page.dpadLock
                             onToggled: { page.dpadLock = checked

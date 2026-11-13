@@ -52,6 +52,7 @@ from PySide6.QtQml import QQmlApplicationEngine
 from reader import read_controller, press_select_loop, release_controller
 from bridge import GamesirBridge
 from mouse_bridge import MouseBridge
+from i18n import LanguageManager
 import kwin
 import mousegrab
 
@@ -111,6 +112,8 @@ def main():
 
     engine = QQmlApplicationEngine()
     engine.addImportPath(QML_DIR)                 # makes `import App` resolve
+    language = LanguageManager(app, engine)
+    engine.rootContext().setContextProperty('i18n', language)
     bridge = GamesirBridge()
     engine.rootContext().setContextProperty('bridge', bridge)
     mouse = MouseBridge()

@@ -5,16 +5,16 @@ import App 1.0
 Card {
     id: sensors
     objectName: "motionSensors"
-    title: "Live Sensors"
+    title: qsTranslate("UI", "Live Sensors")
     readonly property var readings: bridge.motionSensors
     readonly property bool streaming: readings.available === true
-    headerValue: streaming ? "Streaming · raw counts" : "No live data"
+    headerValue: streaming ? qsTranslate("UI", "Streaming · raw counts") : qsTranslate("UI", "No live data")
 
     RowLayout {
         width: parent.width
         spacing: 24
         Repeater {
-            model: ["Gyroscope", "Accelerometer"]
+            model: [qsTranslate("UI", "Gyroscope"), qsTranslate("UI", "Accelerometer")]
             delegate: Column {
                 id: group
                 required property string modelData
@@ -29,8 +29,8 @@ Card {
                     color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                 }
                 Text {
-                    text: group.index === 0 ? "Rotation · near zero at rest"
-                                           : "Acceleration · includes gravity"
+                    text: group.index === 0 ? qsTranslate("UI", "Rotation · near zero at rest")
+                                           : qsTranslate("UI", "Acceleration · includes gravity")
                     color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                 }
                 Repeater {
@@ -75,8 +75,8 @@ Card {
     Text {
         width: parent.width; wrapMode: Text.WordWrap
         visible: !sensors.streaming
-        text: bridge.configClaimed ? "Waiting for sensor reports…"
-                                  : "Choose Configure controller to view live sensors."
+        text: bridge.configClaimed ? qsTranslate("UI", "Waiting for sensor reports…")
+                                  : qsTranslate("UI", "Choose Configure controller to view live sensors.")
         color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
     }
 }

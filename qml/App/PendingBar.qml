@@ -12,7 +12,7 @@ Rectangle {
     Text {
         anchors.left: parent.left; anchors.leftMargin: 14
         anchors.verticalCenter: parent.verticalCenter
-        text: bridge.pendingCount + " unsaved change" + (bridge.pendingCount === 1 ? "" : "s")
+        text: qsTranslate("UI", "Unsaved changes: %1").arg(bridge.pendingCount)
         color: Theme.warn
         font.family: Theme.fontFamily; font.pixelSize: Theme.fontM; font.weight: Font.DemiBold
     }
@@ -26,7 +26,7 @@ Rectangle {
             width: dl.implicitWidth + 24; height: 30; radius: 7
             color: dh.hovered ? Theme.cardHover : "transparent"
             border.color: Theme.cardBorder; border.width: 1
-            Text { id: dl; anchors.centerIn: parent; text: "Discard"
+            Text { id: dl; anchors.centerIn: parent; text: qsTranslate("UI", "Discard")
                    color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontM }
             HoverHandler { id: dh }
             TapHandler { onTapped: bridge.discardConfig() }
@@ -36,7 +36,7 @@ Rectangle {
             color: Theme.accent
             Text { id: sl; anchors.centerIn: parent
                    // lighting is global: only say "to Profile N" when a profile setting is staged
-                   text: bridge.pendingHasProfileEdits ? "Save to Profile " + (bridge.profile || "?") : "Save"
+                   text: bridge.pendingHasProfileEdits ? qsTranslate("UI", "Save to Profile %1").arg(bridge.profile || "?") : qsTranslate("UI", "Save")
                    color: Theme.textOnAccent; font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
                    font.weight: Font.DemiBold }
             TapHandler { onTapped: bridge.applyConfig() }

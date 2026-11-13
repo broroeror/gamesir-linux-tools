@@ -188,6 +188,7 @@ while IFS= read -r -d '' py; do
   cp "$HERE/$py" "$SHARE/"
 done < "$APP_PY_LIST"
 cp -r "$HERE/vendors" "$HERE/qml" "$HERE/assets" "$HERE/completions" "$SHARE"/
+cp -r "$HERE/translations" "$SHARE"/
 cp "$HERE/70-gamesir.rules" "$SHARE"/
 mkdir -p "$SHARE/packaging/udev"
 cp "$HERE/packaging/udev/70-deadband-g502x.rules" "$SHARE/packaging/udev/"

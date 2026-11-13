@@ -3,7 +3,7 @@ import QtQuick.Layouts
 
 Window {
     id: tester
-    title: "Stick test"
+    title: qsTranslate("UI", "Stick test")
     width: 720; height: 600
     minimumWidth: 640; minimumHeight: 600
     color: Theme.bg
@@ -12,7 +12,7 @@ Window {
     property int remaining: 5
     property bool measured: false
     property bool travelled: false
-    property string message: "Leave both sticks untouched to measure rest, or test their full travel."
+    property string message: qsTranslate("UI", "Leave both sticks untouched to measure rest, or test their full travel.")
     property var readings: [fresh(), fresh()]
     readonly property var axes: [bridge.leftStickX, bridge.leftStickY,
                                  bridge.rightStickX, bridge.rightStickY]
@@ -32,12 +32,12 @@ Window {
     function reset() {
         phase = ""; measured = false; travelled = false
         readings = [fresh(), fresh()]
-        message = "Leave both sticks untouched to measure rest, or test their full travel."
+        message = qsTranslate("UI", "Leave both sticks untouched to measure rest, or test their full travel.")
     }
     function cancel() {
         if (phase === "rest") measured = false
         phase = ""
-        message = "Test stopped. Keep this window focused while measuring."
+        message = qsTranslate("UI", "Test stopped. Keep this window focused while measuring.")
     }
     function start(kind) {
         if (!available) return
@@ -50,8 +50,8 @@ Window {
             deadline = Date.now() + 5000; remaining = 5
         }
         phase = kind
-        message = kind === "rest" ? "Release both sticks and leave them untouched for 5 seconds."
-                                 : "Rotate both sticks around the edges, then release them and measure return."
+        message = kind === "rest" ? qsTranslate("UI", "Release both sticks and leave them untouched for 5 seconds.")
+                                 : qsTranslate("UI", "Rotate both sticks around the edges, then release them and measure return.")
     }
     function sample() {
         if (!available || !phase) return
@@ -79,8 +79,8 @@ Window {
         if (phase === "rest" && Date.now() >= deadline) {
             measured = readings.every(function(s) { return s.n >= 30 })
             phase = ""
-            message = measured ? "Rest / return measurement complete. Results are suggestions; settings are unchanged."
-                               : "Not enough samples. Repeat the rest measurement."
+            message = measured ? qsTranslate("UI", "Rest / return measurement complete. Results are suggestions; settings are unchanged.")
+                               : qsTranslate("UI", "Not enough samples. Repeat the rest measurement.")
         }
     }
     Timer {
@@ -93,26 +93,26 @@ Window {
         anchors.fill: parent; anchors.margins: 20; spacing: 14
         Text {
             Layout.fillWidth: true; wrapMode: Text.WordWrap
-            text: tester.available ? tester.message + (tester.phase === "rest" ? " (" + tester.remaining + " s)" : "") : "Connect the controller and enable configuration if required."
+            text: tester.available ? tester.message + (tester.phase === "rest" ? " (" + tester.remaining + " s)" : "") : qsTranslate("UI", "Connect the controller and enable configuration if required.")
             color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
         }
         Flow {
             Layout.fillWidth: true; spacing: 8
             PillButton {
-                label: tester.phase === "travel" ? "Measure return · 5 s" : "Measure rest · 5 s"
+                label: tester.phase === "travel" ? qsTranslate("UI", "Measure return · 5 s") : qsTranslate("UI", "Measure rest · 5 s")
                 enabled: tester.available && tester.phase !== "rest"
                 onClicked: tester.start("rest")
             }
             PillButton {
-                label: "Test travel"; enabled: tester.available && !tester.phase
+                label: qsTranslate("UI", "Test travel"); enabled: tester.available && !tester.phase
                 onClicked: tester.start("travel")
             }
-            PillButton { label: "Reset"; onClicked: tester.reset() }
+            PillButton { label: qsTranslate("UI", "Reset"); onClicked: tester.reset() }
         }
         RowLayout {
             Layout.fillWidth: true; spacing: 16
             Repeater {
-                model: ["Left stick", "Right stick"]
+                model: [qsTranslate("UI", "Left stick"), qsTranslate("UI", "Right stick")]
                 delegate: Card {
                     id: result
                     required property int index
@@ -146,20 +146,20 @@ Window {
                     Text {
                         width: parent.width; wrapMode: Text.WordWrap
                         text: tester.measured
-                              ? "Center offset: " + (Math.hypot(result.stats.x, result.stats.y) * 100).toFixed(1) + "%\n"
-                                + "Noise (RMS): " + (Math.sqrt(Math.max(0, result.stats.m2 / result.stats.n)) * 100).toFixed(1) + "%\n"
-                                + "Peak at rest: " + (result.stats.peak * 100).toFixed(1) + "%\n"
-                                + (result.stats.peak > 0.2 ? "Stick moved? Repeat at rest."
-                                   : "Suggested deadzone: " + Math.ceil(result.stats.peak * 100 + 1) + "%")
-                              : "Rest / return: not measured"
+                              ? qsTranslate("UI", "Center offset: ") + (Math.hypot(result.stats.x, result.stats.y) * 100).toFixed(1) + "%\n"
+                                + qsTranslate("UI", "Noise (RMS): ") + (Math.sqrt(Math.max(0, result.stats.m2 / result.stats.n)) * 100).toFixed(1) + "%\n"
+                                + qsTranslate("UI", "Peak at rest: ") + (result.stats.peak * 100).toFixed(1) + "%\n"
+                                + (result.stats.peak > 0.2 ? qsTranslate("UI", "Stick moved? Repeat at rest.")
+                                   : qsTranslate("UI", "Suggested deadzone: ") + Math.ceil(result.stats.peak * 100 + 1) + "%")
+                              : qsTranslate("UI", "Rest / return: not measured")
                         color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                     }
                     Text {
                         width: parent.width; wrapMode: Text.WordWrap
                         text: tester.travelled
-                              ? "Travel X: " + Math.round(result.stats.minX * 100) + " to " + Math.round(result.stats.maxX * 100) + "%\n"
-                                + "Travel Y: " + Math.round(result.stats.minY * 100) + " to " + Math.round(result.stats.maxY * 100) + "%"
-                              : "Travel: not measured"
+                              ? qsTranslate("UI", "Travel X: ") + Math.round(result.stats.minX * 100) + qsTranslate("UI", " to ") + Math.round(result.stats.maxX * 100) + "%\n"
+                                + qsTranslate("UI", "Travel Y: ") + Math.round(result.stats.minY * 100) + qsTranslate("UI", " to ") + Math.round(result.stats.maxY * 100) + "%"
+                              : qsTranslate("UI", "Travel: not measured")
                         color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                     }
                 }
@@ -168,7 +168,7 @@ Window {
         Item { Layout.fillHeight: true }
         Text {
             Layout.fillWidth: true; wrapMode: Text.WordWrap
-            text: "Measures reported input. Firmware deadzones and curves can hide drift; this does not calibrate the controller."
+            text: qsTranslate("UI", "Measures reported input. Firmware deadzones and curves can hide drift; this does not calibrate the controller.")
             color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
         }
     }

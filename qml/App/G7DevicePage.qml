@@ -34,12 +34,12 @@ Item {
 
         Card {
             Layout.fillWidth: true
-            title: "G7 Pro configuration session"
+            title: qsTranslate("UI", "G7 Pro configuration session")
             Text {
                 width: parent.width; wrapMode: Text.WordWrap
                 text: bridge.configStatus + (bridge.configClaimed
-                      ? "\nThe controller or dongle is temporarily unavailable to games."
-                      : "\nUse Configure controller above to edit or refresh settings.")
+                      ? qsTranslate("UI", "\nThe controller or dongle is temporarily unavailable to games.")
+                      : qsTranslate("UI", "\nUse Configure controller above to edit or refresh settings."))
                 color: bridge.configClaimed ? Theme.warn : Theme.textDim
                 font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
             }
@@ -47,10 +47,10 @@ Item {
 
         Card {
             Layout.fillWidth: true
-            title: "Charging dock"
+            title: qsTranslate("UI", "Charging dock")
             Row {
                 width: parent.width
-                Text { text: "Auto on / off"; color: Theme.text; font.family: Theme.fontFamily }
+                Text { text: qsTranslate("UI", "Auto on / off"); color: Theme.text; font.family: Theme.fontFamily }
                 Item { width: parent.width - 150; height: 1 }
                 ToggleSwitch {
                     checked: page.autoOn
@@ -59,7 +59,7 @@ Item {
             }
             Row {
                 width: parent.width
-                Text { text: "Brightness"; color: Theme.textDim
+                Text { text: qsTranslate("UI", "Brightness"); color: Theme.textDim
                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                 Item { width: parent.width - 110; height: 1 }
                 Text { text: dockBright.value + "%"; color: Theme.text

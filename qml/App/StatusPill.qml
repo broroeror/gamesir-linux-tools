@@ -17,7 +17,7 @@ Row {
             color: bridge.connected ? Theme.ok : Theme.textFaint
         }
         Text {
-            text: bridge.connected ? "Connected" : "Searching…"
+            text: bridge.connected ? qsTranslate("UI", "Connected") : qsTranslate("UI", "Searching…")
             color: Theme.textDim
             font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
             anchors.verticalCenter: parent.verticalCenter
@@ -40,7 +40,7 @@ Row {
         visible: bridge.firmware.length > 0 && !parent.compact
         anchors.verticalCenter: parent.verticalCenter
         text: "fw " + bridge.firmware
-              + (bridge.connectionKind.length ? " · " + bridge.connectionKind : "")
+              + (bridge.connectionKind.length ? " · " + qsTranslate("UI", bridge.connectionKind) : "")
         color: bridge.onDongle ? Theme.warn : Theme.textFaint
         font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
     }

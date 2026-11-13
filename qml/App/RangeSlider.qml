@@ -129,7 +129,7 @@ Item {
         visible: r.showInputs
         anchors.top: trackArea.bottom; anchors.topMargin: 8
         width: parent.width; height: 24
-        NumberBox { anchors.left: parent.left; label: "Min"; value: r.lo; onCommitted: (v) => r.setLo(v) }
-        NumberBox { anchors.right: parent.right; label: "Max"; value: r.hi; onCommitted: (v) => r.setHi(v) }
+        NumberBox { anchors.left: parent.left; label: qsTranslate("UI", "Min"); value: r.lo; onCommitted: (v) => r.setLo(v) }
+        NumberBox { anchors.right: parent.right; label: qsTranslate("UI", "Max"); value: r.hi; onCommitted: (v) => r.setHi(v) }
     }
 }

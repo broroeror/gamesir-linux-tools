@@ -58,8 +58,8 @@ Item {
             // ---- DPI stages ----
             Card {
                 width: parent.width
-                title: "DPI stages"
-                headerValue: mouse.dpiMin + "–" + mouse.dpiMax + " DPI  ·  step " + mouse.dpiStep
+                title: qsTranslate("UI", "DPI stages")
+                headerValue: mouse.dpiMin + "–" + mouse.dpiMax + qsTranslate("UI", " DPI  ·  step ") + mouse.dpiStep
 
                 Column {
                     width: parent.width
@@ -124,11 +124,11 @@ Item {
 
                                 // which stage is Active (boot) vs Sniper (shift-DPI)
                                 PillButton {
-                                    label: "Active"; highlight: row.isActive
+                                    label: qsTranslate("UI", "Active"); highlight: row.isActive
                                     onClicked: mouse.stageDpiDefault(row.index)
                                 }
                                 PillButton {
-                                    label: "Sniper"; highlight: row.isSniper
+                                    label: qsTranslate("UI", "Sniper"); highlight: row.isSniper
                                     onClicked: mouse.stageDpiShift(row.index)
                                 }
                             }
@@ -140,7 +140,7 @@ Item {
             // ---- Report rate ----
             Card {
                 width: parent.width
-                title: "Report rate"
+                title: qsTranslate("UI", "Report rate")
                 headerValue: page.rateVal() + " Hz"
 
                 Flow {
@@ -160,15 +160,12 @@ Item {
             // ---- how it works ----
             Card {
                 width: parent.width
-                title: "How the DPI buttons work"
+                title: qsTranslate("UI", "How the DPI buttons work")
                 Text {
                     width: parent.width; wrapMode: Text.WordWrap
                     color: Theme.textDim
                     font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
-                    text: "Active is the DPI the mouse boots into. A button set to "
-                        + "DPI Up / DPI Down / DPI Cycle (on the Buttons tab) steps through "
-                        + "the stages above — so give them distinct values to feel the change. "
-                        + "A Sniper button drops to the Sniper stage only while it's held."
+                    text: qsTranslate("UI", "Active is the DPI the mouse boots into. A button set to DPI Up / DPI Down / DPI Cycle (on the Buttons tab) steps through the stages above — so give them distinct values to feel the change. A Sniper button drops to the Sniper stage only while it's held.")
                 }
             }
         }

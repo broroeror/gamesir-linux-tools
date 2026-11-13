@@ -4,7 +4,7 @@ import QtQuick.Layouts
 
 Window {
     id: tester
-    title: "Button test · clicks / hold"
+    title: qsTranslate("UI", "Button test · clicks / hold")
     width: 460; height: 620
     minimumWidth: 400; minimumHeight: 400
     color: Theme.bg
@@ -73,20 +73,20 @@ Window {
         anchors.fill: parent; anchors.margins: 20; spacing: 14
         Text {
             Layout.fillWidth: true; wrapMode: Text.WordWrap
-            text: "Buttons, paddles, D-pad and LT/RT. Each new press adds 1. Hold a control to check its timer and short interruptions."
+            text: qsTranslate("UI", "Buttons, paddles, D-pad and LT/RT. Each new press adds 1. Hold a control to check its timer and short interruptions.")
             color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
         }
         RowLayout {
             Layout.fillWidth: true
             Text {
                 Layout.fillWidth: true; wrapMode: Text.WordWrap
-                text: tester.incomplete ? "Events lost — reset and repeat."
-                      : !tester.available ? "Connect the controller and enable configuration if required."
-                      : tester.capturing ? "Recording" : "Paused · focus this window to record."
+                text: tester.incomplete ? qsTranslate("UI", "Events lost — reset and repeat.")
+                      : !tester.available ? qsTranslate("UI", "Connect the controller and enable configuration if required.")
+                      : tester.capturing ? qsTranslate("UI", "Recording") : qsTranslate("UI", "Paused · focus this window to record.")
                 color: tester.incomplete ? Theme.warn : Theme.textDim
                 font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
             }
-            PillButton { label: "Reset"; onClicked: tester.reset() }
+            PillButton { label: qsTranslate("UI", "Reset"); onClicked: tester.reset() }
         }
         ListView {
             Layout.fillWidth: true; Layout.fillHeight: true
@@ -115,7 +115,7 @@ Window {
                     Text {
                         Layout.preferredWidth: 166
                         horizontalAlignment: Text.AlignRight
-                        text: stats.rapid ? "Double click · " + Math.round(stats.gap) + " ms" : "OK"
+                        text: stats.rapid ? qsTranslate("UI", "Double click · ") + Math.round(stats.gap) + " ms" : qsTranslate("UI", "OK")
                         color: stats.rapid ? Theme.warn : Theme.ok
                         font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
                     }
@@ -123,9 +123,9 @@ Window {
                 Text {
                     anchors.left: parent.left; anchors.leftMargin: 12
                     anchors.bottom: parent.bottom; anchors.bottomMargin: 8
-                    text: (row.stats.held ? "Held " + tester.duration(Math.max(0, tester.now - row.stats.receivedAt))
-                                         : (row.stats.paused ? "Paused after " : "Released · held ") + tester.duration(row.stats.holdMs || 0))
-                          + " · short breaks: " + (row.stats.breaks || 0)
+                    text: (row.stats.held ? qsTranslate("UI", "Held ") + tester.duration(Math.max(0, tester.now - row.stats.receivedAt))
+                                         : (row.stats.paused ? qsTranslate("UI", "Paused after ") : qsTranslate("UI", "Released · held ")) + tester.duration(row.stats.holdMs || 0))
+                          + qsTranslate("UI", " · short breaks: ") + (row.stats.breaks || 0)
                     color: row.stats.breaks ? Theme.warn : row.stats.held ? Theme.accent : Theme.textDim
                     font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                 }
@@ -133,7 +133,7 @@ Window {
         }
         Text {
             Layout.fillWidth: true; wrapMode: Text.WordWrap
-            text: "A release → press gap up to 20 ms is flagged. LT/RT press at 10%, release below 5%. Firmware may hide bounce."
+            text: qsTranslate("UI", "A release → press gap up to 20 ms is flagged. LT/RT press at 10%, release below 5%. Firmware may hide bounce.")
             color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
         }
     }

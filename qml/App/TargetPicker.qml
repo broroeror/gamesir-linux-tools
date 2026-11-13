@@ -48,8 +48,8 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             spacing: 6
             Repeater {
-                model: [{ m: "buttons", t: "Buttons" }, { m: "keyboard", t: "Keyboard" },
-                        { m: "numpad", t: "Numpad" }, { m: "mouse", t: "Mouse" }]
+                model: [{ m: "buttons", t: qsTranslate("UI", "Buttons") }, { m: "keyboard", t: qsTranslate("UI", "Keyboard") },
+                        { m: "numpad", t: qsTranslate("UI", "Numpad") }, { m: "mouse", t: qsTranslate("UI", "Mouse") }]
                 delegate: PillButton {
                     required property var modelData
                     label: modelData.t

@@ -36,7 +36,7 @@ Item {
         anchors.top: parent.top; anchors.topMargin: 14
         anchors.horizontalCenter: parent.horizontalCenter
         spacing: 8
-        PillButton { label: "Default"; highlight: page.editLayer === "default"
+        PillButton { label: qsTranslate("UI", "Default"); highlight: page.editLayer === "default"
                      onClicked: page.editLayer = "default" }
         PillButton { label: "G-Shift"; highlight: page.editLayer === "gshift"
                      onClicked: page.editLayer = "gshift" }
@@ -52,7 +52,7 @@ Item {
 
         // -------- LEFT: button list --------
         Card {
-            title: "Buttons"
+            title: qsTranslate("UI", "Buttons")
             Layout.preferredWidth: 270; Layout.minimumWidth: 230; Layout.fillHeight: true
             Column {
                 width: parent.width; spacing: 5
@@ -101,8 +101,8 @@ Item {
 
         // -------- RIGHT: assign a target --------
         Card {
-            title: (page.selIndex < 0 ? "Assign" : "Assign — " + page.selName)
-                   + (page.editLayer === "gshift" ? "  · G-Shift" : "")
+            title: (page.selIndex < 0 ? qsTranslate("UI", "Assign") : qsTranslate("UI", "Assign — ") + page.selName)
+                   + (page.editLayer === "gshift" ? qsTranslate("UI", "  · G-Shift") : "")
             Layout.preferredWidth: 260; Layout.minimumWidth: 220; Layout.fillHeight: true
             Column {
                 width: parent.width; spacing: 10
@@ -111,18 +111,18 @@ Item {
 
                 Flow {
                     width: parent.width; spacing: 6
-                    PillButton { label: "Disabled";  onClicked: page.stage("disabled") }
-                    PillButton { label: "Sniper";    onClicked: page.stage("sniper") }
+                    PillButton { label: qsTranslate("UI", "Disabled");  onClicked: page.stage("disabled") }
+                    PillButton { label: qsTranslate("UI", "Sniper");    onClicked: page.stage("sniper") }
                     PillButton {
                         label: "G-Shift"; visible: page.editLayer === "default"
                         onClicked: page.stage("gshift-hold")     // makes this button the G-Shift trigger
                     }
-                    PillButton { label: "DPI +";     onClicked: page.stage("dpi-up") }
-                    PillButton { label: "DPI −";     onClicked: page.stage("dpi-down") }
-                    PillButton { label: "DPI cycle"; onClicked: page.stage("dpi-cycle") }
+                    PillButton { label: qsTranslate("UI", "DPI +");     onClicked: page.stage("dpi-up") }
+                    PillButton { label: qsTranslate("UI", "DPI −");     onClicked: page.stage("dpi-down") }
+                    PillButton { label: qsTranslate("UI", "DPI cycle"); onClicked: page.stage("dpi-cycle") }
                 }
                 Text {
-                    width: parent.width; text: "Mouse buttons"; color: Theme.textDim
+                    width: parent.width; text: qsTranslate("UI", "Mouse buttons"); color: Theme.textDim
                     font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                 }
                 Flow {
@@ -137,16 +137,16 @@ Item {
                     }
                 }
                 Text {
-                    width: parent.width; text: "Keyboard"; color: Theme.textDim
+                    width: parent.width; text: qsTranslate("UI", "Keyboard"); color: Theme.textDim
                     font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                 }
                 PillButton {
-                    label: "⌨  Choose a key…"
+                    label: qsTranslate("UI", "⌨  Choose a key…")
                     onClicked: keyPicker.active = true
                 }
                 Text {
                     width: parent.width; wrapMode: Text.WordWrap; topPadding: 2
-                    text: "For a multi-step macro, use the Macros tab."
+                    text: qsTranslate("UI", "For a multi-step macro, use the Macros tab.")
                     color: Theme.textFaint; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                 }
                 Text {

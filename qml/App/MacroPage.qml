@@ -145,7 +145,7 @@ Item {
                     }
                 }
                 Item { Layout.fillWidth: true }
-                Text { text: "Macro"; color: Theme.textDim
+                Text { text: qsTranslate("UI", "Macro"); color: Theme.textDim
                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                        Layout.alignment: Qt.AlignVCenter }
                 ToggleSwitch {
@@ -160,7 +160,7 @@ Item {
             // block), so say so rather than let the other tabs' habit mislead.
             Text {
                 width: parent.width; wrapMode: Text.WordWrap
-                text: "Macros are saved to the controller as you edit them; there's no Save step on this tab."
+                text: qsTranslate("UI", "Macros are saved to the controller as you edit them; there's no Save step on this tab.")
                 color: Theme.textDim
                 font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
             }
@@ -174,8 +174,8 @@ Item {
                 ColumnLayout {
                     Layout.fillWidth: true; Layout.preferredWidth: 1; spacing: 12
                     Card {
-                        title: "Sequence"
-                        headerValue: page.events.length + " / " + bridge.macroMax + " steps"
+                        title: qsTranslate("UI", "Sequence")
+                        headerValue: page.events.length + " / " + bridge.macroMax + qsTranslate("UI", " steps")
                         Layout.fillWidth: true
                         ListView {
                             id: eventList
@@ -224,11 +224,11 @@ Item {
                         }
                         Text {
                             visible: page.events.length === 0
-                            text: "No events yet — add one to start the sequence."
+                            text: qsTranslate("UI", "No events yet — add one to start the sequence.")
                             color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                         }
                         PillButton {
-                            label: "+ Add event"
+                            label: qsTranslate("UI", "+ Add event")
                             enabled: page.events.length < bridge.macroMax
                             onClicked: page.addEvent()
                         }
@@ -243,10 +243,10 @@ Item {
                 ColumnLayout {
                     Layout.fillWidth: true; Layout.preferredWidth: 1; spacing: 12
                     Card {
-                        title: page.sel >= 0 ? "Step " + (page.sel + 1) : "Step"
+                        title: page.sel >= 0 ? qsTranslate("UI", "Step ") + (page.sel + 1) : qsTranslate("UI", "Step")
                         Layout.fillWidth: true
                         visible: page.sel >= 0 && page.sel < page.events.length
-                        Text { text: "Button"; color: Theme.textDim
+                        Text { text: qsTranslate("UI", "Button"); color: Theme.textDim
                                font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                         // macros are controller-buttons only (the firmware's macro
                         // player doesn't emit keyboard/mouse — those are Rebinds).
@@ -264,7 +264,7 @@ Item {
                         }
                         Row {
                             width: parent.width; topPadding: 6; spacing: 10
-                            Text { text: "Hold"; color: Theme.textDim; width: 84
+                            Text { text: qsTranslate("UI", "Hold"); color: Theme.textDim; width: 84
                                    anchors.verticalCenter: parent.verticalCenter
                                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                             AccentSlider {
@@ -281,7 +281,7 @@ Item {
                         }
                         Row {
                             width: parent.width; topPadding: 2; spacing: 10
-                            Text { text: "Delay after"; color: Theme.textDim; width: 84
+                            Text { text: qsTranslate("UI", "Delay after"); color: Theme.textDim; width: 84
                                    anchors.verticalCenter: parent.verticalCenter
                                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                             AccentSlider {
@@ -297,22 +297,22 @@ Item {
                             }
                         }
 
-                        Text { text: "Step tools"; color: Theme.textDim; topPadding: 6
+                        Text { text: qsTranslate("UI", "Step tools"); color: Theme.textDim; topPadding: 6
                                font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                         Flow {
                             width: parent.width; spacing: 6
-                            PillButton { label: "Duplicate"; enabled: page.events.length < bridge.macroMax
+                            PillButton { label: qsTranslate("UI", "Duplicate"); enabled: page.events.length < bridge.macroMax
                                          onClicked: page.duplicate(1) }
-                            PillButton { label: "Copy"; onClicked: page.copyStep() }
-                            PillButton { label: "Paste"; enabled: page.clip !== null && page.events.length < bridge.macroMax
+                            PillButton { label: qsTranslate("UI", "Copy"); onClicked: page.copyStep() }
+                            PillButton { label: qsTranslate("UI", "Paste"); enabled: page.clip !== null && page.events.length < bridge.macroMax
                                          onClicked: page.pasteStep() }
-                            PillButton { label: "Move ▲"; enabled: page.sel > 0; onClicked: page.move(-1) }
-                            PillButton { label: "Move ▼"; enabled: page.sel >= 0 && page.sel < page.events.length - 1
+                            PillButton { label: qsTranslate("UI", "Move ▲"); enabled: page.sel > 0; onClicked: page.move(-1) }
+                            PillButton { label: qsTranslate("UI", "Move ▼"); enabled: page.sel >= 0 && page.sel < page.events.length - 1
                                          onClicked: page.move(1) }
                         }
                         Row {
                             width: parent.width; spacing: 8; topPadding: 2
-                            Text { text: "Duplicate ×"; color: Theme.textDim
+                            Text { text: qsTranslate("UI", "Duplicate ×"); color: Theme.textDim
                                    anchors.verticalCenter: parent.verticalCenter
                                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                             NumField {
@@ -321,7 +321,7 @@ Item {
                                 onCommitted: function (v) { page.dupN = Math.max(1, v) }
                             }
                             PillButton {
-                                label: "Go"; enabled: page.events.length < bridge.macroMax
+                                label: qsTranslate("UI", "Go"); enabled: page.events.length < bridge.macroMax
                                 onClicked: page.duplicate(page.dupN)
                             }
                         }

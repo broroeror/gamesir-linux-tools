@@ -3,7 +3,7 @@ import QtQuick.Layouts
 
 Window {
     id: tester
-    title: "Game-input timing"
+    title: qsTranslate("UI", "Game-input timing")
     width: 650; height: 580
     minimumWidth: 600; minimumHeight: 550
     color: Theme.bg
@@ -31,15 +31,15 @@ Window {
         Text {
             Layout.fillWidth: true; wrapMode: Text.WordWrap
             text: tester.claimed
-                  ? "Release the controller to game input, then start. Rotate a stick continuously for 10 seconds."
-                  : "Rotate a stick continuously for 10 seconds. This measures input-update spacing, not physical button latency."
+                  ? qsTranslate("UI", "Release the controller to game input, then start. Rotate a stick continuously for 10 seconds.")
+                  : qsTranslate("UI", "Rotate a stick continuously for 10 seconds. This measures input-update spacing, not physical button latency.")
             color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
         }
         Flow {
             Layout.fillWidth: true; spacing: 8
             PillButton {
                 visible: tester.claimed
-                label: "Release to game input"; enabled: !tester.results.running
+                label: qsTranslate("UI", "Release to game input"); enabled: !tester.results.running
                 onClicked: {
                     tester.restoreController = bridge.selectedController
                     bridge.setConfigClaimed(false)
@@ -47,25 +47,25 @@ Window {
             }
             PillButton {
                 visible: bridge.hasConfigSession && !tester.claimed
-                label: "Configure controller"; enabled: !tester.results.running
+                label: qsTranslate("UI", "Configure controller"); enabled: !tester.results.running
                 onClicked: {
                     bridge.setConfigClaimed(true)
                     tester.restoreController = ""
                 }
             }
             PillButton {
-                label: "Start · 10 s"
+                label: qsTranslate("UI", "Start · 10 s")
                 enabled: bridge.connected && !bridge.demoMode && !tester.claimed && !tester.results.running
                 onClicked: { bridge.startReportTiming(); tester.refresh() }
             }
             PillButton {
-                label: "Stop"; enabled: tester.results.running === true
+                label: qsTranslate("UI", "Stop"); enabled: tester.results.running === true
                 onClicked: { bridge.stopReportTiming(); tester.refresh() }
             }
         }
         Text {
             Layout.fillWidth: true; wrapMode: Text.WordWrap
-            text: (tester.results.message || "Ready.")
+            text: qsTranslate("UI", tester.results.message || "Ready.")
                   + (tester.results.running ? "  " + (tester.results.elapsed || 0).toFixed(1) + " / 10 s" : "")
             color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
         }
@@ -77,7 +77,7 @@ Window {
             }
         }
         Card {
-            title: "Observed game-input updates"; Layout.fillWidth: true
+            title: qsTranslate("UI", "Observed game-input updates"); Layout.fillWidth: true
             Text {
                 text: tester.results.hz === undefined ? "— Hz" : tester.results.hz.toFixed(1) + " Hz"
                 color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontL * 2
@@ -85,9 +85,9 @@ Window {
             GridLayout {
                 width: parent.width; columns: 3; columnSpacing: 24; rowSpacing: 8
                 Repeater {
-                    model: [{label: "Median", key: "median"}, {label: "p95", key: "p95"},
-                            {label: "Maximum", key: "maximum"}, {label: "Minimum", key: "minimum"},
-                            {label: "Jitter (std dev)", key: "jitter"}]
+                    model: [{label: qsTranslate("UI", "Median"), key: "median"}, {label: "p95", key: "p95"},
+                            {label: qsTranslate("UI", "Maximum"), key: "maximum"}, {label: qsTranslate("UI", "Minimum"), key: "minimum"},
+                            {label: qsTranslate("UI", "Jitter (std dev)"), key: "jitter"}]
                     delegate: Text {
                         required property var modelData
                         text: modelData.label + ": " + (tester.results[modelData.key] === undefined ? "—"
@@ -98,13 +98,13 @@ Window {
             }
             Text {
                 width: parent.width; wrapMode: Text.WordWrap
-                text: (tester.results.source || "Source: Linux game input (evdev)")
-                      + " · " + (tester.results.samples || 0) + " updates"
+                text: (tester.results.source || qsTranslate("UI", "Source: Linux game input (evdev)"))
+                      + " · " + (tester.results.samples || 0) + qsTranslate("UI", " updates")
                 color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
             }
         }
         Text {
-            text: "Interval peaks · grouped samples · 0–" + Math.max(1, tester.results.maximum || 0).toFixed(3) + " ms"
+            text: qsTranslate("UI", "Interval peaks · grouped samples · 0–") + Math.max(1, tester.results.maximum || 0).toFixed(3) + " ms"
             color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
         }
         Canvas {
@@ -125,7 +125,7 @@ Window {
         }
         Text {
             Layout.fillWidth: true; wrapMode: Text.WordWrap
-            text: "Unchanged input may be omitted by the driver. Results include this PC's input stack and are not a USB polling-rate or end-to-end latency measurement."
+            text: qsTranslate("UI", "Unchanged input may be omitted by the driver. Results include this PC's input stack and are not a USB polling-rate or end-to-end latency measurement.")
             color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
         }
     }

@@ -253,6 +253,9 @@ def main():
     app = QGuiApplication(sys.argv)
     qml_dir = os.path.join(HERE, 'qml')
     engine = QQmlApplicationEngine()
+    from i18n import LanguageManager
+    language = LanguageManager(app, engine)
+    engine.rootContext().setContextProperty('i18n', language)
     engine.addImportPath(qml_dir)
     bridge = GamesirBridge()
     engine.rootContext().setContextProperty('bridge', bridge)
