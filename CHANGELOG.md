@@ -5,6 +5,8 @@ and Logitech mice — newest first. This is the
 curated, user-facing summary; the complete history is in git. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com).
 
+## [Unreleased]
+
 ## [0.7.0] — 2026-11-13
 
 ### Added
