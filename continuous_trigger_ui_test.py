@@ -70,7 +70,7 @@ def main():
     assert QMetaObject.invokeMethod(switch, 'toggled', Qt.DirectConnection, Q_ARG(bool, True))
     settle()
     assert switch.property('checked')
-    assert pad._pending[(1, 0xb2)]['data'] == [1, 20]
+    assert pad._pending[(1, 0xb2)]['data'] == [1, 20, 0, 0]   # combo keys cleared (#47)
     assert pad._pending[(1, 0xb6)]['data'] == [1]
     # Exercise every official remappable source through the actual QML switch,
     # including the ordinary buttons missing from the original app.

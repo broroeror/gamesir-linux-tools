@@ -96,7 +96,7 @@ def _profile_fields():
     prof = ctrl.active()
     labels = prof.field_labels()
     out = [(addr, ln, labels.get(addr, f'0x{addr:04x}')) for addr, ln in prof.read_fields()]
-    out += [(addr, 2, 'Remap ' + name) for name, addr in prof.REMAP_SLOTS]
+    out += [(addr, prof.remap_len(addr), 'Remap ' + name) for name, addr in prof.REMAP_SLOTS]
     if prof.has_motion and prof.motion:
         out += [(addr, ln, f'Motion 0x{addr:04x}')
                 for addr, ln in motion.read_addrs(prof.motion)]

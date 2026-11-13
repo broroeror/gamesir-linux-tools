@@ -234,6 +234,15 @@ class ControllerProfile:
         fields += [(addr, 1) for _name, addr in self.CONTINUOUS_TRIGGER_SLOTS]
         return fields
 
+    def remap_len(self, addr):
+        """Bytes in a button record that Deadband reads, backs up and writes:
+        [type, target] plus the two combo keys on Cyclone-protocol pads (#47),
+        stopping before byte 4 (the Cyclone's Continuous Trigger flag), except
+        slots whose following bytes aren't mapped (REMAP_SHORT)."""
+        if self.write_style == 'cyclone' and addr not in self.REMAP_SHORT:
+            return 4
+        return 2
+
     def profile_bank(self, profile):
         """Profile number -> register bank (identity map for these models)."""
         return profile if profile in self.profile_banks else None

@@ -394,11 +394,12 @@ def remap_write_bytes(target_name):
     return [0x00, 0x00]
 
 
-# A button record is [type, target, key2, key3, key4]: the three bytes after the
-# target hold the extra keys of a key combo set in GameSir's app (01 74 68 81 =
-# LCtrl+LShift+Down, #47). On a paddle, byte 5 switches its macro on. A 2-byte
-# write left an old combo's keys behind, so rebinding sent the leftovers too.
-COMBO_KEYS = 3
+# A button record starts [type, target, key2, key3, flag]: the two bytes after
+# the target hold the extra keys of a key combo set in GameSir's app (01 74 68 81
+# = LCtrl+LShift+Down, #47), and byte 4 is the Cyclone's Continuous Trigger flag
+# (CONTINUOUS_TRIGGER_SLOTS), which a rebind must leave alone. A 2-byte write left
+# an old combo's keys behind, so rebinding sent the leftovers too.
+COMBO_KEYS = 2
 
 
 def full_remap_record(data):

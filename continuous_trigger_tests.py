@@ -220,8 +220,11 @@ class ContinuousTriggerTests(unittest.TestCase):
         fields = backup._profile_fields()
         self.assertIn((0x215, 1, 'Continuous Trigger RT'), fields)
         backup._validate_writes([(4, 0x215, [1])])
+        # A's record is 0x7a-0x7d (target + combo keys, #47) and its flag 0x7e;
+        # 0x7f-0x80 are unmapped, so a write running past the flag is refused
+        backup._validate_writes([(4, 0x7e, [1])])
         with self.assertRaises(ValueError):
-            backup._validate_writes([(4, 0x214, [99, 1])])
+            backup._validate_writes([(4, 0x7e, [1, 99])])
 
     def test_new_unknown_firmware_value_at_apply_refused_without_writes(self):
         self.assertTrue(self.pad.setContinuousTrigger('RT', True))

@@ -2730,7 +2730,7 @@ class GamesirBridge(QObject):
     def _remap_record(self, addr, data):
         """The bytes a rebind writes. Cyclone-protocol pads also get their combo
         keys cleared (cfg.full_remap_record); the G7 Pro's records differ."""
-        if self._prof.write_style == 'cyclone' and addr not in self._prof.REMAP_SHORT:
+        if self._prof.remap_len(addr) == 4:
             return cfg.full_remap_record(data)
         return data
 
