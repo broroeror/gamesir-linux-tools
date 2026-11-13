@@ -261,6 +261,20 @@ Afterwards **Deadband** is in your app launcher (or run `deadband`). To remove
 it, run `./uninstall.sh`. Upgrading from the old `gamesir-cyclone2` install?
 `install.sh` cleans it up, and your settings carry over on first run.
 
+### AppImage
+
+To build a portable AppImage that bundles Python, PySide6, hidapi and libusb
+(the target machine doesn't need Python or Qt installed):
+
+```sh
+./packaging/appimage/build-appimage.sh
+```
+
+The result is `dist/Deadband-<version>-<arch>.AppImage`. Build prerequisites and
+notes are in **[packaging/appimage/README.md](packaging/appimage/README.md)**.
+Controller access still needs the udev rule described under
+[Running](#running).
+
 ### macOS (early)
 
 Deadband now runs on macOS too, from source for the moment. It's been tested
