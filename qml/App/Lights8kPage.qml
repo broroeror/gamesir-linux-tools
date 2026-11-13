@@ -96,11 +96,10 @@ Item {
                     Layout.fillWidth: true; Layout.preferredWidth: 1; spacing: 12
 
                     Card {
-                        title: "Controller Light"; Layout.fillWidth: true
+                        title: qsTranslate("UI", "Controller Light"); Layout.fillWidth: true
                         Text {
                             width: parent.width; wrapMode: Text.WordWrap
-                            text: "Lighting is shared by all controller profiles (P1–P4): " +
-                                  "switching profile doesn't change it."
+                            text: qsTranslate("UI", "Lighting is shared by all controller profiles (P1–P4): switching profile doesn't change it.")
                             color: Theme.textFaint; font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontS
                         }
@@ -111,7 +110,7 @@ Item {
                                 delegate: PillButton {
                                     required property string modelData
                                     required property int index
-                                    label: modelData
+                                    label: qsTranslate("UI", modelData)
                                     highlight: page.curMode === index
                                     onClicked: { page.curMode = index; bridge.setLight8kMode(index) }
                                 }
@@ -119,7 +118,7 @@ Item {
                         }
                         Row {
                             width: parent.width
-                            Text { text: "Brightness"; color: Theme.textDim
+                            Text { text: qsTranslate("UI", "Brightness"); color: Theme.textDim
                                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                             Item { width: parent.width - 110; height: 1 }
                             Text { text: briSlider.value + "%"; color: Theme.text
@@ -132,7 +131,7 @@ Item {
                     }
 
                     Card {
-                        title: "Home Indicator"; Layout.fillWidth: true
+                        title: qsTranslate("UI", "Home Indicator"); Layout.fillWidth: true
                         Row {
                             width: parent.width; spacing: 14
                             // ring preview doubles as the quadrant selector: click a
@@ -221,15 +220,15 @@ Item {
                                     width: 104; horizontalAlignment: Text.AlignHCenter
                                     wrapMode: Text.WordWrap
                                     text: page.sel.length === 1
-                                          ? ("Quadrant " + (page.sel[0] + 1))
-                                          : ("Quadrants " + page.sel.slice().sort().map(function (i) { return i + 1 }).join(", "))
+                                          ? (qsTranslate("UI", "Quadrant ") + (page.sel[0] + 1))
+                                          : (qsTranslate("UI", "Quadrants ") + page.sel.slice().sort().map(function (i) { return i + 1 }).join(", "))
                                     color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                                 }
                                 Text {
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     width: 104; horizontalAlignment: Text.AlignHCenter
                                     wrapMode: Text.WordWrap
-                                    text: "Click wedges to select — pick several to edit together"
+                                    text: qsTranslate("UI", "Click wedges to select — pick several to edit together")
                                     color: Theme.textFaint; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS - 1
                                 }
                             }
@@ -246,8 +245,8 @@ Item {
                     // Puts the whole ring back to the factory baseline (all four
                     // quadrants yellow). Destructive, so it confirms first.
                     ConfirmButton {
-                        label: "Restore default lighting"
-                        confirmLabel: "Restore default lighting?"
+                        label: qsTranslate("UI", "Restore default lighting")
+                        confirmLabel: qsTranslate("UI", "Restore default lighting?")
                         onConfirmed: bridge.restoreLighting()
                     }
                     Item { Layout.fillHeight: true }
@@ -261,16 +260,16 @@ Item {
                     Layout.fillWidth: true; Layout.preferredWidth: 1; spacing: 12
 
                     Card {
-                        title: "Power"; Layout.fillWidth: true
+                        title: qsTranslate("UI", "Power"); Layout.fillWidth: true
                         Row {
                             width: parent.width
-                            Text { text: "Auto power on/off"; color: Theme.text
+                            Text { text: qsTranslate("UI", "Auto power on/off"); color: Theme.text
                                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
                                    anchors.verticalCenter: parent.verticalCenter }
                             Item { width: parent.width - 190; height: 1 }
                             ToggleSwitch { id: autoSw; onToggled: bridge.setLight8kAuto(autoSw.checked) }
                         }
-                        Text { text: "Sleep timer"; color: Theme.textDim
+                        Text { text: qsTranslate("UI", "Sleep timer"); color: Theme.textDim
                                font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                         Flow {
                             width: parent.width; spacing: 8
@@ -279,7 +278,7 @@ Item {
                                 delegate: PillButton {
                                     required property string modelData
                                     required property int index
-                                    label: modelData
+                                    label: qsTranslate("UI", modelData)
                                     highlight: page.curSleep === index
                                     onClicked: { page.curSleep = index; bridge.setLight8kSleep(index) }
                                 }
@@ -288,7 +287,7 @@ Item {
                     }
 
                     Card {
-                        title: "Dock LED"; Layout.fillWidth: true
+                        title: qsTranslate("UI", "Dock LED"); Layout.fillWidth: true
                         Flow {
                             width: parent.width; spacing: 8
                             Repeater {
@@ -296,7 +295,7 @@ Item {
                                 delegate: PillButton {
                                     required property string modelData
                                     required property int index
-                                    label: modelData
+                                    label: qsTranslate("UI", modelData)
                                     highlight: page.curDock === index
                                     onClicked: { page.curDock = index; bridge.setLight8kDockMode(index) }
                                 }
@@ -304,7 +303,7 @@ Item {
                         }
                         Row {
                             width: parent.width
-                            Text { text: "Brightness"; color: Theme.textDim
+                            Text { text: qsTranslate("UI", "Brightness"); color: Theme.textDim
                                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                             Item { width: parent.width - 110; height: 1 }
                             Text { text: dockBri.value + "%"; color: Theme.text

@@ -73,7 +73,7 @@ Item {
                 spacing: 8
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "Assign a key"; color: Theme.text
+                    text: qsTranslate("UI", "Assign a key"); color: Theme.text
                     font.family: Theme.fontFamily; font.pixelSize: Theme.fontL; font.weight: Font.DemiBold
                 }
                 Item { width: 14; height: 1 }

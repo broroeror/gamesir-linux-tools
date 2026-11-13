@@ -53,6 +53,9 @@ The configurable models offer:
   mouse's own factory copy.
 - **Demo mode** — preview one of each supported controller in software, no
   hardware connected.
+- **Languages** — English plus Traditional and Simplified Chinese, Vietnamese,
+  Russian, Spanish, Brazilian Portuguese, German, French and Japanese.
+  Choose **Settings → Language**; see [translation contributions](translations/README.md).
 - **Diagnostics** — a built-in doctor that pinpoints permission, udev, and
   hidapi-backend problems, and shows each controller's USB link speed and
   vendor channel, with a copy-paste report for bug reports (see

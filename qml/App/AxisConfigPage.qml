@@ -10,7 +10,7 @@ import QtQuick.Layouts
 // ([label, key] each) and `isStick` swaps the stick/trigger specifics.
 Item {
     id: page
-    property var sideKeys: [["Left Stick", "st"], ["Right Stick", "rs"]]
+    property var sideKeys: [[qsTranslate("UI", "Left Stick"), "st"], [qsTranslate("UI", "Right Stick"), "rs"]]
     property bool isStick: true
 
     // Cards keep their contents full-size but COMPRESS their vertical padding to
@@ -33,10 +33,10 @@ Item {
             Card {
                 visible: !bridge.profile
                 width: parent.width
-                title: "No profile selected"
+                title: qsTranslate("UI", "No profile selected")
                 Text {
                     width: parent.width; wrapMode: Text.WordWrap
-                    text: "Pick a profile (1–4) in the top bar to read and edit its settings."
+                    text: qsTranslate("UI", "Pick a profile (1–4) in the top bar to read and edit its settings.")
                     color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
                 }
             }

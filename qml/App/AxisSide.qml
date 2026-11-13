@@ -173,7 +173,7 @@ Item {
             }
 
             Card {
-                title: "Deadzone"; Layout.fillWidth: true
+                title: qsTranslate("UI", "Deadzone"); Layout.fillWidth: true
                 headerValue: root.fmtDz(dz.lo) + "–" + root.fmtDz(dz.hi); spacing: 8
                 RangeSlider {
                     id: dz; width: parent.width; from: 0; to: 100; lo: 0; hi: 100
@@ -184,7 +184,7 @@ Item {
             }
 
             Card {
-                title: "Anti-Deadzone"; Layout.fillWidth: true
+                title: qsTranslate("UI", "Anti-Deadzone"); Layout.fillWidth: true
                 headerValue: root.fmtDz(adz.lo) + "–" + root.fmtDz(adz.hi); spacing: 8
                 RangeSlider {
                     id: adz; width: parent.width; from: 0; to: 100; lo: 0; hi: 100
@@ -195,7 +195,7 @@ Item {
             }
 
             Card {
-                title: "Curve Adjustment"; Layout.fillWidth: true
+                title: qsTranslate("UI", "Curve Adjustment"); Layout.fillWidth: true
                 Flow {
                     width: parent.width; spacing: 8
                     Repeater {
@@ -203,13 +203,13 @@ Item {
                         delegate: PillButton {
                             required property string modelData
                             required property int index
-                            label: modelData
+                            label: qsTranslate("UI", modelData)
                             highlight: root.curveType === index
                             onClicked: root.presetClicked(modelData)
                         }
                     }
                     PillButton {
-                        label: "Custom"; highlight: root.curveType === 3
+                        label: qsTranslate("UI", "Custom"); highlight: root.curveType === 3
                         onClicked: { root.curveType = 3
                                      bridge.setCurve(root.side, "Custom", curve.points) }
                     }
@@ -223,7 +223,7 @@ Item {
                     visible: !bridge.g7Layout && (root.curveType === 1 || root.curveType === 2)
                     Row {
                         width: parent.width
-                        Text { text: "Intensity"; color: Theme.textDim
+                        Text { text: qsTranslate("UI", "Intensity"); color: Theme.textDim
                                font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                         Item { width: parent.width - 90; height: 1 }
                         Text { text: root.intensity + "%"; color: Theme.text
@@ -238,16 +238,16 @@ Item {
             }
 
             Card {
-                title: root.isStick ? "Stick Trajectory" : "Hair Trigger Mode"
+                title: root.isStick ? qsTranslate("UI", "Stick Trajectory") : qsTranslate("UI", "Hair Trigger Mode")
                 Layout.fillWidth: true
                 Flow {
                     width: parent.width; spacing: 8
                     Repeater {
-                        model: root.isStick ? ["Circle", "Raw"] : bridge.hairModes
+                        model: root.isStick ? [qsTranslate("UI", "Circle"), qsTranslate("UI", "Raw")] : bridge.hairModes
                         delegate: PillButton {
                             required property string modelData
                             required property int index
-                            label: modelData
+                            label: qsTranslate("UI", modelData)
                             highlight: root.typeIdx === index
                             onClicked: {
                                 root.typeIdx = index
@@ -269,7 +269,7 @@ Item {
                     visible: !root.isStick && root.typeIdx !== 0 && bridge.hairThresholdsSupported
                     Row {
                         width: parent.width
-                        Text { text: "Threshold"; color: Theme.textDim
+                        Text { text: qsTranslate("UI", "Threshold"); color: Theme.textDim
                                font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                         Item { width: parent.width - 110; height: 1 }
                         Text { text: hairRange.lo + "–" + hairRange.hi; color: Theme.text
@@ -286,8 +286,8 @@ Item {
 
             Card {
                 visible: root.isStick && bridge.g7Layout
-                title: "Stick hardware"; Layout.fillWidth: true
-                Text { text: "Resolution"; color: Theme.textDim; font.family: Theme.fontFamily
+                title: qsTranslate("UI", "Stick hardware"); Layout.fillWidth: true
+                Text { text: qsTranslate("UI", "Resolution"); color: Theme.textDim; font.family: Theme.fontFamily
                        visible: !bridge.seFullView }
                 Flow {
                     visible: !bridge.seFullView
@@ -304,18 +304,18 @@ Item {
                 }
                 Row {
                     spacing: 14
-                    Row { spacing: 6; Text { text: "Invert X"; color: Theme.textDim }
+                    Row { spacing: 6; Text { text: qsTranslate("UI", "Invert X"); color: Theme.textDim }
                         ToggleSwitch { checked: root.g7InvertX
                             onToggled: { root.g7InvertX = checked
                                          bridge.setG7Extra(root.side + "_invert_x", checked ? 1 : 0) } } }
-                    Row { spacing: 6; Text { text: "Invert Y"; color: Theme.textDim }
+                    Row { spacing: 6; Text { text: qsTranslate("UI", "Invert Y"); color: Theme.textDim }
                         ToggleSwitch { checked: root.g7InvertY
                             onToggled: { root.g7InvertY = checked
                                          bridge.setG7Extra(root.side + "_invert_y", checked ? 1 : 0) } } }
                 }
                 Row {
                     width: parent.width
-                    Text { text: "X / Y sensitivity"; color: Theme.textDim }
+                    Text { text: qsTranslate("UI", "X / Y sensitivity"); color: Theme.textDim }
                     Item { width: parent.width - 150; height: 1 }
                     Text { text: root.g7Sensitivity + "%"; color: Theme.text }
                 }
@@ -344,14 +344,14 @@ Item {
                 PillButton {
                     anchors.centerIn: parent
                     width: Math.min(parent.width, 220)
-                    label: "Reset to defaults"
+                    label: qsTranslate("UI", "Reset to defaults")
                     onClicked: root.resetDefaults()
                 }
             }
 
             Card {
                 id: graphCard
-                title: "Response Curve"; Layout.fillWidth: true
+                title: qsTranslate("UI", "Response Curve"); Layout.fillWidth: true
                 Row {
                     width: parent.width; spacing: 6
                     // Y axis label — "Output" runs vertically up the left edge.
@@ -359,7 +359,7 @@ Item {
                         width: 14; height: curve.height
                         anchors.verticalCenter: undefined
                         Text {
-                            text: "Output"; color: Theme.textFaint
+                            text: qsTranslate("UI", "Output"); color: Theme.textFaint
                             font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                             rotation: -90; anchors.centerIn: parent
                         }
@@ -379,7 +379,7 @@ Item {
                         }
                         // X axis label — "Input" runs along the bottom.
                         Text {
-                            text: "Input"; color: Theme.textFaint
+                            text: qsTranslate("UI", "Input"); color: Theme.textFaint
                             width: curve.width; horizontalAlignment: Text.AlignHCenter
                             font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                         }
@@ -388,7 +388,7 @@ Item {
             }
 
             Card {
-                title: "Live"; Layout.fillWidth: true
+                title: qsTranslate("UI", "Live"); Layout.fillWidth: true
 
                 // Stick visualiser — compact, centred.
                 Item {

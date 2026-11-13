@@ -23,15 +23,14 @@ Column {
 
     Text {
         width: parent.width; wrapMode: Text.WordWrap
-        text: "Snapshot every profile + lighting to a file, or write a saved " +
-              "snapshot back. Restoring overwrites the controller."
+        text: qsTranslate("UI", "Snapshot every profile + lighting to a file, or write a saved snapshot back. Restoring overwrites the controller.")
         color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
     }
 
     Row {
         spacing: 8
         PillButton {
-            label: "Back up to file…"
+            label: qsTranslate("UI", "Back up to file…")
             highlight: true
             opacity: bridge.backupBusy ? 0.5 : 1
             onClicked: if (!bridge.backupBusy) {
@@ -41,7 +40,7 @@ Column {
             }
         }
         PillButton {
-            label: "Restore from file…"
+            label: qsTranslate("UI", "Restore from file…")
             opacity: bridge.backupBusy ? 0.5 : 1
             onClicked: if (!bridge.backupBusy) openDlg.open()
         }
@@ -53,8 +52,8 @@ Column {
         visible: bridge.profileResetSupported
         enabled: !bridge.backupBusy
         opacity: enabled ? 1 : 0.5
-        label: "Reset all profiles to defaults"
-        confirmLabel: "Reset ALL " + bridge.profileCount + " profiles?"
+        label: qsTranslate("UI", "Reset all profiles to defaults")
+        confirmLabel: qsTranslate("UI", "Reset all %1 profiles?").arg(bridge.profileCount)
         onConfirmed: bridge.resetAllProfiles()
     }
 
@@ -69,7 +68,7 @@ Column {
     }
     Text {
         visible: bridge.backupBusy
-        text: "Working… " + panel.progDone + " / " + panel.progTotal + " blocks"
+        text: qsTranslate("UI", "Working… ") + panel.progDone + " / " + panel.progTotal + qsTranslate("UI", " blocks")
         color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
     }
     Text {
@@ -83,8 +82,8 @@ Column {
     FileDialog {
         id: saveDlg
         fileMode: FileDialog.SaveFile
-        title: "Save controller backup"
-        nameFilters: ["JSON files (*.json)"]
+        title: qsTranslate("UI", "Save controller backup")
+        nameFilters: [qsTranslate("UI", "JSON files (*.json)")]
         defaultSuffix: "json"
         currentFolder: StandardPaths.writableLocation(StandardPaths.DocumentsLocation)
         onAccepted: bridge.exportBackup(selectedFile)
@@ -92,8 +91,8 @@ Column {
     FileDialog {
         id: openDlg
         fileMode: FileDialog.OpenFile
-        title: "Restore controller backup"
-        nameFilters: ["JSON files (*.json)"]
+        title: qsTranslate("UI", "Restore controller backup")
+        nameFilters: [qsTranslate("UI", "JSON files (*.json)")]
         onAccepted: bridge.importBackup(selectedFile)
     }
 }

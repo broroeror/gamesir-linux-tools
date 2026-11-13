@@ -49,6 +49,7 @@ package() {
   cp -r vendors "$share"/
   find "$share/vendors" -name '__pycache__' -type d -prune -exec rm -rf {} +
   cp -r qml "$share"/
+  cp -r translations "$share"/
   # media-key descriptor fixup, installed by the user with udev-hid-bpf (Manual)
   install -Dm644 -t "$share/hid-bpf" packaging/hid-bpf/*.bpf.o
   install -d "$share/assets"

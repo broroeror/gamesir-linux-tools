@@ -13,7 +13,7 @@ Item {
     id: page
 
     property int sec: 0                                   // 0 = Aim, 1 = Tilt
-    readonly property string section: sec === 0 ? "Aim" : "Tilt"
+    readonly property string section: sec === 0 ? qsTranslate("UI", "Aim") : qsTranslate("UI", "Tilt")
     property var aim: ({})
     property var tilt: ({})
     readonly property var cur: sec === 0 ? aim : tilt
@@ -136,11 +136,11 @@ Item {
             Row {
                 spacing: 8
                 Repeater {
-                    model: bridge.motionHasTilt ? ["Aim", "Tilt"] : ["Aim"]
+                    model: bridge.motionHasTilt ? [qsTranslate("UI", "Aim"), qsTranslate("UI", "Tilt")] : [qsTranslate("UI", "Aim")]
                     delegate: PillButton {
                         required property string modelData
                         required property int index
-                        label: modelData
+                        label: qsTranslate("UI", modelData)
                         highlight: page.sec === index
                         onClicked: page.sec = index
                     }
@@ -148,7 +148,7 @@ Item {
                 Item { width: 8; height: 1 }
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: page.sec === 0 ? "Aim — point-to-aim gyro" : "Tilt — lean-to-steer gyro"
+                    text: page.sec === 0 ? qsTranslate("UI", "Aim — point-to-aim gyro") : qsTranslate("UI", "Tilt — lean-to-steer gyro")
                     color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                 }
             }
@@ -161,8 +161,8 @@ Item {
                 ColumnLayout {
                     Layout.fillWidth: true; Layout.preferredWidth: 1; spacing: 12
                     Card {
-                        title: "Activation"; Layout.fillWidth: true
-                        Text { text: "Method"; color: Theme.textDim
+                        title: qsTranslate("UI", "Activation"); Layout.fillWidth: true
+                        Text { text: qsTranslate("UI", "Method"); color: Theme.textDim
                                font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                         Flow {
                             width: parent.width; spacing: 8
@@ -171,7 +171,7 @@ Item {
                                 delegate: PillButton {
                                     required property string modelData
                                     required property int index
-                                    label: modelData
+                                    label: qsTranslate("UI", modelData)
                                     highlight: page.cur.act_method === index
                                     onClicked: page.setEnum("act_method", index)
                                 }
@@ -179,8 +179,8 @@ Item {
                         }
                         Text {
                             text: bridge.motionButtonMax > 1
-                                  ? "Activation buttons  (up to " + bridge.motionButtonMax + ", held together)"
-                                  : "Activation button"
+                                  ? qsTranslate("UI", "Activation buttons (up to %1, held together)").arg(bridge.motionButtonMax)
+                                  : qsTranslate("UI", "Activation button")
                             color: Theme.textDim; topPadding: 4
                             font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                         }
@@ -204,7 +204,7 @@ Item {
                     }
 
                     Card {
-                        title: "Output"; Layout.fillWidth: true
+                        title: qsTranslate("UI", "Output"); Layout.fillWidth: true
                         Flow {
                             width: parent.width; spacing: 8
                             Repeater {
@@ -212,7 +212,7 @@ Item {
                                 delegate: PillButton {
                                     required property string modelData
                                     required property int index
-                                    label: modelData
+                                    label: qsTranslate("UI", modelData)
                                     highlight: page.cur.output === index
                                     onClicked: page.setEnum("output", index)
                                 }
@@ -220,7 +220,7 @@ Item {
                         }
                         Row {
                             width: parent.width; topPadding: 6; visible: bridge.motionHasSens
-                            Text { text: "Sensitivity"; color: Theme.textDim
+                            Text { text: qsTranslate("UI", "Sensitivity"); color: Theme.textDim
                                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                             Item { width: parent.width - 130; height: 1 }
                             Text { text: sensSlider.value + "%"; color: Theme.text
@@ -233,11 +233,11 @@ Item {
                         }
                         RowLayout {
                             width: parent.width; visible: page.rangeSensitivityVisible
-                            Text { text: "Sensitivity (input range)"; color: Theme.textDim
+                            Text { text: qsTranslate("UI", "Sensitivity (input range)"); color: Theme.textDim
                                    Layout.fillWidth: true
                                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                             Text { text: page.rangeSensitivity > 0
-                                         ? page.rangeSensitivity.toFixed(2) + "×" : "Invalid range"
+                                         ? page.rangeSensitivity.toFixed(2) + "×" : qsTranslate("UI", "Invalid range")
                                    color: Theme.text
                                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                         }
@@ -253,17 +253,16 @@ Item {
                         }
                         Text {
                             width: parent.width; visible: page.rangeSensitivityVisible
-                            text: "Higher = stronger stick response. Adjusts the upper input limit; "
-                                  + "1× uses the full input range. Save to Profile to apply."
+                            text: qsTranslate("UI", "Higher = stronger stick response. Adjusts the upper input limit; 1× uses the full input range. Save to Profile to apply.")
                             wrapMode: Text.WordWrap
                             color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                         }
                         Row {
                             width: parent.width; topPadding: 4
-                            Text { text: "Horizontal"; color: Theme.textDim
+                            Text { text: qsTranslate("UI", "Horizontal"); color: Theme.textDim
                                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                             Item { width: parent.width - 150; height: 1 }
-                            Text { text: "Vertical"; color: Theme.textDim
+                            Text { text: qsTranslate("UI", "Vertical"); color: Theme.textDim
                                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                         }
                         AccentSlider {
@@ -271,7 +270,7 @@ Item {
                             onMoved: page.setVal("xy_scale", value)
                         }
                         Text {
-                            width: parent.width; text: "X / Y sensitivity balance"
+                            width: parent.width; text: qsTranslate("UI", "X / Y sensitivity balance")
                             color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                             horizontalAlignment: Text.AlignHCenter
                         }
@@ -280,11 +279,11 @@ Item {
                     // Directional-Macros output: assign each gyro direction to a
                     // button / key / mouse click (both controllers, when RE'd).
                     Card {
-                        title: bridge.isG7Pro ? "Button Binds" : "Directional Macros"; Layout.fillWidth: true
+                        title: bridge.isG7Pro ? qsTranslate("UI", "Button Binds") : qsTranslate("UI", "Directional Macros"); Layout.fillWidth: true
                         visible: page.cur.output === 2 && bridge.motionHasDirMacros
                         Text {
                             visible: bridge.motionHasOverlap
-                            text: "Overlap area: " + overlapSlider.value + "%"
+                            text: qsTranslate("UI", "Overlap area: ") + overlapSlider.value + "%"
                             color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                         }
                         AccentSlider {
@@ -293,8 +292,8 @@ Item {
                             onMoved: page.setVal("overlap_area", value)
                         }
                         Repeater {
-                            model: [{ n: "Up", i: 0 }, { n: "Down", i: 1 },
-                                    { n: "Left", i: 2 }, { n: "Right", i: 3 }]
+                            model: [{ n: qsTranslate("UI", "Up"), i: 0 }, { n: qsTranslate("UI", "Down"), i: 1 },
+                                    { n: qsTranslate("UI", "Left"), i: 2 }, { n: qsTranslate("UI", "Right"), i: 3 }]
                             delegate: Row {
                                 required property var modelData
                                 width: parent.width; spacing: 8
@@ -325,8 +324,8 @@ Item {
                 ColumnLayout {
                     Layout.fillWidth: true; Layout.preferredWidth: 1; spacing: 12
                     Card {
-                        title: "Rotation Axis"; Layout.fillWidth: true
-                        Text { text: "X-axis output"; color: Theme.textDim
+                        title: qsTranslate("UI", "Rotation Axis"); Layout.fillWidth: true
+                        Text { text: qsTranslate("UI", "X-axis output"); color: Theme.textDim
                                font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                         Flow {
                             width: parent.width; spacing: 8
@@ -335,7 +334,7 @@ Item {
                                 delegate: PillButton {
                                     required property string modelData
                                     required property int index
-                                    label: modelData
+                                    label: qsTranslate("UI", modelData)
                                     highlight: page.cur.xaxis === index
                                     onClicked: page.setEnum("xaxis", index)
                                 }
@@ -351,7 +350,7 @@ Item {
                                     width: parent.width
                                     visible: !bridge.isG7Pro || page.sec === 0 || modelData !== "Invert Roll"
                                     opacity: page.invLive(modelData) ? 1.0 : 0.4
-                                    Text { text: modelData; color: Theme.text
+                                    Text { text: qsTranslate("UI", modelData); color: Theme.text
                                            font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
                                            anchors.verticalCenter: parent.verticalCenter }
                                     Item { width: parent.width - 190; height: 1 }
@@ -366,10 +365,10 @@ Item {
                     }
 
                     Card {
-                        title: "Deadzone & Response"; Layout.fillWidth: true
+                        title: qsTranslate("UI", "Deadzone & Response"); Layout.fillWidth: true
                         Row {
                             width: parent.width
-                            Text { text: "Deadzone"; color: Theme.textDim
+                            Text { text: qsTranslate("UI", "Deadzone"); color: Theme.textDim
                                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                             Item { width: parent.width - 160; height: 1 }
                             Text { text: dzRange.lo + "–" + dzRange.hi + "%"; color: Theme.text
@@ -387,7 +386,7 @@ Item {
                         }
                         Row {
                             width: parent.width; topPadding: 4
-                            Text { text: "Anti-deadzone"; color: Theme.textDim
+                            Text { text: qsTranslate("UI", "Anti-deadzone"); color: Theme.textDim
                                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                             Item { width: parent.width - 160; height: 1 }
                             Text { text: adzRange.lo + "–" + adzRange.hi + "%"; color: Theme.text
@@ -402,7 +401,7 @@ Item {
                                 bridge.setMotionDeadzone(page.section, "adz_max", hi)
                             }
                         }
-                        Text { text: "Response curve"; color: Theme.textDim; topPadding: 6
+                        Text { text: qsTranslate("UI", "Response curve"); color: Theme.textDim; topPadding: 6
                                font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                         Flow {
                             width: parent.width; spacing: 8
@@ -411,7 +410,7 @@ Item {
                                 delegate: PillButton {
                                     required property string modelData
                                     required property int index
-                                    label: modelData
+                                    label: qsTranslate("UI", modelData)
                                     highlight: page.cur.curve_type === index
                                     onClicked: page.setCurveType(index)
                                 }
@@ -420,13 +419,13 @@ Item {
                         Text {
                             width: parent.width; wrapMode: Text.WordWrap
                             visible: bridge.isG7Pro && page.cur.curve_type === 3
-                            text: "Custom uses the curve points already stored in this profile."
+                            text: qsTranslate("UI", "Custom uses the curve points already stored in this profile.")
                             color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                         }
                         Row {
                             width: parent.width; topPadding: 4
                             visible: bridge.motionHasCurveStrength && (page.cur.curve_type === 1 || page.cur.curve_type === 2)
-                            Text { text: "Curve strength"; color: Theme.textDim
+                            Text { text: qsTranslate("UI", "Curve strength"); color: Theme.textDim
                                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                             Item { width: parent.width - 130; height: 1 }
                             Text { text: curveIntSlider.value + "%"; color: Theme.text

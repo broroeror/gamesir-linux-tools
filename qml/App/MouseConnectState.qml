@@ -18,23 +18,19 @@ ColumnLayout {
         Layout.fillWidth: true
         horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap
         font.family: Theme.fontFamily; font.pixelSize: Theme.fontL; color: Theme.text
-        text: "Your G502 X is still using its factory profiles."
+        text: qsTranslate("UI", "Your G502 X is still using its factory profiles.")
     }
     Card {
         visible: mouse.present && mouse.needsProfileSetup
-        title: "Set up editable profiles (one-time)"
+        title: qsTranslate("UI", "Set up editable profiles (one-time)")
         Layout.fillWidth: true
         Text {
             width: parent.width; wrapMode: Text.WordWrap
             color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
-            text: "The factory profiles live in read-only memory, so they can't be "
-                + "edited directly. Deadband can copy them into editable slots, the "
-                + "same thing Logitech's own software does the first time it sees "
-                + "the mouse. Your current settings carry over unchanged, and a "
-                + "backup is saved first."
+            text: qsTranslate("UI", "The factory profiles live in read-only memory, so they can't be edited directly. Deadband can copy them into editable slots, the same thing Logitech's own software does the first time it sees the mouse. Your current settings carry over unchanged, and a backup is saved first.")
         }
         PillButton {
-            label: mouse.busy ? "Setting up…" : "Set up editable profiles"
+            label: mouse.busy ? qsTranslate("UI", "Setting up…") : qsTranslate("UI", "Set up editable profiles")
             enabled: !mouse.busy
             onClicked: mouse.setupProfiles()
         }
@@ -46,14 +42,14 @@ ColumnLayout {
         horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap
         font.family: Theme.fontFamily; font.pixelSize: Theme.fontL; color: Theme.text
         text: mouse.permission === "no-access"
-                ? "Your G502 X is connected, but Deadband can't access it yet."
+                ? qsTranslate("UI", "Your G502 X is connected, but Deadband can't access it yet.")
                 : mouse.permission === "absent"
-                ? "Connect your Logitech G502 X to configure it."
-                : "Looking for a G502 X…"
+                ? qsTranslate("UI", "Connect your Logitech G502 X to configure it.")
+                : qsTranslate("UI", "Looking for a G502 X…")
     }
     Card {
         visible: mouse.permission === "no-access"
-        title: "Grant access (one-time)"
+        title: qsTranslate("UI", "Grant access (one-time)")
         Layout.fillWidth: true
         Text {
             width: parent.width; wrapMode: Text.WrapAnywhere
@@ -64,9 +60,9 @@ ColumnLayout {
         Text {
             width: parent.width; wrapMode: Text.WordWrap; topPadding: 6
             color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
-            text: "…then replug the mouse. If ratbagd holds the device, stop it first."
+            text: qsTranslate("UI", "…then replug the mouse. If ratbagd holds the device, stop it first.")
         }
     }
     PillButton { visible: !mouse.present
-                 Layout.alignment: Qt.AlignHCenter; label: "Retry"; onClicked: mouse.refresh() }
+                 Layout.alignment: Qt.AlignHCenter; label: qsTranslate("UI", "Retry"); onClicked: mouse.refresh() }
 }

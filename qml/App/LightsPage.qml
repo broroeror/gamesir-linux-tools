@@ -147,18 +147,13 @@ Item {
             spacing: 16
 
             Card {
-                title: "Lighting Profile"; Layout.fillWidth: true
+                title: qsTranslate("UI", "Lighting Profile"); Layout.fillWidth: true
                 Text {
                     width: parent.width; wrapMode: Text.WordWrap
                     // Two separate sets of "profiles" are easy to mix up: say so.
                     text: bridge.lightingSlotSelectable
-                          ? "Lighting has its own four profiles, separate from the " +
-                            "controller profiles (P1–P4) at the top: switching one " +
-                            "doesn't change the other. Picking one here switches " +
-                            "the controller's lights straight away."
-                          : "Lighting has its own profiles, separate from the controller " +
-                            "profiles at the top. Pick one on the controller with " +
-                            "M + Y / B / A / X; whichever it shows is the one you're editing."
+                          ? qsTranslate("UI", "Lighting has its own four profiles, separate from the controller profiles (P1–P4) at the top: switching one doesn't change the other. Picking one here switches the controller's lights straight away.")
+                          : qsTranslate("UI", "Lighting has its own profiles, separate from the controller profiles at the top. Pick one on the controller with M + Y / B / A / X; whichever it shows is the one you're editing.")
                     color: Theme.textFaint; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                 }
                 Row {
@@ -178,34 +173,34 @@ Item {
             }
 
             Card {
-                title: "Presets"; Layout.fillWidth: true
+                title: qsTranslate("UI", "Presets"); Layout.fillWidth: true
                 Flow {
                     width: parent.width; spacing: 8
                     Repeater {
                         model: bridge.presetNames
                         delegate: TextButton {
                             required property string modelData
-                            label: modelData
+                            label: qsTranslate("UI", modelData)
                             highlight: bridge.currentPreset === modelData
                             onClicked: bridge.applyPreset(modelData)
                         }
                     }
-                    TextButton { label: "Off"; highlight: bridge.currentPreset === "Off"
+                    TextButton { label: qsTranslate("UI", "Off"); highlight: bridge.currentPreset === "Off"
                                  onClicked: bridge.lightsOff() }
                 }
                 Text {
                     width: parent.width; wrapMode: Text.WordWrap
                     visible: bridge.currentPreset === ""
-                    text: "Showing custom colours. Pick a preset to replace them."
+                    text: qsTranslate("UI", "Showing custom colours. Pick a preset to replace them.")
                     color: Theme.textFaint; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                 }
             }
 
             Card {
-                title: "Brightness & Speed"; Layout.fillWidth: true
+                title: qsTranslate("UI", "Brightness & Speed"); Layout.fillWidth: true
                 Row {
                     width: parent.width
-                    Text { text: "Brightness"; color: Theme.textDim
+                    Text { text: qsTranslate("UI", "Brightness"); color: Theme.textDim
                            font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                     Item { width: parent.width - briLbl.width - 70; height: 1 }
                     Text { id: briLbl; text: bridge.brightness + "%"; color: Theme.text
@@ -218,7 +213,7 @@ Item {
                 }
                 Row {
                     width: parent.width
-                    Text { text: "Speed"; color: Theme.textDim
+                    Text { text: qsTranslate("UI", "Speed"); color: Theme.textDim
                            font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                     Item { width: parent.width - spdLbl.width - 42; height: 1 }
                     Text { id: spdLbl; text: bridge.speed + ""; color: Theme.text
@@ -232,14 +227,14 @@ Item {
             }
 
             Card {
-                title: "Power"; Layout.fillWidth: true
+                title: qsTranslate("UI", "Power"); Layout.fillWidth: true
                 visible: bridge.lightingPowerSupported
                 // Lives on the left normally; reparents into the centre column's
                 // slack (under the controller) when the viewport is short.
                 parent: page.compact ? centerColumn : leftCol
                 Row {
                     width: parent.width
-                    Text { text: "Audio reactive"; color: Theme.text
+                    Text { text: qsTranslate("UI", "Audio reactive"); color: Theme.text
                            font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
                            anchors.verticalCenter: parent.verticalCenter }
                     Item { width: parent.width - 130 - audioSw.width; height: 1 }
@@ -247,20 +242,19 @@ Item {
                 }
                 Text {
                     width: parent.width; wrapMode: Text.WordWrap
-                    text: "Experimental — arms the device flag, but live reactivity " +
-                          "needs the host to stream audio (not yet implemented)."
+                    text: qsTranslate("UI", "Experimental — arms the device flag, but live reactivity needs the host to stream audio (not yet implemented).")
                     color: Theme.textFaint
                     font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                 }
                 Row {
                     width: parent.width
-                    Text { text: "Pick-up to wake"; color: Theme.text
+                    Text { text: qsTranslate("UI", "Pick-up to wake"); color: Theme.text
                            font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
                            anchors.verticalCenter: parent.verticalCenter }
                     Item { width: parent.width - 130 - wakeSw.width; height: 1 }
                     ToggleSwitch { id: wakeSw; onToggled: bridge.setPickupWake(wakeSw.checked) }
                 }
-                Text { text: "Sleep timer"; color: Theme.textDim
+                Text { text: qsTranslate("UI", "Sleep timer"); color: Theme.textDim
                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
                 Flow {
                     width: parent.width; spacing: 6
@@ -268,7 +262,7 @@ Item {
                         model: bridge.sleepOptions
                         delegate: TextButton {
                             required property string modelData
-                            label: modelData
+                            label: qsTranslate("UI", modelData)
                             highlight: page.sleepSel === modelData
                             onClicked: { page.sleepSel = modelData; bridge.setSleepTimeout(modelData) }
                         }
@@ -331,7 +325,7 @@ Item {
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
                                 Text {
-                                    text: bridge.lightNames[index]; color: Theme.textDim
+                                    text: qsTranslate("UI", bridge.lightNames[index]); color: Theme.textDim
                                     font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
@@ -347,7 +341,7 @@ Item {
                     visible: bridge.canSwapHomeProfile
                     spacing: 10
                     Text {
-                        text: "Home and Profile lights the wrong way round on your controller?"
+                        text: qsTranslate("UI", "Home and Profile lights the wrong way round on your controller?")
                         width: Math.min(implicitWidth, centerArea.width - 110)
                         wrapMode: Text.WordWrap
                         color: Theme.textDim; font.family: Theme.fontFamily
@@ -360,7 +354,7 @@ Item {
                         onToggled: function (on) { bridge.setHomeProfileSwapped(on) }
                     }
                     Text {
-                        text: "Swap"
+                        text: qsTranslate("UI", "Swap")
                         color: Theme.textDim; font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontS
                         anchors.verticalCenter: parent.verticalCenter
@@ -378,7 +372,7 @@ Item {
             spacing: 16
 
             Card {
-                title: "Zone — " + (bridge.lightNames[page.sel] || ""); Layout.fillWidth: true
+                title: qsTranslate("UI", "Zone — ") + (bridge.lightNames[page.sel] || ""); Layout.fillWidth: true
                 ColorPicker {
                     id: picker; width: parent.width
                     onEdited: page.onZoneEdited(c)
@@ -386,7 +380,7 @@ Item {
             }
 
             Card {
-                title: "Keyframes"; Layout.fillWidth: true
+                title: qsTranslate("UI", "Keyframes"); Layout.fillWidth: true
                 Flow {
                     width: parent.width; spacing: 6
                     Repeater {
@@ -410,14 +404,14 @@ Item {
                 }
                 Text {
                     width: parent.width
-                    text: page.frames.length + " / 8 keyframes — edit zone colors per frame"
+                    text: page.frames.length + qsTranslate("UI", " / 8 keyframes — edit zone colors per frame")
                     color: Theme.textFaint; font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontS; wrapMode: Text.WordWrap
                 }
                 Row {
                     width: parent.width; spacing: 8
-                    TextButton { label: "Randomize"; onClicked: page.randomizeFrame() }
-                    TextButton { label: page.playing ? "Pause" : "Play"
+                    TextButton { label: qsTranslate("UI", "Randomize"); onClicked: page.randomizeFrame() }
+                    TextButton { label: page.playing ? "Pause" : qsTranslate("UI", "Play")
                                  visible: bridge.lightingPlaybackSupported
                                  onClicked: page.togglePlay() }
                 }
@@ -426,8 +420,8 @@ Item {
             // Rewrites the keyframe records from the factory baseline. Destructive,
             // so it confirms first.
             ConfirmButton {
-                label: "Restore default lighting"
-                confirmLabel: "Restore default lighting?"
+                label: qsTranslate("UI", "Restore default lighting")
+                confirmLabel: qsTranslate("UI", "Restore default lighting?")
                 visible: bridge.lightingRestorable
                 onConfirmed: bridge.restoreLighting()
             }

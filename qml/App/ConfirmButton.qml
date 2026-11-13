@@ -5,7 +5,7 @@ import QtQuick
 Item {
     id: cb
     property string label: ""
-    property string confirmLabel: "Confirm"
+    property string confirmLabel: qsTranslate("UI", "Confirm")
     property bool arming: false
     signal confirmed()
 
@@ -29,7 +29,7 @@ Item {
             onClicked: { cb.arming = false; cb.confirmed() }
         }
         PillButton {
-            label: "Cancel"
+            label: qsTranslate("UI", "Cancel")
             onClicked: cb.arming = false
         }
     }

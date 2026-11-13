@@ -16,9 +16,9 @@ Rectangle {
         id: actions
         anchors.right: parent.right; anchors.rightMargin: 14
         anchors.verticalCenter: parent.verticalCenter; spacing: 8
-        PillButton { label: "Discard"; enabled: !mouse.busy; onClicked: mouse.discard() }
+        PillButton { label: qsTranslate("UI", "Discard"); enabled: !mouse.busy; onClicked: mouse.discard() }
         PillButton {
-            label: mouse.busy ? "Applying…" : "Apply " + mouse.pendingCount
+            label: mouse.busy ? qsTranslate("UI", "Applying…") : qsTranslate("UI", "Apply ") + mouse.pendingCount
             highlight: !mouse.busy; enabled: !mouse.busy
             onClicked: mouse.apply()
         }

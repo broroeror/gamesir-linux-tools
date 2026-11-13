@@ -86,39 +86,39 @@ QtObject {
 
     // Ordered list of themeable tokens for the Settings UI (key + label).
     readonly property var themeKeys: [
-        { key: "accent",     label: "Accent" },
-        { key: "bg",         label: "Background" },
-        { key: "bgGlow",     label: "Corner glow" },
-        { key: "navBar",     label: "Top bar" },
-        { key: "card",       label: "Card" },
-        { key: "cardBorder", label: "Card border" },
-        { key: "button",     label: "Button" },
-        { key: "track",      label: "Slider" },
-        { key: "ringSelect", label: "Selection glow" },
-        { key: "text",       label: "Text" },
-        { key: "textDim",    label: "Dim text" }
+        { key: "accent",     label: qsTranslate("UI", "Accent") },
+        { key: "bg",         label: qsTranslate("UI", "Background") },
+        { key: "bgGlow",     label: qsTranslate("UI", "Corner glow") },
+        { key: "navBar",     label: qsTranslate("UI", "Top bar") },
+        { key: "card",       label: qsTranslate("UI", "Card") },
+        { key: "cardBorder", label: qsTranslate("UI", "Card border") },
+        { key: "button",     label: qsTranslate("UI", "Button") },
+        { key: "track",      label: qsTranslate("UI", "Slider") },
+        { key: "ringSelect", label: qsTranslate("UI", "Selection glow") },
+        { key: "text",       label: qsTranslate("UI", "Text") },
+        { key: "textDim",    label: qsTranslate("UI", "Dim text") }
     ]
 
     // Named preset palettes. Any key omitted falls back to _def, so a preset can
     // restyle just the accent + surfaces and leave the rest at the shipped value.
     readonly property var presets: [
-        { name: "GameSir Red",  colors: _def },
-        { name: "Cobalt",       colors: { accent: "#3B82F6", bg: "#0B0E14", bgGlow: "#122036",
+        { name: qsTranslate("UI", "GameSir Red"),  colors: _def },
+        { name: qsTranslate("UI", "Cobalt"),       colors: { accent: "#3B82F6", bg: "#0B0E14", bgGlow: "#122036",
                                           navBar: "#111521", card: "#161B26", cardBorder: "#232B3A",
                                           button: "#1E2636", track: "#2C3648", ringSelect: "#FFFFFF", text: "#EEF2F8", textDim: "#94A0B4" } },
-        { name: "Emerald",      colors: { accent: "#2FBF71", bg: "#0A0F0C", bgGlow: "#0F2A1C",
+        { name: qsTranslate("UI", "Emerald"),      colors: { accent: "#2FBF71", bg: "#0A0F0C", bgGlow: "#0F2A1C",
                                           navBar: "#101613", card: "#151C18", cardBorder: "#222C27",
                                           button: "#1D2620", track: "#2B372F", ringSelect: "#FFFFFF", text: "#EDF5F0", textDim: "#93A69C" } },
         { name: "Gruvbox",      colors: { accent: "#FE8019", bg: "#282828", bgGlow: "#3C3836",
                                           navBar: "#1D2021", card: "#32302F", cardBorder: "#504945",
                                           button: "#3C3836", track: "#665C54", ringSelect: "#FBF1C7", text: "#EBDBB2", textDim: "#BDAE93" } },
-        { name: "Violet",       colors: { accent: "#8B5CF6", bg: "#0E0B14", bgGlow: "#20143A",
+        { name: qsTranslate("UI", "Violet"),       colors: { accent: "#8B5CF6", bg: "#0E0B14", bgGlow: "#20143A",
                                           navBar: "#15111F", card: "#1A1626", cardBorder: "#2A2340",
                                           button: "#241E36", track: "#342C4E", ringSelect: "#FFFFFF", text: "#F0ECF8", textDim: "#A198B4" } },
-        { name: "Amber",        colors: { accent: "#F59E0B", bg: "#12100A", bgGlow: "#2E2410",
+        { name: qsTranslate("UI", "Amber"),        colors: { accent: "#F59E0B", bg: "#12100A", bgGlow: "#2E2410",
                                           navBar: "#1A1610", card: "#201C14", cardBorder: "#2E2A20",
                                           button: "#2A2418", track: "#38321F", ringSelect: "#FFFFFF", text: "#F6F1E8", textDim: "#B0A894" } },
-        { name: "Slate (light)",colors: { accent: "#E03A2F", bg: "#E9ECF1", bgGlow: "#F3D9D6",
+        { name: qsTranslate("UI", "Slate (light)"),colors: { accent: "#E03A2F", bg: "#E9ECF1", bgGlow: "#F3D9D6",
                                           navBar: "#DCE0E8", card: "#FFFFFF", cardBorder: "#CDD3DE",
                                           button: "#E6E9EF", track: "#C2C7D2", ringSelect: "#333A47", text: "#1A1D24", textDim: "#5C636F" } }
     ]

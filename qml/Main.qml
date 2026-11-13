@@ -27,7 +27,7 @@ Window {
         for (var i = 0; i < mouse.profiles.length; i++)
             if (mouse.profiles[i].sector === mouse.selectedProfile)
                 return mouse.profiles[i].label
-        return "this profile"
+        return qsTranslate("UI", "this profile")
     }
     // Tabs follow what the connected controller actually has, so a profile
     // without (say) mapped lighting or vibration motors doesn't get an empty page.
@@ -49,6 +49,18 @@ Window {
           .concat(bridge.hasMacros ? ["Macros"] : [])
     readonly property var mouseTabs: ["Buttons", "DPI", "Macros"]
     readonly property var tabs: activeDevice === "mouse" ? mouseTabs : controllerTabs
+    readonly property var tabLabels: ({
+        "Rebinds": qsTranslate("UI", "Rebinds"),
+        "Sticks": qsTranslate("UI", "Sticks"),
+        "Triggers": qsTranslate("UI", "Triggers"),
+        "Vibration": qsTranslate("UI", "Vibration"),
+        "Motion": qsTranslate("UI", "Motion"),
+        "Device": qsTranslate("UI", "Device"),
+        "Lights": qsTranslate("UI", "Lights"),
+        "Macros": qsTranslate("UI", "Macros"),
+        "Buttons": qsTranslate("UI", "Buttons"),
+        "DPI": qsTranslate("UI", "DPI")
+    })
     // Card vertical-compression is global (only one page shows at a time); reset it
     // to full on every tab switch so the newly-shown page's FitScroll re-fits from
     // scratch and a page never inherits another's compression.
@@ -174,10 +186,10 @@ Window {
                 if (colors[key] !== undefined) normalized[key] = colors[key]
             }
             appearance.themeJson = JSON.stringify(normalized)
-            themeFileStatus = "Theme imported"
+            themeFileStatus = qsTranslate("UI", "Theme imported")
             themeFileError = false
         } catch (e) {
-            themeFileStatus = "Could not import theme: " + e
+            themeFileStatus = qsTranslate("UI", "Could not import theme: ") + e
             themeFileError = true
         }
     }
@@ -191,24 +203,24 @@ Window {
     // File picker for the background (png / jpeg / gif image, or webm / mp4 video).
     FileDialog {
         id: bgDialog
-        title: "Choose a background image or video"
-        nameFilters: ["Images & video (*.png *.jpg *.jpeg *.gif *.webm *.mp4 *.mkv *.mov *.m4v)",
-                      "Images (*.png *.jpg *.jpeg *.gif)",
-                      "Video (*.webm *.mp4 *.mkv *.mov *.m4v)",
-                      "All files (*)"]
+        title: qsTranslate("UI", "Choose a background image or video")
+        nameFilters: [qsTranslate("UI", "Images & video (*.png *.jpg *.jpeg *.gif *.webm *.mp4 *.mkv *.mov *.m4v)"),
+                      qsTranslate("UI", "Images (*.png *.jpg *.jpeg *.gif)"),
+                      qsTranslate("UI", "Video (*.webm *.mp4 *.mkv *.mov *.m4v)"),
+                      qsTranslate("UI", "All files (*)")]
         onAccepted: appearance.bgImage = selectedFile.toString()
     }
     FileDialog {
         id: ctrlPicDialog
-        title: "Choose a picture for the " + bridge.controllerName
-        nameFilters: ["Images (*.png *.jpg *.jpeg *.webp *.svg)", "All files (*)"]
+        title: qsTranslate("UI", "Choose a picture for %1").arg(bridge.controllerName)
+        nameFilters: [qsTranslate("UI", "Images (*.png *.jpg *.jpeg *.webp *.svg)"), qsTranslate("UI", "All files (*)")]
         onAccepted: win.setControllerPicture(bridge.controllerName, selectedFile.toString())
     }
     FileDialog {
         id: ctrlTemplateDialog
         fileMode: FileDialog.SaveFile
-        title: "Save the " + bridge.controllerName + " template"
-        nameFilters: ["PNG images (*.png)"]
+        title: qsTranslate("UI", "Save the %1 template").arg(bridge.controllerName)
+        nameFilters: [qsTranslate("UI", "PNG images (*.png)")]
         defaultSuffix: "png"
         currentFolder: StandardPaths.writableLocation(StandardPaths.PicturesLocation)
         onAccepted: {
@@ -219,32 +231,32 @@ Window {
             previewView.grabToImage(function (result) {
                 previewView.template = false
                 win.pictureStatus = result.saveToFile(target)
-                    ? "Template saved" : "Could not save the template there"
+                    ? qsTranslate("UI", "Template saved") : qsTranslate("UI", "Could not save the template there")
             }, Qt.size(2000, Math.round(2000 / previewView.aspect)))
         }
     }
     FileDialog {
         id: exportThemeDialog
         fileMode: FileDialog.SaveFile
-        title: "Export theme"
-        nameFilters: ["JSON files (*.json)"]
+        title: qsTranslate("UI", "Export theme")
+        nameFilters: [qsTranslate("UI", "JSON files (*.json)")]
         defaultSuffix: "json"
         currentFolder: StandardPaths.writableLocation(StandardPaths.DocumentsLocation)
         onAccepted: {
             var err = bridge.exportTheme(selectedFile, JSON.stringify(win._currentThemeMap()))
-            win.themeFileStatus = err ? "Could not export theme: " + err : "Theme exported"
+            win.themeFileStatus = err ? qsTranslate("UI", "Could not export theme: ") + err : qsTranslate("UI", "Theme exported")
             win.themeFileError = !!err
         }
     }
     FileDialog {
         id: importThemeDialog
         fileMode: FileDialog.OpenFile
-        title: "Import theme"
-        nameFilters: ["JSON files (*.json)"]
+        title: qsTranslate("UI", "Import theme")
+        nameFilters: [qsTranslate("UI", "JSON files (*.json)")]
         onAccepted: {
             var result = bridge.importTheme(selectedFile)
             if (result.indexOf("ERROR:") === 0) {
-                win.themeFileStatus = "Could not import theme: " + result.slice(6)
+                win.themeFileStatus = qsTranslate("UI", "Could not import theme: ") + result.slice(6)
                 win.themeFileError = true
             } else {
                 win.applyImportedTheme(result)
@@ -406,7 +418,7 @@ Window {
                     id: g7Session
                     visible: win.activeDevice === "controller" && bridge.hasConfigSession
                     Layout.alignment: Qt.AlignVCenter
-                    label: bridge.configClaimed ? "Release to games" : "Configure controller"
+                    label: bridge.configClaimed ? qsTranslate("UI", "Release to games") : qsTranslate("UI", "Configure controller")
                     statusDot: bridge.configClaimed ? Theme.warn : "transparent"
                     onClicked: bridge.setConfigClaimed(!bridge.configClaimed)
                 }
@@ -434,15 +446,15 @@ Window {
                     visible: win.activeDevice === "mouse" && mouse.present
                              && mouse.selectedProfile > 0
                     enabled: !mouse.busy
-                    label: win.width < 1450 ? "✎" : "✎ Rename"
+                    label: win.width < 1450 ? "✎" : qsTranslate("UI", "✎ Rename")
                     onClicked: mouseProfiles.startRename()
                     HoverHandler { id: renameHover }
                     QQC.ToolTip {
                         parent: renameBtn
                         visible: renameHover.hovered
                         delay: 400
-                        text: "Rename " + win.selectedProfileLabel + ".\n" +
-                              "Double-click a profile to switch the mouse to it."
+                        text: qsTranslate("UI", "Rename %1").arg(win.selectedProfileLabel) + ".\n" +
+                              qsTranslate("UI", "Double-click a profile to switch the mouse to it.")
                     }
                 }
 
@@ -455,17 +467,15 @@ Window {
                     visible: win.activeDevice === "mouse" && mouse.present
                              && mouse.resetSupported && mouse.selectedProfile > 0
                     enabled: !mouse.busy
-                    label: win.width < 1450 ? "↺" : "↺ Reset profile"
-                    confirmLabel: "Reset " + win.selectedProfileLabel + "?"
+                    label: win.width < 1450 ? "↺" : qsTranslate("UI", "↺ Reset profile")
+                    confirmLabel: qsTranslate("UI", "Reset %1?").arg(win.selectedProfileLabel)
                     onConfirmed: mouse.resetProfile()
                     HoverHandler { id: mouseResetHover }
                     QQC.ToolTip {
                         parent: mouseResetBtn
                         visible: mouseResetHover.hovered
                         delay: 400
-                        text: "Restores " + win.selectedProfileLabel + " to the mouse's\n" +
-                              "factory settings: buttons, G-Shift, DPI, rate and name.\n" +
-                              "Your current settings are backed up first."
+                        text: qsTranslate("UI", "Restores %1 to the mouse's\nfactory settings: buttons, G-Shift, DPI, rate and name.\nYour current settings are backed up first.").arg(win.selectedProfileLabel)
                     }
                 }
 
@@ -478,17 +488,15 @@ Window {
                     Layout.alignment: Qt.AlignVCenter
                     visible: bridge.profile > 0 && bridge.profileResetSupported
                              && win.activeDevice === "controller"
-                    label: win.width < 1320 ? "↺" : "↺ Reset profile"
-                    confirmLabel: "Reset Profile " + bridge.profile + "?"
+                    label: win.width < 1320 ? "↺" : qsTranslate("UI", "↺ Reset profile")
+                    confirmLabel: qsTranslate("UI", "Reset Profile %1?").arg(bridge.profile)
                     onConfirmed: bridge.resetProfileToDefault()
                     HoverHandler { id: resetHover }
                     QQC.ToolTip {
                         parent: resetBtn
                         visible: resetHover.hovered
                         delay: 400
-                        text: "Resets only the current profile (P" + bridge.profile +
-                              ") to defaults.\nReset all " + bridge.profileCount +
-                              " in Settings → Backup & Restore."
+                        text: qsTranslate("UI", "Resets only the current profile (P%1) to defaults.\nReset all %2 in Settings → Backup & Restore.").arg(bridge.profile).arg(bridge.profileCount)
                     }
                 }
 
@@ -503,19 +511,13 @@ Window {
                     spacing: 8
                     Text {
                         visible: win.width >= 1000   // hide label when narrow; help icon still explains
-                        text: "Sticks → cursor"; color: Theme.textDim
+                        text: qsTranslate("UI", "Sticks → cursor"); color: Theme.textDim
                         font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                         anchors.verticalCenter: parent.verticalCenter
                     }
                     HelpIcon {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "Toggles KDE's Game Controller (KWin) plugin.\n\n" +
-                              "On: the controller's sticks move your mouse pointer " +
-                              "and the triggers click — handy from the couch.\n\n" +
-                              "Off: the controller acts as a normal gamepad (games " +
-                              "still read it directly).\n\n" +
-                              "Same setting as System Settings → Game Controller; " +
-                              "applied live and remembered."
+                        text: qsTranslate("UI", "Toggles KDE's Game Controller (KWin) plugin.\n\nOn: the controller's sticks move your mouse pointer and the triggers click — handy from the couch.\n\nOff: the controller acts as a normal gamepad (games still read it directly).\n\nSame setting as System Settings → Game Controller; applied live and remembered.")
                     }
                     ToggleSwitch {
                         id: mmSwitch
@@ -546,7 +548,7 @@ Window {
                     }
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: mouse.present ? "Connected" : "Not connected"
+                        text: mouse.present ? qsTranslate("UI", "Connected") : qsTranslate("UI", "Not connected")
                         color: Theme.textDim
                         font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                     }
@@ -561,7 +563,7 @@ Window {
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
                         visible: mouse.present
-                        text: mouse.wireless ? "Wireless" : "Wired"
+                        text: mouse.wireless ? qsTranslate("UI", "Wireless") : qsTranslate("UI", "Wired")
                         color: Theme.textDim
                         font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                     }
@@ -591,17 +593,19 @@ Window {
         // ------------------------------------------------------------- nav
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 52
+            Layout.preferredHeight: Math.max(52, navigation.implicitHeight + 16)
             color: Theme.bg
-            Row {
+            Flow {
+                id: navigation
                 anchors.centerIn: parent
+                width: parent.width - 24
                 spacing: 6
                 Repeater {
                     model: win.tabs
                     delegate: NavTab {
                         required property int index
                         required property string modelData
-                        label: modelData
+                        label: win.tabLabels[modelData]
                         active: win.currentTab === index
                         onClicked: win.currentTab = index
                     }
@@ -614,14 +618,12 @@ Window {
                 // edit -- the pending bar picks it up from whichever tab is open.
                 Rectangle {
                     visible: pollDrop.visible
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 1; height: 22; color: Theme.cardBorder
+                    width: 1; height: 32; color: Theme.cardBorder
                 }
                 DropdownButton {
                     id: pollDrop
                     visible: win.activeDevice === "controller" && bridge.pollRates.length > 0
-                    anchors.verticalCenter: parent.verticalCenter
-                    label: "Poll rate"
+                    label: qsTranslate("UI", "Poll rate")
                     model: bridge.pollRates
                     enabled: bridge.pollRateEditable
                     opacity: enabled ? 1 : 0.45
@@ -667,35 +669,27 @@ Window {
                     color: Theme.warn; font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontM; font.weight: Font.DemiBold
                     text: bridge.accessProblem === "needs-usb-lib"
-                          ? "⚠ Found your controller, but a library it needs isn't installed"
+                          ? qsTranslate("UI", "⚠ Found your controller, but a library it needs isn't installed")
                           : bridge.accessProblem === "mac-open"
-                          ? "⚠ Found your controller, but couldn't open it"
+                          ? qsTranslate("UI", "⚠ Found your controller, but couldn't open it")
                           : bridge.accessProblem === "backend"
-                          ? "⚠ Found your controller, but the Python hidapi library can't open it"
-                          : "⚠ Found your controller, but Deadband isn't allowed to open it"
+                          ? qsTranslate("UI", "⚠ Found your controller, but the Python hidapi library can't open it")
+                          : qsTranslate("UI", "⚠ Found your controller, but Deadband isn't allowed to open it")
                 }
                 Text {
                     width: parent.width; wrapMode: Text.WordWrap
                     color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                     text: bridge.accessProblem === "needs-usb-lib"
-                          ? "On macOS this controller is reached over USB directly, which needs "
-                            + "two small Python packages. Install them, then restart Deadband:"
+                          ? qsTranslate("UI", "On macOS this controller is reached over USB directly, which needs two small Python packages. Install them, then restart Deadband:")
                           : bridge.accessProblem === "mac-open"
-                          ? "Another app may be using it: GameSir's own app, Steam, or a second "
-                            + "copy of Deadband. Close it, then unplug and replug the controller."
+                          ? qsTranslate("UI", "Another app may be using it: GameSir's own app, Steam, or a second copy of Deadband. Close it, then unplug and replug the controller.")
                           : bridge.accessProblem === "backend"
                           ? (bridge.isNixos
-                             ? "Your hidapi is built with the libusb backend, which can't open "
-                               + "hidraw devices. On NixOS, use an overridden hidapi build — "
-                               + "details in Diagnostics:"
-                             : "Your hidapi is built with the libusb backend, which can't open hidraw "
-                               + "devices (the pip default when built from source). Rebuild it — the "
-                               + "--no-cache-dir matters, or pip reuses the old libusb build. "
-                               + "Prerequisites & details in Diagnostics:")
+                             ? qsTranslate("UI", "Your hidapi is built with the libusb backend, which can't open hidraw devices. On NixOS, use an overridden hidapi build — details in Diagnostics:")
+                             : qsTranslate("UI", "Your hidapi is built with the libusb backend, which can't open hidraw devices (the pip default when built from source). Rebuild it — the --no-cache-dir matters, or pip reuses the old libusb build. Prerequisites & details in Diagnostics:"))
                           : (bridge.isNixos
-                             ? "On NixOS the rule comes from your configuration — add this (or use "
-                               + "the community flake), rebuild, then replug:"
-                             : "Run this once, then unplug and replug the controller:")
+                             ? qsTranslate("UI", "On NixOS the rule comes from your configuration — add this (or use the community flake), rebuild, then replug:")
+                             : qsTranslate("UI", "Run this once, then unplug and replug the controller:"))
                 }
                 Text {
                     visible: accessCol.fixCmd.length > 0
@@ -707,11 +701,11 @@ Window {
                     spacing: 8
                     PillButton {
                         visible: accessCol.fixCmd.length > 0
-                        label: "Copy command" + (bridge.accessProblem === "no-access" ? "s" : "")
+                        label: qsTranslate("UI", "Copy command")
                         onClicked: bridge.copyText(accessCol.fixCmd)
                     }
                     PillButton {
-                        label: "Diagnostics…"
+                        label: qsTranslate("UI", "Diagnostics…")
                         onClicked: { diagWin.show(); diagWin.raise(); bridge.runDiagnostics() }
                     }
                 }
@@ -745,7 +739,7 @@ Window {
                 anchors.fill: parent
                 visible: win.tabs[win.currentTab] === "Sticks"
                 isStick: true
-                sideKeys: [["Left Stick", "st"], ["Right Stick", "rs"]]
+                sideKeys: [[qsTranslate("UI", "Left Stick"), "st"], [qsTranslate("UI", "Right Stick"), "rs"]]
             }
 
             // Triggers tab.
@@ -753,7 +747,7 @@ Window {
                 anchors.fill: parent
                 visible: win.tabs[win.currentTab] === "Triggers"
                 isStick: false
-                sideKeys: [["Left Trigger", "lt"], ["Right Trigger", "rt"]]
+                sideKeys: [[qsTranslate("UI", "Left Trigger"), "lt"], [qsTranslate("UI", "Right Trigger"), "rt"]]
             }
 
             // Lights tab. Only the Cyclone's keyframe/palette RGB is wired up; other
@@ -774,11 +768,11 @@ Window {
                 Card {
                     anchors.centerIn: parent
                     width: 440
-                    title: "Lighting"
+                    title: qsTranslate("UI", "Lighting")
                     Text {
                         width: parent.width
                         wrapMode: Text.WordWrap
-                        text: "This controller has no app-configurable lighting."
+                        text: qsTranslate("UI", "This controller has no app-configurable lighting.")
                         color: Theme.textDim
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontM
@@ -797,11 +791,11 @@ Window {
                 Card {
                     anchors.centerIn: parent
                     width: 440
-                    title: "Macros"
+                    title: qsTranslate("UI", "Macros")
                     Text {
                         width: parent.width
                         wrapMode: Text.WordWrap
-                        text: "This controller has no app-configurable macros."
+                        text: qsTranslate("UI", "This controller has no app-configurable macros.")
                         color: Theme.textDim
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontM
@@ -821,11 +815,11 @@ Window {
                 Card {
                     anchors.centerIn: parent
                     width: 440
-                    title: "Motion"
+                    title: qsTranslate("UI", "Motion")
                     Text {
                         width: parent.width
                         wrapMode: Text.WordWrap
-                        text: "This controller has no app-configurable motion / gyro."
+                        text: qsTranslate("UI", "This controller has no app-configurable motion / gyro.")
                         color: Theme.textDim
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontM
@@ -849,23 +843,22 @@ Window {
                 Card {
                     anchors.centerIn: parent; width: 460
                     title: g7ReleasedOverlay.claimInProgress
-                           ? "Preparing controller"
+                           ? qsTranslate("UI", "Preparing controller")
                            : g7ReleasedOverlay.claimFailed
-                           ? "Couldn't configure controller"
-                           : "Controller released to games"
+                           ? qsTranslate("UI", "Couldn't configure controller")
+                           : qsTranslate("UI", "Controller released to games")
                     Text {
                         width: parent.width; wrapMode: Text.WordWrap
                         text: g7ReleasedOverlay.claimInProgress
                               ? bridge.configStatus
                               : g7ReleasedOverlay.claimFailed
-                              ? bridge.configStatus + "\n\nDeadband will retry when you choose Configure controller."
-                              : "Configuration needs temporary exclusive access to the controller or dongle. " +
-                                "Deadband restores xpad whenever you release it."
+                              ? bridge.configStatus + qsTranslate("UI", "\n\nDeadband will retry when you choose Configure controller.")
+                              : qsTranslate("UI", "Configuration needs temporary exclusive access to the controller or dongle. Deadband restores xpad whenever you release it.")
                         color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
                     }
                     PillButton {
                         visible: !g7ReleasedOverlay.claimInProgress
-                        label: g7ReleasedOverlay.claimFailed ? "Retry" : "Configure controller"
+                        label: g7ReleasedOverlay.claimFailed ? qsTranslate("UI", "Retry") : qsTranslate("UI", "Configure controller")
                         onClicked: bridge.setConfigClaimed(true)
                     }
                 }
@@ -916,7 +909,7 @@ Window {
                     Layout.fillWidth: true; implicitHeight: 26
                     Text {
                         anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
-                        text: "Settings"; color: Theme.text
+                        text: qsTranslate("UI", "Settings"); color: Theme.text
                         font.family: Theme.fontFamily; font.pixelSize: Theme.fontL
                         font.weight: Font.DemiBold
                     }
@@ -945,19 +938,30 @@ Window {
                         width: scroller.availableWidth
                         spacing: 16
 
+                        SectionHeader { text: qsTranslate("UI", "Language") }
+                        DropdownButton {
+                            objectName: "languageSelector"
+                            label: "🌐"
+                            model: i18n.languageNames
+                            currentIndex: i18n.languageCodes.indexOf(i18n.language)
+                            onActivated: index => i18n.setLanguage(i18n.languageCodes[index])
+                        }
+
+                        Divider {}
+
                         // ------------------------------------------ Appearance
-                        SectionHeader { text: "Appearance" }
-                        Row {
+                        SectionHeader { text: qsTranslate("UI", "Appearance") }
+                        Flow {
                             width: parent.width; spacing: 8
                             Text {
-                                text: "Density"; color: Theme.textDim; width: 72
-                                anchors.verticalCenter: parent.verticalCenter
+                                text: qsTranslate("UI", "Density"); color: Theme.textDim
+                                height: 30; verticalAlignment: Text.AlignVCenter
                                 font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                             }
                             Repeater {
-                                model: [["Compact", "compact"],
-                                        ["Comfortable", "comfortable"],
-                                        ["Cozy", "cozy"]]
+                                model: [[qsTranslate("UI", "Compact"), "compact"],
+                                        [qsTranslate("UI", "Comfortable"), "comfortable"],
+                                        [qsTranslate("UI", "Cozy"), "cozy"]]
                                 delegate: PillButton {
                                     required property var modelData
                                     label: modelData[0]
@@ -970,7 +974,7 @@ Window {
                         Divider {}
 
                         // ------------------------------------------ Demo mode
-                        SectionHeader { text: "Demo mode" }
+                        SectionHeader { text: qsTranslate("UI", "Demo mode") }
                         Row {
                             width: parent.width; spacing: 12
                             ToggleSwitch {
@@ -982,9 +986,7 @@ Window {
                             Text {
                                 width: parent.width - 60; wrapMode: Text.WordWrap
                                 anchors.verticalCenter: parent.verticalCenter
-                                text: "Preview one of each supported controller in software, "
-                                    + "with no hardware connected — pick a model from the top-bar "
-                                    + "selector. Ignores real controllers while on; turns off on restart."
+                                text: qsTranslate("UI", "Preview one of each supported controller in software, with no hardware connected — pick a model from the top-bar selector. Ignores real controllers while on; turns off on restart.")
                                 color: Theme.textDim; font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontS
                             }
@@ -995,14 +997,14 @@ Window {
                         // ------------------------------------------ Theme colors
                         Item {
                             width: body.width; height: themeHdr.height
-                            SectionHeader { id: themeHdr; text: "Theme" }
+                            SectionHeader { id: themeHdr; text: qsTranslate("UI", "Theme") }
                             PillButton {
                                 anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                                label: "Reset colors"; onClicked: win.resetTheme()
+                                label: qsTranslate("UI", "Reset colors"); onClicked: win.resetTheme()
                             }
                         }
                         Text {
-                            text: "Presets"; color: Theme.textDim; topPadding: 2
+                            text: qsTranslate("UI", "Presets"); color: Theme.textDim; topPadding: 2
                             font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                         }
                         Flow {
@@ -1015,9 +1017,9 @@ Window {
                                     onClicked: win.applyPreset(modelData.colors)
                                 }
                             }
-                            PillButton { label: "Import…"; onClicked: importThemeDialog.open() }
+                            PillButton { label: qsTranslate("UI", "Import…"); onClicked: importThemeDialog.open() }
                             PillButton {
-                                label: "Export…"
+                                label: qsTranslate("UI", "Export…")
                                 onClicked: {
                                     exportThemeDialog.selectedFile = exportThemeDialog.currentFolder + "/deadband-theme.json"
                                     exportThemeDialog.open()
@@ -1032,7 +1034,7 @@ Window {
                             font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                         }
                         Text {
-                            text: "Custom colors"; color: Theme.textDim; topPadding: 4
+                            text: qsTranslate("UI", "Custom colors"); color: Theme.textDim; topPadding: 4
                             font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                         }
                         Flow {
@@ -1052,19 +1054,17 @@ Window {
                         Divider {}
 
                         // ------------------------------------------ Background
-                        SectionHeader { text: "Background" }
+                        SectionHeader { text: qsTranslate("UI", "Background") }
                         Text {
                             width: parent.width; wrapMode: Text.WordWrap
-                            text: "Use a PNG, JPEG, animated GIF — or a WEBM/MP4 video (played "
-                                + "muted on loop) — behind the app. The dim slider keeps cards "
-                                + "and text readable over busy media."
+                            text: qsTranslate("UI", "Use a PNG, JPEG, animated GIF — or a WEBM/MP4 video (played muted on loop) — behind the app. The dim slider keeps cards and text readable over busy media.")
                             color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                         }
                         Row {
                             width: parent.width; spacing: 8
-                            PillButton { label: "Choose…"; onClicked: bgDialog.open() }
+                            PillButton { label: qsTranslate("UI", "Choose…"); onClicked: bgDialog.open() }
                             PillButton {
-                                label: "Clear"; visible: appearance.bgImage !== ""
+                                label: qsTranslate("UI", "Clear"); visible: appearance.bgImage !== ""
                                 onClicked: appearance.bgImage = ""
                             }
                         }
@@ -1079,13 +1079,13 @@ Window {
                             visible: appearance.bgImage !== ""
                             width: parent.width; spacing: 8
                             Text {
-                                text: "Fit"; color: Theme.textDim; width: 72
+                                text: qsTranslate("UI", "Fit"); color: Theme.textDim; width: 72
                                 anchors.verticalCenter: parent.verticalCenter
                                 font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                             }
                             Repeater {
-                                model: [["Crop", "crop"], ["Fit", "fit"],
-                                        ["Stretch", "stretch"], ["Tile", "tile"]]
+                                model: [[qsTranslate("UI", "Crop"), "crop"], [qsTranslate("UI", "Fit"), "fit"],
+                                        [qsTranslate("UI", "Stretch"), "stretch"], [qsTranslate("UI", "Tile"), "tile"]]
                                 delegate: PillButton {
                                     required property var modelData
                                     label: modelData[0]
@@ -1098,7 +1098,7 @@ Window {
                             visible: appearance.bgImage !== ""
                             width: parent.width; spacing: 8
                             Text {
-                                text: "Dim"; color: Theme.textDim; width: 72
+                                text: qsTranslate("UI", "Dim"); color: Theme.textDim; width: 72
                                 anchors.verticalCenter: parent.verticalCenter
                                 font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                             }
@@ -1120,25 +1120,21 @@ Window {
                         Divider {}
 
                         // ------------------------------------------ Controller picture
-                        SectionHeader { text: "Controller picture" }
+                        SectionHeader { text: qsTranslate("UI", "Controller picture") }
                         Text {
                             width: parent.width; wrapMode: Text.WordWrap
                             text: bridge.controllerName === ""
-                                ? "Connect a controller (or turn on demo mode) to give it your own picture."
-                                : "Swap the drawn " + bridge.controllerName + " for your own picture. "
-                                  + "Deadband stretches it over the outline and draws the buttons on "
-                                  + "top, so start from the template to line things up; a PNG with a "
-                                  + "transparent background works best. Each controller model keeps "
-                                  + "its own picture, on this computer only."
+                                ? qsTranslate("UI", "Connect a controller (or turn on demo mode) to give it your own picture.")
+                                : qsTranslate("UI", "Swap the drawn %1 for your own picture. Deadband stretches it over the outline and draws the buttons on top, so start from the template to line things up; a PNG with a transparent background works best. Each controller model keeps its own picture, on this computer only.").arg(bridge.controllerName)
                             color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                         }
                         Row {
                             visible: bridge.controllerName !== ""
                             width: parent.width; spacing: 8
-                            PillButton { label: "Choose…"; onClicked: ctrlPicDialog.open() }
-                            PillButton { label: "Save template…"; onClicked: ctrlTemplateDialog.open() }
+                            PillButton { label: qsTranslate("UI", "Choose…"); onClicked: ctrlPicDialog.open() }
+                            PillButton { label: qsTranslate("UI", "Save template…"); onClicked: ctrlTemplateDialog.open() }
                             PillButton {
-                                label: "Clear"
+                                label: qsTranslate("UI", "Clear")
                                 visible: !!Theme.ctrlPictures[bridge.controllerName]
                                 onClicked: win.setControllerPicture(bridge.controllerName, "")
                             }
@@ -1149,7 +1145,7 @@ Window {
                             text: "▸ " + decodeURIComponent(("" + (Theme.ctrlPictures[bridge.controllerName] || ""))
                                                                 .split('/').pop())
                                   + (previewView.customPicture !== "" && !previewView.pictureShown
-                                     ? "  (can't be opened, showing the drawing)" : "")
+                                     ? qsTranslate("UI", "  (can't be opened, showing the drawing)") : "")
                             color: Theme.textFaint; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                         }
                         Text {
@@ -1166,13 +1162,10 @@ Window {
                         Divider {}
 
                         // ------------------------------------------ Backup & Restore
-                        SectionHeader { text: "Controllers" }
+                        SectionHeader { text: qsTranslate("UI", "Controllers") }
                         Text {
                             width: parent.width; wrapMode: Text.WordWrap
-                            text: "Name each device so the picker shows \"Black\" instead of " +
-                                  "\"Cyclone 2 #1\". Names are remembered per USB port — identical " +
-                                  "models are indistinguishable to the computer, so moving a dongle " +
-                                  "to another port leaves its name behind."
+                            text: qsTranslate("UI", "Name each device so the picker shows \"Black\" instead of \"Cyclone 2 #1\". Names are remembered per USB port — identical models are indistinguishable to the computer, so moving a dongle to another port leaves its name behind.")
                             color: Theme.textDim
                             font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                         }
@@ -1181,7 +1174,7 @@ Window {
                             spacing: 8
                             Text {
                                 visible: bridge.controllers.length === 0
-                                text: "Nothing connected."
+                                text: qsTranslate("UI", "Nothing connected.")
                                 color: Theme.textFaint
                                 font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                             }
@@ -1208,7 +1201,7 @@ Window {
                                         Text {
                                             // the port IS the key, so show it rather than
                                             // implying the name is bound to the hardware
-                                            text: "port " + modelData.port +
+                                            text: qsTranslate("UI", "port ") + modelData.port +
                                                   (modelData.live ? "" : " — " + modelData.status)
                                             color: modelData.live ? Theme.textFaint : Theme.warn
                                             font.family: Theme.fontFamily; font.pixelSize: Theme.fontS - 1
@@ -1218,7 +1211,7 @@ Window {
                                         anchors.verticalCenter: parent.verticalCenter
                                         width: 150
                                         text: win.nameFor(modelData.id)
-                                        placeholderText: "name…"
+                                        placeholderText: qsTranslate("UI", "name…")
                                         color: Theme.text
                                         font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                                         background: Rectangle {
@@ -1232,19 +1225,17 @@ Window {
                         }
 
                         Divider { visible: !bridge.remapOnly || bridge.seFullView }   // else two stack
-                        SectionHeader { visible: !bridge.remapOnly || bridge.seFullView; text: "Backup & Restore" }
+                        SectionHeader { visible: !bridge.remapOnly || bridge.seFullView; text: qsTranslate("UI", "Backup & Restore") }
                         BackupPanel { visible: !bridge.remapOnly || bridge.seFullView; width: parent.width }
 
 
                         Divider {}
 
                         // ------------------------------------------ Controller tests
-                        SectionHeader { text: "Controller tests" }
+                        SectionHeader { text: qsTranslate("UI", "Controller tests") }
                         Text {
                             width: parent.width; wrapMode: Text.WordWrap
-                            text: "Check for stick drift, double-clicking buttons and uneven "
-                                + "input timing. The tests only watch input; nothing is changed "
-                                + "on the controller."
+                            text: qsTranslate("UI", "Check for stick drift, double-clicking buttons and uneven input timing. The tests only watch input; nothing is changed on the controller.")
                             color: Theme.textDim
                             font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                         }
@@ -1252,15 +1243,15 @@ Window {
                             width: parent.width
                             spacing: 8
                             PillButton {
-                                label: "Sticks…"
+                                label: qsTranslate("UI", "Sticks…")
                                 onClicked: { win.settingsOpen = false; stickTester.show(); stickTester.raise(); stickTester.requestActivate() }
                             }
                             PillButton {
-                                label: "Buttons…"
+                                label: qsTranslate("UI", "Buttons…")
                                 onClicked: { win.settingsOpen = false; buttonTester.show(); buttonTester.raise(); buttonTester.requestActivate() }
                             }
                             PillButton {
-                                label: "Input timing…"
+                                label: qsTranslate("UI", "Input timing…")
                                 onClicked: { win.settingsOpen = false; timingTester.show(); timingTester.raise(); timingTester.requestActivate() }
                             }
                         }
@@ -1268,17 +1259,15 @@ Window {
                         Divider {}
 
                         // ------------------------------------------ Diagnostics
-                        SectionHeader { text: "Help & Diagnostics" }
+                        SectionHeader { text: qsTranslate("UI", "Help & Diagnostics") }
                         Text {
                             width: parent.width; wrapMode: Text.WordWrap
-                            text: "Something not working? Diagnostics checks whether Deadband "
-                                + "can actually open your devices and tells you how to fix it — "
-                                + "with a report you can paste into a GitHub issue."
+                            text: qsTranslate("UI", "Something not working? Diagnostics checks whether Deadband can actually open your devices and tells you how to fix it — with a report you can paste into a GitHub issue.")
                             color: Theme.textDim
                             font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                         }
                         PillButton {
-                            label: "🩺 Open diagnostics…"
+                            label: qsTranslate("UI", "🩺 Open diagnostics…")
                             onClicked: { diagWin.show(); diagWin.raise() }
                         }
 
