@@ -5,9 +5,22 @@ and Logitech mice — newest first. This is the
 curated, user-facing summary; the complete history is in git. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com).
 
-## [Unreleased]
+## [0.7.0] — 2026-11-13
 
 ### Added
+- **Ten languages.** Settings → Language switches the interface live, follows
+  your system language by default, and falls back to English. First
+  translations for Simplified and Traditional Chinese, Japanese, German, French,
+  Spanish, Brazilian Portuguese, Russian and Vietnamese, by
+  [@sinchrotron](https://github.com/sinchrotron) (#63, #64); native-speaker
+  corrections are welcome (`translations/README.md`).
+- **AppImage.** A portable build for immutable distros such as Bazzite, with its
+  own Python and Qt; releases now include a ready-made download. Build script by
+  [@Mischala](https://github.com/Mischala) (#62).
+- **Tarantula Pro 8K: every button.** C1–C4, T1–T3 and M show live and can be
+  rebound or given macros, factory paddle settings show as Default, the battery
+  readout is hidden on this wired-only pad, and a new controller drawing. By
+  [@Gaeritag](https://github.com/Gaeritag) (#52).
 - **Controller tests** in Settings: a stick test (rest drift, noise, travel and a
   suggested deadzone), a button test (press counts, holds and double-click
   gaps) and a game-input timing test. They only watch input. Thanks to
