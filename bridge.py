@@ -2582,7 +2582,7 @@ class GamesirBridge(QObject):
         # -- "2 changes" for one edit -- and dragging a value back to where it
         # started left a pending no-op write.
         loaded = self._config.get(key)
-        if loaded is not None and self._scalar_bytes(key, loaded)[0] == data:
+        if not self._backup_busy and loaded is not None and self._scalar_bytes(key, loaded)[0] == data:
             edit = state.get('edit_profile') or state.get('profile')
             pkey = (self._prof.profile_bank(edit), addr)
             if self._pending.pop(pkey, None) is not None:
@@ -2789,7 +2789,6 @@ class GamesirBridge(QObject):
             x = self._prof.extras
             addr = x['DPAD_SWAP' if name == 'dpad_swap' else 'DPAD_LOCK']
             encoded = 1 if value else 0
-            self._config[name] = bool(encoded)
             self._queue(addr, [encoded], name.replace('_', ' ').title(),
                         'On' if encoded else 'Off')
             return

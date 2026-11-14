@@ -117,6 +117,27 @@ class Nova2LiteSaveTests(unittest.TestCase):
         self.assertEqual(self.bridge.pendingCount, 0)
         self.assertEqual(self.pad.writes, [])
 
+        # While Save is in progress (_backup_busy), selecting the loaded value stays pending
+        self.bridge.setScalar('vib_l', 25)
+        self.bridge._backup_busy = True
+        try:
+            self.bridge.setScalar('vib_l', 75)
+            self.assertEqual(self.bridge.pendingCount, 1)
+            pending, = self.bridge._pending.values()
+            self.assertEqual(pending['data'], [75])
+        finally:
+            self.bridge._backup_busy = False
+
+    def test_dpad_extra_staging_preserves_readback_baseline_on_discard(self):
+        self.bridge._config['dpad_swap'] = False
+        self.bridge._config['dpad_lock'] = False
+        self.bridge.setG7Extra('dpad_swap', 1)
+        self.assertEqual(self.bridge.pendingCount, 1)
+        self.assertFalse(self.bridge.config['dpad_swap'])
+        self.bridge.discardConfig()
+        self.assertEqual(self.bridge.pendingCount, 0)
+        self.assertFalse(self.bridge.config['dpad_swap'])
+
     def test_real_readback_mismatch_still_fails_and_keeps_pending_edits(self):
         self.bridge.setScalar('vib_l', 32)
         self.pad.drop_writes = True

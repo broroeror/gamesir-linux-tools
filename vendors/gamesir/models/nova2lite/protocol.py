@@ -396,8 +396,6 @@ def _decode_stick_curve(stick_id: int, raw12: list) -> list:
     if cached is not None and len(cached) == 10:
         if cached[0] == ctype and cached[1] == inten and _pts_255_to_100(cached[4:10]) == hw_pts_100:
             return list(cached)
-    if ctype == 0 and inten == 100 and hw_pts_100 == [25, 25, 50, 50, 75, 75]:
-        return list(_cy.CURVE_BLOCKS[0][1])
     if 0 <= ctype < len(_cy.CURVE_BLOCKS):
         name = _cy.CURVE_BLOCKS[ctype][0]
         preset = _cy.preset_curve_block(name, inten)

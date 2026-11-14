@@ -162,8 +162,11 @@ class Nova2LiteTests(unittest.TestCase):
         self.assertEqual(n2l.match_read_reply(reply, 1, n2l.ST_DZ_MAX, 1), [95])
         self.assertEqual(n2l.match_read_reply(reply, 1, n2l.ST_ADZ_MIN, 1), [2])
         self.assertEqual(n2l.match_read_reply(reply, 1, n2l.ST_ADZ_MAX, 1), [98])
-        self.assertEqual(n2l.match_read_reply(reply, 1, n2l.ST_CURVE, 10),
-                         list(_cy.CURVE_BLOCKS[0][1]))
+        curve_blk = n2l.match_read_reply(reply, 1, n2l.ST_CURVE, 10)
+        self.assertEqual(curve_blk, [0, 100, 0, 0, 64, 64, 128, 128, 191, 191])
+        # Writing the decoded native linear curve back preserves [25, 25, 50, 50, 75, 75]
+        pkt = n2l.write_packets(1, n2l.ST_CURVE, curve_blk)[0]
+        self.assertEqual(list(pkt[5:17]), raw12)
 
         # Hair trigger read/write
         hair_reply = [0x21, 0x00, 0x01, 0x02, 0x24] + [0] * 59
