@@ -58,6 +58,7 @@ class Nova2LiteSelfRemapTests(unittest.TestCase):
         profiles.set_active(profiles.NOVA_2_LITE)
         self.pad = MappingPad()
         control.set_device(self.pad)
+        n2l.parse_device_info([0x01, 0x01] + [0] * 8 + [0x82, 0x01] + [0] * 4 + [0x23, 0x02] + [0] * 46)
         self.addCleanup(control.clear_device)
         self.bridge = GamesirBridge()
         self.addCleanup(self.bridge.deleteLater)
@@ -184,6 +185,9 @@ class Nova2LiteSelfRemapTests(unittest.TestCase):
                     self.stage(api, 'A', target)
                     pending, = self.bridge._pending.values()
                     self.assertEqual(pending['data'], [1, dict(n2l.GAMEPAD_TARGETS)[target]])
+        self.bridge._pending.clear()
+        self.bridge.setRemapCode('A', 0x5C)   # keyboard/mouse code not in GAMEPAD_TARGETS
+        self.assertEqual(self.bridge.pendingCount, 0)
         self.assertEqual(self.pad.writes, [])
 
     def test_existing_cyclone_self_mapping_bytes_are_unchanged(self):
@@ -193,7 +197,7 @@ class Nova2LiteSelfRemapTests(unittest.TestCase):
             with self.subTest(api=api):
                 self.stage(api, 'A', 'A')
                 pending, = self.bridge._pending.values()
-                self.assertEqual(pending['data'], [1, 9])
+                self.assertEqual(pending['data'], [1, 9, 0, 0])
         self.assertEqual(self.pad.writes, [])
 
 

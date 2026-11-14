@@ -214,7 +214,8 @@ def read_session_t4n2(device, driving_id):
                 sel = state.get('selected')
                 if sel in ids and sel != driving_id:
                     break
-            if now - last_info > 5.0 and control.reads_idle():
+            info_interval = 5.0 if nova2lite.device_info_verified() else 0.5
+            if now - last_info > info_interval and (not nova2lite.device_info_verified() or control.reads_idle()):
                 last_info = now
                 control.send_cmd(*nova2lite.device_info_packet(), probe=True, padded=False)
             data = device.read(64, timeout_ms=100)
@@ -232,6 +233,7 @@ def read_session_t4n2(device, driving_id):
                 if parsed:
                     state['mode_ok'] = True
                     state.update(parsed)
+                    button_capture.record(driving_id)
                 continue
             control.store_t4n2_reply(data)
     except Exception as exc:

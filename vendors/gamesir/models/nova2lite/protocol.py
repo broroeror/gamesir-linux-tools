@@ -133,10 +133,13 @@ _hair_ui_cache = {
     LT_HAIR: [0x00, 0x0A, 0x5A],
     RT_HAIR: [0x00, 0x0A, 0x5A],
 }
+_device_info_verified = False
 
 
 def reset_session_state():
-    """Reset cached composite packet state on device bind/disconnect."""
+    """Reset cached composite packet state and device verification on bind/disconnect."""
+    global _device_info_verified
+    _device_info_verified = False
     _stick_state[1] = [5, 0, 25, 25, 50, 50, 75, 75, 100, 100, 0, 100]
     _stick_state[2] = [5, 0, 25, 25, 50, 50, 75, 75, 100, 100, 0, 100]
     _curve_ui_cache[1] = None
@@ -145,6 +148,11 @@ def reset_session_state():
     _hair_hw_state[:] = [2, 2]
     _hair_ui_cache[LT_HAIR] = [0x00, 0x0A, 0x5A]
     _hair_ui_cache[RT_HAIR] = [0x00, 0x0A, 0x5A]
+
+
+def device_info_verified() -> bool:
+    """True once a valid 0x01 device-info reply has been received in the current session."""
+    return _device_info_verified
 
 
 def connection_kind(pid: int):
@@ -248,6 +256,7 @@ def streams_live_data(devnode: str, secs: float = 0.5) -> bool:
 
 def parse_device_info(data) -> dict:
     """Decode a 0x01 device-info reply into firmware/battery/charging fields."""
+    global _device_info_verified
     if not data or len(data) < 18 or data[0] != 0x01 or data[1] == 0x00:
         return {}
     out = {}
@@ -258,6 +267,8 @@ def parse_device_info(data) -> dict:
     if bat_raw <= 5:
         out['battery'] = min(100, bat_raw * 25)
     out['charging'] = (data[17] == 0x02) or (bat_raw >= 5)
+    if 'firmware' in out and 'battery' in out:
+        _device_info_verified = True
     return out
 
 

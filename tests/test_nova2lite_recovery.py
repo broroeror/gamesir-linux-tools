@@ -83,6 +83,7 @@ class Nova2LiteRecoveryTests(unittest.TestCase):
         profiles.set_active(profiles.NOVA_2_LITE)
         self.pad = T4N2Pad()
         control.set_device(self.pad)
+        n2l.parse_device_info([0x01, 0x01] + [0] * 8 + [0x82, 0x01] + [0] * 4 + [0x23, 0x02] + [0] * 46)
         self.addCleanup(control.clear_device)
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)

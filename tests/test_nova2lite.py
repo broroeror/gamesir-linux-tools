@@ -68,6 +68,11 @@ class Nova2LiteTests(unittest.TestCase):
         self.assertEqual(pkt[7:], bytes(58))
 
     def test_parse_device_info(self):
+        n2l.reset_session_state()
+        self.assertFalse(n2l.device_info_verified())
+        # Empty/unpaired dongle response (data[1] == 0) is ignored and does not verify
+        self.assertEqual(n2l.parse_device_info([0x01, 0x00] + [0x00] * 62), {})
+        self.assertFalse(n2l.device_info_verified())
         report = [0x01, 0x01] + [0x00] * 62
         report[10] = 0x82
         report[11] = 0x01
@@ -75,8 +80,7 @@ class Nova2LiteTests(unittest.TestCase):
         report[17] = 0x02   # charging
         info = n2l.parse_device_info(report)
         self.assertEqual(info, {'firmware': '1.82', 'battery': 75, 'charging': True})
-        # Empty/unpaired dongle response (data[1] == 0) is ignored
-        self.assertEqual(n2l.parse_device_info([0x01, 0x00] + [0x00] * 62), {})
+        self.assertTrue(n2l.device_info_verified())
 
     def test_parse_input_report(self):
         report = bytearray(64)
@@ -177,6 +181,28 @@ class Nova2LiteTests(unittest.TestCase):
         self.assertEqual(len(pulse), 65)
         self.assertEqual(list(pulse[1:6]), [0x04, 180, 0x08, 0, 0x08])
         self.assertEqual(list(stop[1:6]), [0x04, 0, 0x08, 0, 0x08])
+
+        # write_reg is refused until a valid 0x01 device-info reply is received in the current session
+        dev.packets.clear()
+        self.assertFalse(n2l.device_info_verified())
+        self.assertFalse(control.write_reg(1, n2l.DPAD_LOCK, [1]))
+        self.assertEqual(dev.packets, [])
+
+        info_reply = [0x01, 0x01] + [0x00] * 62
+        info_reply[10] = 0x82
+        info_reply[11] = 0x01
+        info_reply[16] = 0x04
+        n2l.parse_device_info(info_reply)
+        self.assertTrue(n2l.device_info_verified())
+        with patch.object(control.time, 'sleep'):
+            self.assertTrue(control.write_reg(1, n2l.DPAD_LOCK, [1]))
+        self.assertEqual(len(dev.packets), 1)
+        self.assertEqual(list(dev.packets[0][1:6]), [0x23, 0x01, 0x06, 0x01, 0x01])
+
+        # Rebinding resets verification for the new session
+        control.set_device(dev)
+        self.assertFalse(n2l.device_info_verified())
+        self.assertFalse(control.write_reg(1, n2l.DPAD_LOCK, [1]))
 
 
 if __name__ == '__main__':

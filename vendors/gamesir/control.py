@@ -332,7 +332,7 @@ def write_reg(bank, addr, data, write_style=None, gen=None):
                 return False
             return send_cmd(*request, gen=gen, padded=False)
     if style == 't4n2':
-        if profiles.active() is not profiles.NOVA_2_LITE:
+        if profiles.active() is not profiles.NOVA_2_LITE or not nova2lite.device_info_verified():
             return False
         with _wseq_lock:
             pkts = nova2lite.write_packets(bank, addr, data)

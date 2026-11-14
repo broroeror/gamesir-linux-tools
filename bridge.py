@@ -2172,7 +2172,7 @@ class GamesirBridge(QObject):
                      + list(cfg.NUMPAD_TARGETS) + list(g7pro.MOUSE_TARGETS))
             return dict((c, n) for n, c in items).get(code, '0x%02x' % code)
         own = dict((c, n) for n, c in self._prof.REMAP_TARGETS)
-        if self._prof is profiles.G7_SE:
+        if self._prof in (profiles.G7_SE, profiles.NOVA_2_LITE):
             return own.get(code, '0x%02x' % code)
         return own[code] if code in own else cfg.target_label(code)
 
@@ -2751,7 +2751,10 @@ class GamesirBridge(QObject):
             # T4N2 encodes a button mapped to itself as Default and reads it
             # back as [00 00]. Stage that same value so Save can verify it.
             code = -1 if code < 0 else code & 0xff
-            if code == dict(self._prof.REMAP_TARGETS).get(source):
+            targets = dict(self._prof.REMAP_TARGETS)
+            if code != -1 and code not in targets.values():
+                return
+            if code == targets.get(source):
                 code = -1
             # Save may already be applying a different snapshot. Keep a newer
             # selection pending even when it matches the old loaded value.

@@ -59,6 +59,7 @@ class Nova2LiteSaveTests(unittest.TestCase):
         profiles.set_active(profiles.NOVA_2_LITE)
         self.pad = FiveLevelPad()
         control.set_device(self.pad)
+        n2l.parse_device_info([0x01, 0x01] + [0] * 8 + [0x82, 0x01] + [0] * 4 + [0x23, 0x02] + [0] * 46)
         self.addCleanup(control.clear_device)
         self.bridge = GamesirBridge()
         self.addCleanup(self.bridge.deleteLater)
