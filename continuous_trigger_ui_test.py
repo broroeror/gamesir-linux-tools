@@ -44,6 +44,13 @@ def main():
     context = engine.rootContext()
     context.setContextProperty('bridge', pad)
     context.setContextProperty('mouse', mouse)
+    # Main.qml binds Settings -> Language to the app's LanguageManager (#64);
+    # English, with the test's own settings scope, so a saved choice can't leak in
+    from i18n import LanguageManager
+    from PySide6.QtCore import QSettings
+    language = LanguageManager(app, engine, settings=QSettings('deadband-test', 'DeadbandControllerUiCheck'))
+    language.setLanguage('en')
+    context.setContextProperty('i18n', language)
     context.setContextProperty('appVersion', 'continuous-trigger-ui-check')
     context.setContextProperty('assetsDir', QUrl.fromLocalFile(str(source / 'assets') + '/').toString())
     warnings = []

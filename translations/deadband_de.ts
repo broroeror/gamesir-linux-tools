@@ -36,18 +36,18 @@
         <translation>Profil (1–4) in der oberen Leiste auswählen, um Einstellungen zu lesen und zu bearbeiten.</translation>
     </message>
     <message>
-        <location filename="../qml/App/AxisSide.qml" line="+176"/>
+        <location filename="../qml/App/AxisSide.qml" line="+184"/>
         <location filename="../qml/App/MotionPage.qml" line="+371"/>
         <source>Deadzone</source>
         <translation>Totzone</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+12"/>
         <source>Anti-Deadzone</source>
         <translation>Anti-Totzone</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+12"/>
         <source>Curve Adjustment</source>
         <translation>Kurvenanpassung</translation>
     </message>
@@ -117,7 +117,7 @@
         <translation>Auf Standard zurücksetzen</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+8"/>
         <source>Response Curve</source>
         <translation>Reaktionskurve</translation>
     </message>
@@ -824,7 +824,7 @@ Oben „Controller konfigurieren“ zum Bearbeiten oder Aktualisieren wählen.</
     </message>
     <message>
         <location line="+0"/>
-        <location filename="../qml/App/VibrationPage.qml" line="+19"/>
+        <location filename="../qml/App/VibrationPage.qml" line="+20"/>
         <source>Right</source>
         <translation>Rechts</translation>
     </message>
@@ -1589,7 +1589,7 @@ Oben „Controller konfigurieren“ zum Bearbeiten oder Aktualisieren wählen.</
         <translation>Schiefer (hell)</translation>
     </message>
     <message>
-        <location filename="../qml/App/VibrationPage.qml" line="-27"/>
+        <location filename="../qml/App/VibrationPage.qml" line="-28"/>
         <source>Vibration strength</source>
         <translation>Vibrationsstärke</translation>
     </message>
@@ -1599,12 +1599,12 @@ Oben „Controller konfigurieren“ zum Bearbeiten oder Aktualisieren wählen.</
         <translation>LT oder RT halten, um die Motoren auf dieser Seite zu testen. Stärkeres Drücken verstärkt die Vibration bis zum unten eingestellten Wert.</translation>
     </message>
     <message>
-        <location line="+17"/>
+        <location line="+18"/>
         <source>Test left grip (heavy motor)</source>
         <translation>Linken Griff testen (schwerer Motor)</translation>
     </message>
     <message>
-        <location line="+19"/>
+        <location line="+20"/>
         <source>Test right grip (light motor)</source>
         <translation>Rechten Griff testen (leichter Motor)</translation>
     </message>
@@ -1634,29 +1634,29 @@ Oben „Controller konfigurieren“ zum Bearbeiten oder Aktualisieren wählen.</
         <translation>Linker Trigger</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+14"/>
         <source>Test left trigger</source>
         <translation>Linken Trigger testen</translation>
     </message>
     <message>
         <location line="+7"/>
-        <location line="+33"/>
+        <location line="+35"/>
         <source>Force</source>
         <translation>Erzwingen</translation>
     </message>
     <message>
-        <location line="-29"/>
-        <location line="+33"/>
+        <location line="-31"/>
+        <location line="+35"/>
         <source>Sync</source>
         <translation>Synchronisieren</translation>
     </message>
     <message>
-        <location line="-23"/>
+        <location line="-25"/>
         <source>Right trigger</source>
         <translation>Rechter Trigger</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+14"/>
         <source>Test right trigger</source>
         <translation>Rechten Trigger testen</translation>
     </message>

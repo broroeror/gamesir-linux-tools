@@ -36,18 +36,18 @@
         <translation>Elige un perfil (1–4) en la barra superior para leer y editar sus ajustes.</translation>
     </message>
     <message>
-        <location filename="../qml/App/AxisSide.qml" line="+176"/>
+        <location filename="../qml/App/AxisSide.qml" line="+184"/>
         <location filename="../qml/App/MotionPage.qml" line="+371"/>
         <source>Deadzone</source>
         <translation>Zona muerta</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+12"/>
         <source>Anti-Deadzone</source>
         <translation>Antizona muerta</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+12"/>
         <source>Curve Adjustment</source>
         <translation>Ajuste de curva</translation>
     </message>
@@ -117,7 +117,7 @@
         <translation>Restablecer valores</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+8"/>
         <source>Response Curve</source>
         <translation>Curva de respuesta</translation>
     </message>
@@ -824,7 +824,7 @@ Usa Configurar mando arriba para editar o actualizar los ajustes.</translation>
     </message>
     <message>
         <location line="+0"/>
-        <location filename="../qml/App/VibrationPage.qml" line="+19"/>
+        <location filename="../qml/App/VibrationPage.qml" line="+20"/>
         <source>Right</source>
         <translation>Derecha</translation>
     </message>
@@ -1589,7 +1589,7 @@ Usa Configurar mando arriba para editar o actualizar los ajustes.</translation>
         <translation>Pizarra (claro)</translation>
     </message>
     <message>
-        <location filename="../qml/App/VibrationPage.qml" line="-27"/>
+        <location filename="../qml/App/VibrationPage.qml" line="-28"/>
         <source>Vibration strength</source>
         <translation>Intensidad de vibración</translation>
     </message>
@@ -1599,12 +1599,12 @@ Usa Configurar mando arriba para editar o actualizar los ajustes.</translation>
         <translation>Mantén LT o RT para probar los motores de ese lado. Cuanto más pulses, mayor será la vibración, hasta el nivel indicado abajo.</translation>
     </message>
     <message>
-        <location line="+17"/>
+        <location line="+18"/>
         <source>Test left grip (heavy motor)</source>
         <translation>Probar empuñadura izquierda (motor pesado)</translation>
     </message>
     <message>
-        <location line="+19"/>
+        <location line="+20"/>
         <source>Test right grip (light motor)</source>
         <translation>Probar empuñadura derecha (motor ligero)</translation>
     </message>
@@ -1634,29 +1634,29 @@ Usa Configurar mando arriba para editar o actualizar los ajustes.</translation>
         <translation>Gatillo izquierdo</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+14"/>
         <source>Test left trigger</source>
         <translation>Probar gatillo izquierdo</translation>
     </message>
     <message>
         <location line="+7"/>
-        <location line="+33"/>
+        <location line="+35"/>
         <source>Force</source>
         <translation>Forzar</translation>
     </message>
     <message>
-        <location line="-29"/>
-        <location line="+33"/>
+        <location line="-31"/>
+        <location line="+35"/>
         <source>Sync</source>
         <translation>Sincronizar</translation>
     </message>
     <message>
-        <location line="-23"/>
+        <location line="-25"/>
         <source>Right trigger</source>
         <translation>Gatillo derecho</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+14"/>
         <source>Test right trigger</source>
         <translation>Probar gatillo derecho</translation>
     </message>

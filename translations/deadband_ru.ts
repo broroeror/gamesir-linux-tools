@@ -36,18 +36,18 @@
         <translation>Выберите профиль (1–4) вверху, чтобы прочитать и изменить настройки.</translation>
     </message>
     <message>
-        <location filename="../qml/App/AxisSide.qml" line="+176"/>
+        <location filename="../qml/App/AxisSide.qml" line="+184"/>
         <location filename="../qml/App/MotionPage.qml" line="+371"/>
         <source>Deadzone</source>
         <translation>Мёртвая зона</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+12"/>
         <source>Anti-Deadzone</source>
         <translation>Антимёртвая зона</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+12"/>
         <source>Curve Adjustment</source>
         <translation>Настройка кривой</translation>
     </message>
@@ -117,7 +117,7 @@
         <translation>Сбросить по умолчанию</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+8"/>
         <source>Response Curve</source>
         <translation>Кривая отклика</translation>
     </message>
@@ -824,7 +824,7 @@ Use Configure controller above to edit or refresh settings.</source>
     </message>
     <message>
         <location line="+0"/>
-        <location filename="../qml/App/VibrationPage.qml" line="+19"/>
+        <location filename="../qml/App/VibrationPage.qml" line="+20"/>
         <source>Right</source>
         <translation>Вправо</translation>
     </message>
@@ -1589,7 +1589,7 @@ Use Configure controller above to edit or refresh settings.</source>
         <translation>Сланец (светлая)</translation>
     </message>
     <message>
-        <location filename="../qml/App/VibrationPage.qml" line="-27"/>
+        <location filename="../qml/App/VibrationPage.qml" line="-28"/>
         <source>Vibration strength</source>
         <translation>Сила вибрации</translation>
     </message>
@@ -1599,12 +1599,12 @@ Use Configure controller above to edit or refresh settings.</source>
         <translation>Удерживайте LT или RT для проверки моторов с этой стороны. Чем сильнее нажатие, тем сильнее вибрация, до заданного ниже уровня.</translation>
     </message>
     <message>
-        <location line="+17"/>
+        <location line="+18"/>
         <source>Test left grip (heavy motor)</source>
         <translation>Тест левой рукоятки (тяжёлый мотор)</translation>
     </message>
     <message>
-        <location line="+19"/>
+        <location line="+20"/>
         <source>Test right grip (light motor)</source>
         <translation>Тест правой рукоятки (лёгкий мотор)</translation>
     </message>
@@ -1634,29 +1634,29 @@ Use Configure controller above to edit or refresh settings.</source>
         <translation>Левый триггер</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+14"/>
         <source>Test left trigger</source>
         <translation>Тест левого триггера</translation>
     </message>
     <message>
         <location line="+7"/>
-        <location line="+33"/>
+        <location line="+35"/>
         <source>Force</source>
         <translation>Принудительно</translation>
     </message>
     <message>
-        <location line="-29"/>
-        <location line="+33"/>
+        <location line="-31"/>
+        <location line="+35"/>
         <source>Sync</source>
         <translation>Синхронизация</translation>
     </message>
     <message>
-        <location line="-23"/>
+        <location line="-25"/>
         <source>Right trigger</source>
         <translation>Правый триггер</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+14"/>
         <source>Test right trigger</source>
         <translation>Тест правого триггера</translation>
     </message>

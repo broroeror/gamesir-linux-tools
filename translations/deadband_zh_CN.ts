@@ -36,18 +36,18 @@
         <translation>在顶栏选择配置文件（1–4）以读取和编辑设置。</translation>
     </message>
     <message>
-        <location filename="../qml/App/AxisSide.qml" line="+176"/>
+        <location filename="../qml/App/AxisSide.qml" line="+184"/>
         <location filename="../qml/App/MotionPage.qml" line="+371"/>
         <source>Deadzone</source>
         <translation>死区</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+12"/>
         <source>Anti-Deadzone</source>
         <translation>反死区</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+12"/>
         <source>Curve Adjustment</source>
         <translation>曲线调整</translation>
     </message>
@@ -117,7 +117,7 @@
         <translation>恢复默认值</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+8"/>
         <source>Response Curve</source>
         <translation>响应曲线</translation>
     </message>
@@ -824,7 +824,7 @@ Use Configure controller above to edit or refresh settings.</source>
     </message>
     <message>
         <location line="+0"/>
-        <location filename="../qml/App/VibrationPage.qml" line="+19"/>
+        <location filename="../qml/App/VibrationPage.qml" line="+20"/>
         <source>Right</source>
         <translation>右</translation>
     </message>
@@ -1589,7 +1589,7 @@ Use Configure controller above to edit or refresh settings.</source>
         <translation>石板灰（浅色）</translation>
     </message>
     <message>
-        <location filename="../qml/App/VibrationPage.qml" line="-27"/>
+        <location filename="../qml/App/VibrationPage.qml" line="-28"/>
         <source>Vibration strength</source>
         <translation>振动强度</translation>
     </message>
@@ -1599,12 +1599,12 @@ Use Configure controller above to edit or refresh settings.</source>
         <translation>按住 LT 或 RT 测试该侧马达。按得越深，振动越强，最高为下方设置的强度。</translation>
     </message>
     <message>
-        <location line="+17"/>
+        <location line="+18"/>
         <source>Test left grip (heavy motor)</source>
         <translation>测试左握把（重马达）</translation>
     </message>
     <message>
-        <location line="+19"/>
+        <location line="+20"/>
         <source>Test right grip (light motor)</source>
         <translation>测试右握把（轻马达）</translation>
     </message>
@@ -1634,29 +1634,29 @@ Use Configure controller above to edit or refresh settings.</source>
         <translation>左扳机</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+14"/>
         <source>Test left trigger</source>
         <translation>测试左扳机</translation>
     </message>
     <message>
         <location line="+7"/>
-        <location line="+33"/>
+        <location line="+35"/>
         <source>Force</source>
         <translation>强制</translation>
     </message>
     <message>
-        <location line="-29"/>
-        <location line="+33"/>
+        <location line="-31"/>
+        <location line="+35"/>
         <source>Sync</source>
         <translation>同步</translation>
     </message>
     <message>
-        <location line="-23"/>
+        <location line="-25"/>
         <source>Right trigger</source>
         <translation>右扳机</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+14"/>
         <source>Test right trigger</source>
         <translation>测试右扳机</translation>
     </message>

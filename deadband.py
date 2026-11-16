@@ -102,7 +102,6 @@ def main():
     app.setApplicationName(APP_NAME)
     app.setOrganizationName(ORG_NAME)
     app.setDesktopFileName(ORG_NAME)
-    
     _migrate_settings()                 # must follow the names above
     # the 1024px art where it exists: macOS shows the window icon in the Dock,
     # at Retina size

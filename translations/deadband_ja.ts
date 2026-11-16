@@ -36,18 +36,18 @@
         <translation>上部バーでプロファイル（1～4）を選択して設定を読み込み、編集します。</translation>
     </message>
     <message>
-        <location filename="../qml/App/AxisSide.qml" line="+176"/>
+        <location filename="../qml/App/AxisSide.qml" line="+184"/>
         <location filename="../qml/App/MotionPage.qml" line="+371"/>
         <source>Deadzone</source>
         <translation>デッドゾーン</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+12"/>
         <source>Anti-Deadzone</source>
         <translation>アンチデッドゾーン</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+12"/>
         <source>Curve Adjustment</source>
         <translation>カーブ調整</translation>
     </message>
@@ -117,7 +117,7 @@
         <translation>デフォルトに戻す</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+8"/>
         <source>Response Curve</source>
         <translation>応答カーブ</translation>
     </message>
@@ -824,7 +824,7 @@ Use Configure controller above to edit or refresh settings.</source>
     </message>
     <message>
         <location line="+0"/>
-        <location filename="../qml/App/VibrationPage.qml" line="+19"/>
+        <location filename="../qml/App/VibrationPage.qml" line="+20"/>
         <source>Right</source>
         <translation>右</translation>
     </message>
@@ -1589,7 +1589,7 @@ Use Configure controller above to edit or refresh settings.</source>
         <translation>スレート（ライト）</translation>
     </message>
     <message>
-        <location filename="../qml/App/VibrationPage.qml" line="-27"/>
+        <location filename="../qml/App/VibrationPage.qml" line="-28"/>
         <source>Vibration strength</source>
         <translation>振動の強さ</translation>
     </message>
@@ -1599,12 +1599,12 @@ Use Configure controller above to edit or refresh settings.</source>
         <translation>LT または RT を長押しして、その側のモーターをテストします。深く押すほど振動が強くなり、下の設定値が上限です。</translation>
     </message>
     <message>
-        <location line="+17"/>
+        <location line="+18"/>
         <source>Test left grip (heavy motor)</source>
         <translation>左グリップをテスト（重いモーター）</translation>
     </message>
     <message>
-        <location line="+19"/>
+        <location line="+20"/>
         <source>Test right grip (light motor)</source>
         <translation>右グリップをテスト（軽いモーター）</translation>
     </message>
@@ -1634,29 +1634,29 @@ Use Configure controller above to edit or refresh settings.</source>
         <translation>左トリガー</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+14"/>
         <source>Test left trigger</source>
         <translation>左トリガーをテスト</translation>
     </message>
     <message>
         <location line="+7"/>
-        <location line="+33"/>
+        <location line="+35"/>
         <source>Force</source>
         <translation>強制</translation>
     </message>
     <message>
-        <location line="-29"/>
-        <location line="+33"/>
+        <location line="-31"/>
+        <location line="+35"/>
         <source>Sync</source>
         <translation>同期</translation>
     </message>
     <message>
-        <location line="-23"/>
+        <location line="-25"/>
         <source>Right trigger</source>
         <translation>右トリガー</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+14"/>
         <source>Test right trigger</source>
         <translation>右トリガーをテスト</translation>
     </message>

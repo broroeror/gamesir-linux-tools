@@ -36,18 +36,18 @@
         <translation>Choisissez un profil (1–4) en haut pour lire et modifier ses réglages.</translation>
     </message>
     <message>
-        <location filename="../qml/App/AxisSide.qml" line="+176"/>
+        <location filename="../qml/App/AxisSide.qml" line="+184"/>
         <location filename="../qml/App/MotionPage.qml" line="+371"/>
         <source>Deadzone</source>
         <translation>Zone morte</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+12"/>
         <source>Anti-Deadzone</source>
         <translation>Anti-zone morte</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+12"/>
         <source>Curve Adjustment</source>
         <translation>Réglage de la courbe</translation>
     </message>
@@ -117,7 +117,7 @@
         <translation>Rétablir les valeurs par défaut</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+8"/>
         <source>Response Curve</source>
         <translation>Courbe de réponse</translation>
     </message>
@@ -824,7 +824,7 @@ Utilisez Configurer la manette en haut pour modifier ou actualiser les réglages
     </message>
     <message>
         <location line="+0"/>
-        <location filename="../qml/App/VibrationPage.qml" line="+19"/>
+        <location filename="../qml/App/VibrationPage.qml" line="+20"/>
         <source>Right</source>
         <translation>Droite</translation>
     </message>
@@ -1589,7 +1589,7 @@ Utilisez Configurer la manette en haut pour modifier ou actualiser les réglages
         <translation>Ardoise (clair)</translation>
     </message>
     <message>
-        <location filename="../qml/App/VibrationPage.qml" line="-27"/>
+        <location filename="../qml/App/VibrationPage.qml" line="-28"/>
         <source>Vibration strength</source>
         <translation>Intensité des vibrations</translation>
     </message>
@@ -1599,12 +1599,12 @@ Utilisez Configurer la manette en haut pour modifier ou actualiser les réglages
         <translation>Maintenez LT ou RT pour tester les moteurs de ce côté. Une pression plus forte augmente la vibration jusqu’au niveau défini ci-dessous.</translation>
     </message>
     <message>
-        <location line="+17"/>
+        <location line="+18"/>
         <source>Test left grip (heavy motor)</source>
         <translation>Tester la poignée gauche (moteur lourd)</translation>
     </message>
     <message>
-        <location line="+19"/>
+        <location line="+20"/>
         <source>Test right grip (light motor)</source>
         <translation>Tester la poignée droite (moteur léger)</translation>
     </message>
@@ -1634,29 +1634,29 @@ Utilisez Configurer la manette en haut pour modifier ou actualiser les réglages
         <translation>Gâchette gauche</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+14"/>
         <source>Test left trigger</source>
         <translation>Tester la gâchette gauche</translation>
     </message>
     <message>
         <location line="+7"/>
-        <location line="+33"/>
+        <location line="+35"/>
         <source>Force</source>
         <translation>Forcer</translation>
     </message>
     <message>
-        <location line="-29"/>
-        <location line="+33"/>
+        <location line="-31"/>
+        <location line="+35"/>
         <source>Sync</source>
         <translation>Synchroniser</translation>
     </message>
     <message>
-        <location line="-23"/>
+        <location line="-25"/>
         <source>Right trigger</source>
         <translation>Gâchette droite</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+14"/>
         <source>Test right trigger</source>
         <translation>Tester la gâchette droite</translation>
     </message>

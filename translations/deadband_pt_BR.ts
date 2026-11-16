@@ -36,18 +36,18 @@
         <translation>Selecione um perfil (1–4) na barra superior para ler e editar suas configurações.</translation>
     </message>
     <message>
-        <location filename="../qml/App/AxisSide.qml" line="+176"/>
+        <location filename="../qml/App/AxisSide.qml" line="+184"/>
         <location filename="../qml/App/MotionPage.qml" line="+371"/>
         <source>Deadzone</source>
         <translation>Zona morta</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+12"/>
         <source>Anti-Deadzone</source>
         <translation>Antizona morta</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+12"/>
         <source>Curve Adjustment</source>
         <translation>Ajuste de curva</translation>
     </message>
@@ -117,7 +117,7 @@
         <translation>Restaurar padrões</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+8"/>
         <source>Response Curve</source>
         <translation>Curva de resposta</translation>
     </message>
@@ -824,7 +824,7 @@ Use Configurar controle acima para editar ou atualizar as configurações.</tran
     </message>
     <message>
         <location line="+0"/>
-        <location filename="../qml/App/VibrationPage.qml" line="+19"/>
+        <location filename="../qml/App/VibrationPage.qml" line="+20"/>
         <source>Right</source>
         <translation>Direita</translation>
     </message>
@@ -1589,7 +1589,7 @@ Use Configurar controle acima para editar ou atualizar as configurações.</tran
         <translation>Ardósia (claro)</translation>
     </message>
     <message>
-        <location filename="../qml/App/VibrationPage.qml" line="-27"/>
+        <location filename="../qml/App/VibrationPage.qml" line="-28"/>
         <source>Vibration strength</source>
         <translation>Intensidade da vibração</translation>
     </message>
@@ -1599,12 +1599,12 @@ Use Configurar controle acima para editar ou atualizar as configurações.</tran
         <translation>Segure LT ou RT para testar os motores desse lado. Quanto mais pressionar, mais forte a vibração, até o nível abaixo.</translation>
     </message>
     <message>
-        <location line="+17"/>
+        <location line="+18"/>
         <source>Test left grip (heavy motor)</source>
         <translation>Testar empunhadura esquerda (motor pesado)</translation>
     </message>
     <message>
-        <location line="+19"/>
+        <location line="+20"/>
         <source>Test right grip (light motor)</source>
         <translation>Testar empunhadura direita (motor leve)</translation>
     </message>
@@ -1634,29 +1634,29 @@ Use Configurar controle acima para editar ou atualizar as configurações.</tran
         <translation>Gatilho esquerdo</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+14"/>
         <source>Test left trigger</source>
         <translation>Testar gatilho esquerdo</translation>
     </message>
     <message>
         <location line="+7"/>
-        <location line="+33"/>
+        <location line="+35"/>
         <source>Force</source>
         <translation>Forçar</translation>
     </message>
     <message>
-        <location line="-29"/>
-        <location line="+33"/>
+        <location line="-31"/>
+        <location line="+35"/>
         <source>Sync</source>
         <translation>Sincronizar</translation>
     </message>
     <message>
-        <location line="-23"/>
+        <location line="-25"/>
         <source>Right trigger</source>
         <translation>Gatilho direito</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+14"/>
         <source>Test right trigger</source>
         <translation>Testar gatilho direito</translation>
     </message>

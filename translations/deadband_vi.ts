@@ -36,18 +36,18 @@
         <translation>Chọn cấu hình (1–4) ở thanh trên để đọc và sửa cài đặt.</translation>
     </message>
     <message>
-        <location filename="../qml/App/AxisSide.qml" line="+176"/>
+        <location filename="../qml/App/AxisSide.qml" line="+184"/>
         <location filename="../qml/App/MotionPage.qml" line="+371"/>
         <source>Deadzone</source>
         <translation>Vùng chết</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+12"/>
         <source>Anti-Deadzone</source>
         <translation>Bù vùng chết</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+12"/>
         <source>Curve Adjustment</source>
         <translation>Điều chỉnh đường cong</translation>
     </message>
@@ -117,7 +117,7 @@
         <translation>Khôi phục mặc định</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+8"/>
         <source>Response Curve</source>
         <translation>Đường cong phản hồi</translation>
     </message>
@@ -824,7 +824,7 @@ Dùng Cấu hình tay cầm ở trên để sửa hoặc làm mới cài đặt.
     </message>
     <message>
         <location line="+0"/>
-        <location filename="../qml/App/VibrationPage.qml" line="+19"/>
+        <location filename="../qml/App/VibrationPage.qml" line="+20"/>
         <source>Right</source>
         <translation>Phải</translation>
     </message>
@@ -1589,7 +1589,7 @@ Dùng Cấu hình tay cầm ở trên để sửa hoặc làm mới cài đặt.
         <translation>Xám đá (sáng)</translation>
     </message>
     <message>
-        <location filename="../qml/App/VibrationPage.qml" line="-27"/>
+        <location filename="../qml/App/VibrationPage.qml" line="-28"/>
         <source>Vibration strength</source>
         <translation>Cường độ rung</translation>
     </message>
@@ -1599,12 +1599,12 @@ Dùng Cấu hình tay cầm ở trên để sửa hoặc làm mới cài đặt.
         <translation>Giữ LT hoặc RT để thử mô-tơ cùng bên. Nhấn sâu hơn để tăng rung, tối đa bằng mức bên dưới.</translation>
     </message>
     <message>
-        <location line="+17"/>
+        <location line="+18"/>
         <source>Test left grip (heavy motor)</source>
         <translation>Thử tay nắm trái (mô-tơ nặng)</translation>
     </message>
     <message>
-        <location line="+19"/>
+        <location line="+20"/>
         <source>Test right grip (light motor)</source>
         <translation>Thử tay nắm phải (mô-tơ nhẹ)</translation>
     </message>
@@ -1634,29 +1634,29 @@ Dùng Cấu hình tay cầm ở trên để sửa hoặc làm mới cài đặt.
         <translation>Cò trái</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+14"/>
         <source>Test left trigger</source>
         <translation>Thử cò trái</translation>
     </message>
     <message>
         <location line="+7"/>
-        <location line="+33"/>
+        <location line="+35"/>
         <source>Force</source>
         <translation>Ép rung</translation>
     </message>
     <message>
-        <location line="-29"/>
-        <location line="+33"/>
+        <location line="-31"/>
+        <location line="+35"/>
         <source>Sync</source>
         <translation>Đồng bộ</translation>
     </message>
     <message>
-        <location line="-23"/>
+        <location line="-25"/>
         <source>Right trigger</source>
         <translation>Cò phải</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+14"/>
         <source>Test right trigger</source>
         <translation>Thử cò phải</translation>
     </message>
