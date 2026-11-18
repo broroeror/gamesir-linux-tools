@@ -320,6 +320,7 @@ Item {
     TargetPicker {
         id: rebindPicker
         current: page.targetCode(page.sel)
+        allowCombos: bridge.canCombo(page.sel)
         function open(m) { mode = m }
         onPicked: function (code) { page.assignCode(page.sel, code) }
     }

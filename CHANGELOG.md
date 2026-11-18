@@ -7,6 +7,12 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
 
 ## [Unreleased]
 
+### Added
+- **Key combos** for remaps on the Cyclone 2, G7 Pro 8K PC and Tarantula Pro 8K:
+  hold up to two of Ctrl, Shift, Alt and Win with a key, such as Win + Left
+  (#30). Combos set in GameSir's app now show their full name instead of only
+  the first key.
+
 ## [0.7.0] — 2026-11-13
 
 ### Added

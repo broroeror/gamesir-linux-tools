@@ -1190,7 +1190,7 @@ Utilisez Configurer la manette en haut pour modifier ou actualiser les réglages
     </message>
     <message>
         <location filename="../qml/App/MousePage.qml" line="-60"/>
-        <location filename="../qml/App/TargetPicker.qml" line="+51"/>
+        <location filename="../qml/App/TargetPicker.qml" line="+85"/>
         <location filename="../qml/Main.qml" line="-800"/>
         <source>Buttons</source>
         <translation>Boutons</translation>
@@ -1511,6 +1511,11 @@ Utilisez Configurer la manette en haut pour modifier ou actualiser les réglages
         <location line="+0"/>
         <source>Mouse</source>
         <translation>Souris</translation>
+    </message>
+    <message>
+        <location line="+25"/>
+        <source>Hold with</source>
+        <translation>Avec</translation>
     </message>
     <message>
         <location filename="../qml/App/Theme.qml" line="-9"/>

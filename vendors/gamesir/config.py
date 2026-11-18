@@ -402,10 +402,55 @@ def remap_write_bytes(target_name):
 COMBO_KEYS = 2
 
 
+# Key combos (#30): the record's target plus up to two extra keys, e.g. 01 74 68 3e
+# = Ctrl+Shift+F12. Verified on a Cyclone 2 that the pad sends modifiers first
+# whatever order they're stored in, so combos are kept in one canonical order.
+# Inside the app a combo is ONE int (the codes packed low byte first) so the
+# remap plumbing that carries a single target code carries a combo unchanged;
+# anything above 0xff is a combo.
+COMBO_MODIFIERS = (0x74, 0x68, 0x76, 0x75)        # Ctrl, Shift, Alt, Win
+COMBO_MAX_KEYS = 1 + COMBO_KEYS
+
+
+def pack_combo(codes):
+    """Codes -> the app's single remap value: a plain code for one key, else
+    the codes (modifiers first, in COMBO_MODIFIERS order) packed into one int."""
+    codes = [c & 0xff for c in codes if c]
+    mods = [c for c in COMBO_MODIFIERS if c in codes]
+    rest = [c for c in codes if c not in COMBO_MODIFIERS]
+    ordered = (mods + rest)[:COMBO_MAX_KEYS]
+    if len(ordered) <= 1:
+        return ordered[0] if ordered else -1
+    return sum(c << (8 * i) for i, c in enumerate(ordered))
+
+
+def unpack_combo(value):
+    """The app's remap value -> the codes it stands for (one, or a combo)."""
+    if value < 0:
+        return []
+    return [(value >> (8 * i)) & 0xff for i in range(COMBO_MAX_KEYS) if (value >> (8 * i)) & 0xff]
+
+
+def decode_remap_record(rec):
+    """[type, target, key2, key3, ...] -> the app's remap value (-1 = unmapped)."""
+    if not rec or not rec[0]:
+        return -1
+    return pack_combo(rec[1:1 + COMBO_MAX_KEYS]) if len(rec) > 1 else 0
+
+
+_COMBO_SHORT = {'LCtrl': 'Ctrl', 'LShift': 'Shift', 'LAlt': 'Alt'}
+
+
+def combo_label(value, label):
+    """'Ctrl+Shift+F12' for a combo, using `label(code)` for each key."""
+    return '+'.join(_COMBO_SHORT.get(label(c), label(c)) for c in unpack_combo(value))
+
+
 def full_remap_record(data):
-    """[type, target] padded with cleared combo keys, so a rebind replaces any
-    combo GameSir's app stored there rather than adding to it."""
-    return list(data[:2]) + [0x00] * COMBO_KEYS
+    """A record padded with cleared combo keys, so a rebind replaces any combo
+    stored there rather than adding to it; a combo's own keys are kept."""
+    data = list(data[:1 + COMBO_MAX_KEYS])
+    return data + [0x00] * (1 + COMBO_MAX_KEYS - len(data))
 
 
 def field_name(addr):

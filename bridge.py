@@ -868,7 +868,8 @@ class GamesirBridge(QObject):
                 reqs = [] if self._se_full_view() else [
                     (bank, addr, ln) for addr, ln in self._prof.read_fields()
                     if self._prof is not profiles.G7_SE or addr != g7se.POLL_RATE]
-                reqs += [(bank, addr, g7se.remap_len(addr) if self._prof is profiles.G7_SE else 2)
+                reqs += [(bank, addr, g7se.remap_len(addr) if self._prof is profiles.G7_SE
+                          else self._prof.remap_len(addr))
                          for _n, addr in self._prof.REMAP_SLOTS]
                 if self._se_full_view():
                     reqs += g7se.view_requests(bank)
@@ -1009,7 +1010,7 @@ class GamesirBridge(QObject):
             if p is profiles.G7_SE:
                 code = g7se.decode_remap(rec, addr)
             else:
-                code = (rec[1] if len(rec) > 1 else 0) if rec[0] else -1
+                code = cfg.decode_remap_record(rec)
                 if code >= 0 and p.REMAP_DEFAULTS.get(addr) == code:
                     code = -1
             remap[name] = code
@@ -2167,6 +2168,8 @@ class GamesirBridge(QObject):
 
     @Slot(int, result=str)
     def targetLabel(self, code):
+        if code > 0xff:
+            return cfg.combo_label(code, self.targetLabel)
         if self._prof is profiles.G7_PRO:
             items = (list(g7pro.GAMEPAD_TARGETS) + list(cfg.KEYBOARD_TARGETS)
                      + list(cfg.NUMPAD_TARGETS) + list(g7pro.MOUSE_TARGETS))
@@ -2663,6 +2666,14 @@ class GamesirBridge(QObject):
             return
         self._queue(self._prof.POLL_RATE, [index], 'Poll rate', self._prof.POLL_RATES[index])
 
+    @Slot(str, result=bool)
+    def canCombo(self, source):
+        """Whether this button can hold a key combo (#30): the Cyclone-protocol
+        pads' full records, verified on a Cyclone 2."""
+        addr = self._remap_addr.get(source)
+        return (addr is not None and profiles.is_recognized()
+                and self._prof.remap_len(addr) == 1 + cfg.COMBO_MAX_KEYS)
+
     @Property('QVariantList', notify=controllerChanged)
     def remapSources(self):
         if self._prof is profiles.G7_SE and not self._se_configuration_supported():
@@ -2767,6 +2778,11 @@ class GamesirBridge(QObject):
         if code < 0:
             default_code = self._prof.REMAP_DEFAULTS.get(addr)
             data = [0x01, default_code] if default_code is not None else [0x00, 0x00]
+        elif code > 0xff:
+            if not self.canCombo(source):
+                return                                  # this slot holds one key only
+            keys = cfg.unpack_combo(code)
+            data = [0x01] + keys + [0x00] * (cfg.COMBO_MAX_KEYS - len(keys))
         else:
             data = [0x01, code & 0xff]
         label = cfg.REMAP_NONE if code < 0 else self.targetLabel(code)
@@ -2904,7 +2920,7 @@ class GamesirBridge(QObject):
             if self._prof is profiles.G7_SE:
                 code = g7se.decode_remap(data, addr)
             else:
-                code = (data[1] if len(data) > 1 else 0) if data[0] else -1
+                code = cfg.decode_remap_record(data)
                 if code >= 0 and self._prof.REMAP_DEFAULTS.get(addr) == code:
                     code = -1
             rec[self._addr_to_remap[addr]] = code

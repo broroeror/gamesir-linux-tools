@@ -1190,7 +1190,7 @@ Use Configure controller above to edit or refresh settings.</source>
     </message>
     <message>
         <location filename="../qml/App/MousePage.qml" line="-60"/>
-        <location filename="../qml/App/TargetPicker.qml" line="+51"/>
+        <location filename="../qml/App/TargetPicker.qml" line="+85"/>
         <location filename="../qml/Main.qml" line="-800"/>
         <source>Buttons</source>
         <translation>ボタン</translation>
@@ -1511,6 +1511,11 @@ Use Configure controller above to edit or refresh settings.</source>
         <location line="+0"/>
         <source>Mouse</source>
         <translation>マウス</translation>
+    </message>
+    <message>
+        <location line="+25"/>
+        <source>Hold with</source>
+        <translation>同時押し</translation>
     </message>
     <message>
         <location filename="../qml/App/Theme.qml" line="-9"/>
