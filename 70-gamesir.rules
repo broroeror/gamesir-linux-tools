@@ -42,6 +42,9 @@ SUBSYSTEM=="input", ATTRS{idVendor}=="3537", TAG+="uaccess"
 # Zenless Zone Zero edition: configuration verified wired and on its dongle.
 SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="105d", TAG+="uaccess"
 SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="105e", TAG+="uaccess"
+# Black and yellow edition (#71): configuration verified by its owner.
+SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="106a", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="106b", TAG+="uaccess"
 # Wuchang receiver: wireless configuration verified on descriptor 5.18.
 SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="10a8", TAG+="uaccess"
 SUBSYSTEM=="usb", ATTR{idVendor}=="3537", ATTR{idProduct}=="109b", TAG+="uaccess"

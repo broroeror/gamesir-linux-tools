@@ -8,6 +8,8 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
 ## [Unreleased]
 
 ### Added
+- **G7 Pro black and yellow edition** (`3537:106a` wired, `106b` dongle), tested by
+  its owner (#71). The udev rule gains both.
 - **Key combos** for remaps on the Cyclone 2, G7 Pro 8K PC and Tarantula Pro 8K:
   hold up to two of Ctrl, Shift, Alt and Win with a key, such as Win + Left
   (#30). Combos set in GameSir's app now show their full name instead of only

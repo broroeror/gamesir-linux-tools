@@ -43,6 +43,12 @@ class DetectionTests(unittest.TestCase):
         self.assertNotIn(0x10a9, g7.CONFIG_PIDS)
         self.assertEqual(g7.LOCKED_MODES[0x10a9][1], 'Home + Share')
 
+    def test_black_yellow_edition_is_configurable(self):
+        for pid, wired in ((0x106a, True), (0x106b, False)):
+            self.assertIs(profiles.detect_one(pid, 'GameSir-G7 Pro'), profiles.G7_PRO)
+            self.assertIn(pid, g7.CONFIG_PIDS)
+            self.assertEqual(g7.connection_kind(pid), wired)
+
     def test_zenless_wired_and_dongle_are_configurable(self):
         for pid, wired in ((0x105d, True), (0x105e, False)):
             self.assertIs(profiles.detect_one(pid, 'GameSir-G7 Pro'), profiles.G7_PRO)

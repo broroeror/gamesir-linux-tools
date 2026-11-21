@@ -395,7 +395,8 @@ everything it does is **reversible** and stays **on your machine**. The specific
   are verified here. Other G7 Pro editions were verified by their owners: Shadow
   Ember (`109b`/`109c`, [@brcly](https://github.com/brcly)), Wuchang (`10a7`/`10a8`,
   [@sinchrotron](https://github.com/sinchrotron)), White Trimode (`1003`/`1004`) and
-  Zenless Zone Zero (`105d`/`105e`, [@henryford](https://github.com/henryford)).
+  Zenless Zone Zero (`105d`/`105e`, [@henryford](https://github.com/henryford)) and a
+  black and yellow edition (`106a`/`106b`, [@ostheimm](https://github.com/ostheimm)).
   The G7 Pro 8K PC Royal2 and Championship editions were added by their owners.
   Treat anything not listed as unproven and use it at your own risk.
 
