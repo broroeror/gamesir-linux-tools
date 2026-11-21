@@ -2983,5 +2983,33 @@ O Deadband tentará novamente ao selecionar Configurar controle.</translation>
         <source>Back buttons only. Saving maps the button on the controller to a spare key (L4 = F13 … T3 = F21) that the bridge turns into this shortcut; any pad macro or remap on it is replaced. Removing the shortcut maps the button back to itself.</source>
         <translation>Só botões traseiros. Ao salvar, o botão é mapeado no controle para uma tecla livre (L4 = F13 … T3 = F21), que a ponte transforma neste atalho; macro ou mapeamento que existir nele é substituído. Remover o atalho faz o botão voltar a ele mesmo.</translation>
     </message>
+    <message>
+        <source>Steam and the PC</source>
+        <translation>Steam e o PC</translation>
+    </message>
+    <message>
+        <source>Virtual PS4 controller with gyro (for gyro in Steam)</source>
+        <translation>Controle PS4 virtual com gyro (para gyro na Steam)</translation>
+    </message>
+    <message>
+        <source>On: Steam gets a PS4 controller with the gyro, plus HOME + button shortcuts. The real Xbox controller may still be listed (muted).</source>
+        <translation>Ligado: a Steam recebe um controle PS4 com o gyro e os atalhos HOME + botão. O controle Xbox real ainda pode aparecer na lista (sem resposta).</translation>
+    </message>
+    <message>
+        <source>Off: Steam sees only the real GameSir Xbox controller. Gyro as mouse, macros and remaps work from the controller itself (Motion tab). Back-button PC shortcuts keep working; HOME + button shortcuts are off.</source>
+        <translation>Desligado: a Steam vê só o GameSir Xbox Controller real. Gyro como mouse, macros e mapeamentos funcionam pelo próprio controle (aba Movimento). Os atalhos de PC nos botões traseiros continuam funcionando; os atalhos HOME + botão ficam desligados.</translation>
+    </message>
+    <message>
+        <source>HOME + button shortcuts need the virtual PS4 controller (Device tab), which is off. Use “Button alone” on a back button instead.</source>
+        <translation>Os atalhos HOME + botão precisam do controle PS4 virtual (aba Dispositivo), que está desligado. Use “Só o botão” num botão traseiro.</translation>
+    </message>
+    <message>
+        <source>Virtual PS4 controller on: gyro goes to Steam</source>
+        <translation>Controle PS4 virtual ligado: o gyro vai para a Steam</translation>
+    </message>
+    <message>
+        <source>Virtual PS4 controller off: Steam sees the real controller</source>
+        <translation>Controle PS4 virtual desligado: a Steam vê o controle real</translation>
+    </message>
 </context>
 </TS>

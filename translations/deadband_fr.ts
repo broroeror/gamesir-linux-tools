@@ -2983,5 +2983,33 @@ Deadband réessaiera lorsque vous choisirez Configurer la manette.</translation>
         <source>Back buttons only. Saving maps the button on the controller to a spare key (L4 = F13 … T3 = F21) that the bridge turns into this shortcut; any pad macro or remap on it is replaced. Removing the shortcut maps the button back to itself.</source>
         <translation>Back buttons only. Saving maps the button on the controller to a spare key (L4 = F13 … T3 = F21) that the bridge turns into this shortcut; any pad macro or remap on it is replaced. Removing the shortcut maps the button back to itself.</translation>
     </message>
+    <message>
+        <source>Steam and the PC</source>
+        <translation>Steam and the PC</translation>
+    </message>
+    <message>
+        <source>Virtual PS4 controller with gyro (for gyro in Steam)</source>
+        <translation>Virtual PS4 controller with gyro (for gyro in Steam)</translation>
+    </message>
+    <message>
+        <source>On: Steam gets a PS4 controller with the gyro, plus HOME + button shortcuts. The real Xbox controller may still be listed (muted).</source>
+        <translation>On: Steam gets a PS4 controller with the gyro, plus HOME + button shortcuts. The real Xbox controller may still be listed (muted).</translation>
+    </message>
+    <message>
+        <source>Off: Steam sees only the real GameSir Xbox controller. Gyro as mouse, macros and remaps work from the controller itself (Motion tab). Back-button PC shortcuts keep working; HOME + button shortcuts are off.</source>
+        <translation>Off: Steam sees only the real GameSir Xbox controller. Gyro as mouse, macros and remaps work from the controller itself (Motion tab). Back-button PC shortcuts keep working; HOME + button shortcuts are off.</translation>
+    </message>
+    <message>
+        <source>HOME + button shortcuts need the virtual PS4 controller (Device tab), which is off. Use “Button alone” on a back button instead.</source>
+        <translation>HOME + button shortcuts need the virtual PS4 controller (Device tab), which is off. Use “Button alone” on a back button instead.</translation>
+    </message>
+    <message>
+        <source>Virtual PS4 controller on: gyro goes to Steam</source>
+        <translation>Virtual PS4 controller on: gyro goes to Steam</translation>
+    </message>
+    <message>
+        <source>Virtual PS4 controller off: Steam sees the real controller</source>
+        <translation>Virtual PS4 controller off: Steam sees the real controller</translation>
+    </message>
 </context>
 </TS>

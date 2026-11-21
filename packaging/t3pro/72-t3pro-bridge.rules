@@ -1,8 +1,5 @@
-# GameSir Tarantula Pro dongle (3537:103e): hide the raw XInput pad from
-# Steam/SDL/games and start the per-user DS4 bridge (t3pro-bridge.service),
-# which exposes a virtual DualShock 4 with gyro instead.
+# GameSir Tarantula Pro dongle (3537:103e): start the per-user bridge
+# (t3pro-bridge.service) when the dongle appears. The bridge exposes a virtual
+# DualShock 4 with gyro, or only runs the PC shortcuts ("ds4": false).
 # Install: sudo cp 72-t3pro-bridge.rules /etc/udev/rules.d/ && sudo udevadm control --reload
-# Must sort after 60-input-id.rules (which sets ID_INPUT_JOYSTICK).
-# (all ATTRS{} keys must match on ONE parent, so match the USB ids via ENV)
-SUBSYSTEM=="input", KERNEL=="event*|js*", ENV{ID_VENDOR_ID}=="3537", ENV{ID_MODEL_ID}=="103e", ATTRS{name}=="Generic X-Box pad", ENV{ID_INPUT_JOYSTICK}="", ENV{ID_INPUT_GAMEPAD}=""
 SUBSYSTEM=="hidraw", ACTION=="add", ATTRS{idVendor}=="3537", ATTRS{idProduct}=="103e", TAG+="systemd", ENV{SYSTEMD_USER_WANTS}+="t3pro-bridge.service"

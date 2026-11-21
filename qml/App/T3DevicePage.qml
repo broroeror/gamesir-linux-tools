@@ -43,6 +43,31 @@ Item {
 
         Card {
             Layout.fillWidth: true
+            title: qsTranslate("UI", "Steam and the PC")
+            Row {
+                spacing: 10
+                ToggleSwitch {
+                    anchors.verticalCenter: parent.verticalCenter
+                    checked: t3.virtualDs4
+                    onToggled: function (on) { t3.setVirtualDs4(on) }
+                }
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: qsTranslate("UI", "Virtual PS4 controller with gyro (for gyro in Steam)")
+                    color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                }
+            }
+            Text {
+                width: parent.width; wrapMode: Text.WordWrap
+                text: t3.virtualDs4
+                    ? qsTranslate("UI", "On: Steam gets a PS4 controller with the gyro, plus HOME + button shortcuts. The real Xbox controller may still be listed (muted).")
+                    : qsTranslate("UI", "Off: Steam sees only the real GameSir Xbox controller. Gyro as mouse, macros and remaps work from the controller itself (Motion tab). Back-button PC shortcuts keep working; HOME + button shortcuts are off.")
+                color: Theme.textFaint; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+            }
+        }
+
+        Card {
+            Layout.fillWidth: true
             title: qsTranslate("UI", "Restore")
             Text {
                 width: parent.width; wrapMode: Text.WordWrap

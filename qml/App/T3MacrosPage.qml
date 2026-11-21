@@ -168,6 +168,12 @@ Item {
                     }
                     Text {
                         width: parent.width; wrapMode: Text.WordWrap
+                        visible: page.homeMode === "chord" && !t3.virtualDs4
+                        text: qsTranslate("UI", "HOME + button shortcuts need the virtual PS4 controller (Device tab), which is off. Use “Button alone” on a back button instead.")
+                        color: Theme.warn; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                    }
+                    Text {
+                        width: parent.width; wrapMode: Text.WordWrap
                         visible: page.homeMode === "button"
                         text: qsTranslate("UI", "Back buttons only. Saving maps the button on the controller to a spare key (L4 = F13 … T3 = F21) that the bridge turns into this shortcut; any pad macro or remap on it is replaced. Removing the shortcut maps the button back to itself.")
                         color: Theme.warn; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS

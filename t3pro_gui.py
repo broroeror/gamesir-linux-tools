@@ -318,6 +318,20 @@ class T3ProBridge(QObject):
         return out
 
     @Property(bool, notify=stateChanged)
+    def virtualDs4(self):
+        return bool(hm.load_config().get('ds4', True))
+
+    @Slot(bool)
+    def setVirtualDs4(self, on):
+        cfg = hm.load_config()
+        cfg['ds4'] = bool(on)
+        hm.save_config(cfg)
+        os.system('systemctl --user restart t3pro-bridge >/dev/null 2>&1')
+        self.stateChanged.emit()
+        self.message.emit(tr('Virtual PS4 controller on: gyro goes to Steam') if on
+                          else tr('Virtual PS4 controller off: Steam sees the real controller'), False)
+
+    @Property(bool, notify=stateChanged)
     def bridgeRunning(self):
         return os.system('systemctl --user -q is-active t3pro-bridge') == 0
 
@@ -533,7 +547,9 @@ class T3ProBridge(QObject):
         bits = {n: hm.PAD_BITS[n] for n in self.REC_BUTTONS}
 
         def job(t):
-            own_stream = os.system('systemctl --user -q is-active t3pro-bridge') != 0
+            # the bridge streams the pad state only in virtual-DS4 mode
+            own_stream = (os.system('systemctl --user -q is-active t3pro-bridge') != 0
+                          or not hm.load_config().get('ds4', True))
             if own_stream:
                 t.set_gamepad_state_report(1)
             events, prev, t0 = [], set(), None

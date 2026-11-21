@@ -239,6 +239,58 @@ def open_dongle_keyboard():
     return None
 
 
+def run_shortcuts_only():
+    """"ds4": false in the config: no virtual DS4, no grab, no state stream.
+    Steam keeps the real GameSir Xbox controller; the pad does its own gyro /
+    macros. Only the back-button PC shortcuts (signal keys on the dongle
+    keyboard) run here. HOME + button chords are off: without the virtual pad
+    HOME can't be hidden from Steam."""
+    from evdev import ecodes
+    chords = t3pro_macros.HomeChords(log=lambda m: print(m, flush=True))
+    sig = {ecodes.ecodes['KEY_' + k]: b for b, k in p.SIGNAL_KEYS.items()}
+    fmt = 'llHHi'
+    sz = struct.calcsize(fmt)
+    kfd = None
+    for _ in range(10):                     # the keyboard node may lag the hidraw one
+        kfd = open_dongle_keyboard()
+        if kfd is not None:
+            break
+        time.sleep(0.5)
+    if kfd is None:
+        print('dongle keyboard not found; exiting', flush=True)
+        return
+    try:                                    # leave the pad's own stream off
+        with p.Tarantula() as t:
+            t.set_gamepad_state_report(0)
+    except (p.ProtocolError, OSError):
+        pass
+    print('shortcuts-only mode: no virtual DS4, Steam uses the real controller', flush=True)
+    stop = []
+    signal.signal(signal.SIGTERM, lambda *_: stop.append(1))
+    signal.signal(signal.SIGINT, lambda *_: stop.append(1))
+    try:
+        while not stop:
+            timeout = 0.005 if chords.busy() else 1.0
+            rl, _, _ = select.select([kfd], [], [], timeout)
+            now = time.monotonic()
+            if rl:
+                try:
+                    data = os.read(kfd, sz * 64)
+                except BlockingIOError:
+                    data = b''
+                except OSError:
+                    break                   # dongle unplugged
+                for off in range(0, len(data) - sz + 1, sz):
+                    _, _, etype, code, value = struct.unpack_from(fmt, data, off)
+                    if etype == ecodes.EV_KEY and value == 1 and code in sig:
+                        chords.trigger_solo(sig[code], now)
+            chords.tick(now)                # pad steps are ignored: nothing to send them to
+    finally:
+        chords.close()
+        os.close(kfd)
+        print('bridge stopped', flush=True)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--no-grab', action='store_true', help='leave the real XInput pad visible')
@@ -249,6 +301,9 @@ def main():
     ap.add_argument('--rumble-gain', type=float, default=None,
                     help='software rumble gain, 0.0-2.0 (default: live from the config file)')
     a = ap.parse_args()
+
+    if not load_config().get('ds4', True):
+        return run_shortcuts_only()
 
     pad = None
     while pad is None:                     # dongle may come up before the pad wakes
