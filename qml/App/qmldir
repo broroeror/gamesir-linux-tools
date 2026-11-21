@@ -45,3 +45,6 @@ StickTester 1.0 StickTester.qml
 ButtonTester 1.0 ButtonTester.qml
 ReportTimingTester 1.0 ReportTimingTester.qml
 FastWheel 1.0 FastWheel.qml
+T3LightsPage 1.0 T3LightsPage.qml
+T3MacrosPage 1.0 T3MacrosPage.qml
+T3VibrationPage 1.0 T3VibrationPage.qml

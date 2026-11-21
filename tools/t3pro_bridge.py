@@ -22,6 +22,8 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 from vendors.gamesir.models.t3pro import protocol as p  # noqa: E402
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import t3pro_macros  # noqa: E402
 
 # ---- UHID -----------------------------------------------------------------
 UHID_START, UHID_STOP, UHID_OPEN, UHID_CLOSE, UHID_OUTPUT = 2, 3, 4, 5, 6
@@ -221,10 +223,8 @@ def main():
     ap.add_argument('--invert-yaw', action='store_true')
     ap.add_argument('--gyro-lsb', type=float, default=13.4, help='pad gyro LSB per deg/s')
     ap.add_argument('--rumble-gain', type=float, default=None,
-                    help='software rumble gain, 0.0-2.0 (default: config file or 1.0)')
+                    help='software rumble gain, 0.0-2.0 (default: live from the config file)')
     a = ap.parse_args()
-    if a.rumble_gain is None:
-        a.rumble_gain = load_config().get('rumble_gain', 1.0)
 
     pad = None
     while pad is None:                     # dongle may come up before the pad wakes
@@ -245,6 +245,8 @@ def main():
     uhid = Uhid(mac)
     gfd, gname = (None, None) if a.no_grab else grab_xpad()
     mapper = Mapper(a.gyro_lsb, a.invert_yaw)
+    chords = t3pro_macros.HomeChords(log=lambda m: print(m, flush=True))
+    last_e = None
     print(f'bridge up: pad fw {info["firmware"]}, battery {info["battery"]}%, '
           f'xpad grab: {gname or "off"}', flush=True)
 
@@ -253,7 +255,7 @@ def main():
     def on_output(rep):
         if rep and rep[0] == 0x05 and len(rep) >= 6:
             weak, strong = rep[4], rep[5]
-            g = max(0.0, min(2.0, a.rumble_gain))
+            g = max(0.0, min(2.0, a.rumble_gain if a.rumble_gain is not None else chords.gain))
             want = [min(255, int(strong * g)), min(255, int(weak * g))]  # pad takes 0-255
             if want != last_rumble:
                 print(f'rumble from host: strong={strong} weak={weak} -> pad L={want[0]} R={want[1]}', flush=True)
@@ -270,7 +272,8 @@ def main():
     last_keep = time.monotonic()
     try:
         while not stop:
-            rl, _, _ = select.select([pad.fd, uhid.fd], [], [], 0.5)
+            rl, _, _ = select.select([pad.fd, uhid.fd], [], [],
+                                     0.005 if (chords.busy() or chords.phase != 'idle') else 0.5)
             if uhid.fd in rl:
                 uhid.handle(on_output)
             if pad.fd in rl:
@@ -283,9 +286,15 @@ def main():
                         stop.append(1)
                         break
                     if r[:4] == bytes([6, 0x1A, 0x0A, 3]):
-                        uhid.send(mapper.ds4(r[4:]))
-                        last_rx = time.monotonic()
+                        last_e = r[4:]
+                        now = time.monotonic()
+                        chords.feed(last_e, now)
+                        chords.tick(now)
+                        uhid.send(mapper.ds4(chords.render(last_e)))
+                        last_rx = now
             now = time.monotonic()
+            if last_e is not None and chords.tick(now):
+                uhid.send(mapper.ds4(chords.render(last_e)))   # macro edge between pad frames
             if now - last_rx > 2 and now - last_keep > 2:
                 # pad slept or the dongle reset: re-enable the stream
                 last_keep = now
@@ -299,6 +308,7 @@ def main():
             pad.set_gamepad_state_report(0)
         except (p.ProtocolError, OSError):
             pass
+        chords.close()
         uhid.close()
         try:
             pad.close()

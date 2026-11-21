@@ -11,6 +11,7 @@ Every write is read back and compared. `backup` before anything else.
   t3pro macro L4 A:0-50 B:300-350     button:start_ms-end_ms ... [--hold] [--loop MS]
   t3pro macro L4 --clear
   t3pro vibration [--left 0-100] [--right 0-100] [--gain 0.0-2.0]
+  t3pro home-macro [BTN STEP... | BTN --remove]   e.g. home-macro A key:LEFTCTRL+2:80
   t3pro rumble [L R]                   short vibration test (0-255)
 """
 import argparse
@@ -143,7 +144,61 @@ def cmd_vibration(t, a):
     cfg['rumble_gain'] = a.gain
     os.makedirs(os.path.dirname(cfg_path), exist_ok=True)
     json.dump(cfg, open(cfg_path, 'w'), indent=2)
-    print(f'software gain set to {a.gain}; restart the bridge: systemctl --user restart t3pro-bridge')
+    print(f'software gain set to {a.gain} (the running bridge picks it up within a second)')
+
+
+def parse_macro_step(s):
+    # pad:HOME+A:100@50   key:LEFTCTRL+2:80
+    kind, rest = s.split(':', 1)
+    parts = rest.split(':')
+    names = parts[0].upper().split('+')
+    hold, delay = 60, 40
+    if len(parts) > 1:
+        h = parts[1]
+        if '@' in h:
+            h, d = h.split('@')
+            delay = int(d)
+        hold = int(h)
+    if kind == 'pad':
+        return {'pad': names, 'hold': hold, 'delay': delay}
+    if kind == 'key':
+        return {'keys': [n if n.startswith('KEY_') else 'KEY_' + n for n in names],
+                'hold': hold, 'delay': delay}
+    raise ValueError(f'step must start with pad: or key: ({s!r})')
+
+
+def cmd_home_macro(t, a):
+    import t3pro_macros as hm
+    cfg = hm.load_config()
+    macros = cfg.setdefault('home_macros', {})
+    if not a.button:
+        if not macros:
+            print('no HOME macros configured')
+        for k, m in sorted(macros.items()):
+            steps = m['steps'] if isinstance(m, dict) else m
+            desc = ' , '.join('+'.join(s.get('pad', []) + s.get('keys', [])) + f" {s.get('hold', 60)}ms"
+                              + (f" wait {s.get('delay', 40)}ms" if s.get('delay', 40) else '') for s in steps)
+            name = m.get('name', '') if isinstance(m, dict) else ''
+            print(f'HOME+{k}: {desc}' + (f'   ({name})' if name else ''))
+        return
+    btn = a.button.upper()
+    if btn not in hm.CHORD_KEYS:
+        sys.exit(f'chord button must be one of: {", ".join(hm.CHORD_KEYS)}')
+    if a.remove:
+        macros.pop(btn, None)
+        hm.save_config(cfg)
+        print(f'HOME+{btn} removed')
+        return
+    if not a.steps:
+        sys.exit('give steps, e.g.  key:LEFTCTRL+2:80   or   pad:X:60@120 pad:Y:60')
+    try:
+        steps = [parse_macro_step(s) for s in a.steps]
+        hm.validate_steps(steps)
+    except ValueError as e:
+        sys.exit(str(e))
+    macros[btn] = {'name': a.name or '', 'steps': steps}
+    hm.save_config(cfg)
+    print(f'HOME+{btn} saved; the running bridge picks it up within a second')
 
 
 def cmd_rumble(t, a):
@@ -172,9 +227,17 @@ def main():
     vb.add_argument('--gain', type=float, help='bridge software gain 0.0-2.0 (1.0 = as the game asks)')
     vb.add_argument('--left', type=int, choices=range(0, 101), metavar='0-100', help='pad left grip level %%')
     vb.add_argument('--right', type=int, choices=range(0, 101), metavar='0-100', help='pad right grip level %%')
+    hmp = sub.add_parser('home-macro', help='software macros on HOME + button (run by the bridge)')
+    hmp.add_argument('button', nargs='?')
+    hmp.add_argument('steps', nargs='*', help='pad:BTN[+BTN]:HOLD[@DELAY] or key:KEY[+KEY]:HOLD[@DELAY]')
+    hmp.add_argument('--name')
+    hmp.add_argument('--remove', action='store_true')
     r = sub.add_parser('rumble'); r.add_argument('left', type=int, nargs='?', default=160)
     r.add_argument('right', type=int, nargs='?', default=160)
     a = ap.parse_args()
+    if a.cmd == 'home-macro':                 # config only, no pad access needed
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        return cmd_home_macro(None, a)
     with p.Tarantula(verbose=a.verbose) as t:
         globals()['cmd_' + a.cmd](t, a)
 

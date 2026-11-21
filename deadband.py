@@ -52,6 +52,7 @@ from PySide6.QtQml import QQmlApplicationEngine
 from reader import read_controller, press_select_loop, release_controller
 from bridge import GamesirBridge
 from mouse_bridge import MouseBridge
+from t3pro_gui import T3ProBridge
 from i18n import LanguageManager
 import kwin
 import mousegrab
@@ -119,6 +120,8 @@ def main():
     engine.rootContext().setContextProperty('bridge', bridge)
     mouse = MouseBridge()
     engine.rootContext().setContextProperty('mouse', mouse)
+    t3 = T3ProBridge()          # original Tarantula Pro (SAPJoy protocol, own device tab)
+    engine.rootContext().setContextProperty('t3', t3)
     engine.rootContext().setContextProperty('appVersion', __version__)
     engine.rootContext().setContextProperty(
         'assetsDir', QUrl.fromLocalFile(ASSETS_DIR + os.sep).toString())
