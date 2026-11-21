@@ -209,9 +209,9 @@ class DetectionTests(unittest.TestCase):
             self.assertEqual(b._pending[(1, 0x00b2)]['data'], [0x01, 0x9a, 0, 0])
             slot_map = dict(prof.REMAP_SLOTS)
             b.setRemapCode('LT', -1)
-            self.assertEqual(b._pending[(1, slot_map['LT'])]['data'], [0x00, 0x00])
+            self.assertEqual(b._pending[(1, slot_map['LT'])]['data'], [0x00, 0x00, 0, 0])
             b.setRemapCode('RT', -1)
-            self.assertEqual(b._pending[(1, slot_map['RT'])]['data'], [0x00, 0x00])
+            self.assertEqual(b._pending[(1, slot_map['RT'])]['data'], [0x00, 0x00, 0, 0])
         finally:
             profiles.set_active(old_prof)
 

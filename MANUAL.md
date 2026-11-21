@@ -90,8 +90,7 @@ restore the default. Remaps are part of the profile, so a backup captures them.
 **Key combos** (Cyclone 2, G7 Pro 8K PC, Tarantula Pro 8K): on the Keyboard or
 Numpad page of the picker, switch on up to two of **Hold with: Ctrl / Shift / Alt /
 Win**, then pick the key, for example Win + Left. The button then sends the whole
-combo. Combos set in GameSir's app show up the same way. The Tarantula's LT and
-RT take single keys only for now.
+combo. Combos set in GameSir's app show up the same way.
 
 ### Continuous Trigger (Cyclone 2)
 
