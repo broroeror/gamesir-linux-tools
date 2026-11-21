@@ -38,6 +38,15 @@ Item {
         if (selStep < steps.length) { stepPicker.kind = steps[selStep].kind; stepPicker.names = steps[selStep].names }
     }
     function setStep(i, field, v) { var s = steps.slice(); s[i] = clone(s[i]); s[i][field] = v; steps = s }
+    // Repeater delegates must not replace their own model while handling an
+    // event (Qt destroys the delegate mid-handler and crashes): defer it.
+    function setStepLater(i, field, v) { Qt.callLater(setStep, i, field, v) }
+    function removeStep(i) {
+        var s = steps.slice(); s.splice(i, 1); steps = s
+        selStep = Math.max(0, Math.min(selStep, s.length - 1)); syncPicker()
+    }
+    function setHomeStepLater(i, field, v) { Qt.callLater(setHomeStep, i, field, v) }
+    function removeHomeStep(i) { var s = homeSteps.slice(); s.splice(i, 1); homeSteps = s }
     function stepText(s) {
         var pre = s.kind === "kb" ? "⌨ " : s.kind === "mouse" ? "🖱 " : s.kind === "media" ? "♪ " : ""
         return pre + (s.names.length ? s.names.join(" + ") : qsTranslate("UI", "(choose)"))
@@ -208,7 +217,7 @@ Item {
                                 width: 100
                                 model: [qsTranslate("UI", "Controller"), qsTranslate("UI", "Keyboard"), qsTranslate("UI", "Mouse")]
                                 currentIndex: modelData.kind === "key" ? 1 : modelData.kind === "mouse" ? 2 : 0
-                                onActivated: function (i) { page.setHomeStep(index, "kind", ["pad", "key", "mouse"][i]) }
+                                onActivated: function (i) { page.setHomeStepLater(index, "kind", ["pad", "key", "mouse"][i]) }
                             }
                             QQC.TextField {
                                 width: 130
@@ -216,13 +225,13 @@ Item {
                                 placeholderText: modelData.kind === "key" ? "LEFTCTRL+2" : modelData.kind === "mouse" ? "LEFT" : "HOME+A"
                                 color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                                 background: Rectangle { color: Theme.bg; radius: 6; border.color: Theme.cardBorder; border.width: 1 }
-                                onEditingFinished: page.setHomeStep(index, "names", text)
+                                onEditingFinished: page.setHomeStepLater(index, "names", text)
                             }
-                            NumField { value: modelData.hold; onCommitted: function (v) { page.setHomeStep(index, "hold", Math.max(10, v)) } }
-                            NumField { value: modelData.delay; onCommitted: function (v) { page.setHomeStep(index, "delay", v) } }
+                            NumField { value: modelData.hold; onCommitted: function (v) { page.setHomeStepLater(index, "hold", Math.max(10, v)) } }
+                            NumField { value: modelData.delay; onCommitted: function (v) { page.setHomeStepLater(index, "delay", v) } }
                             PillButton {
                                 label: "✕"
-                                onClicked: { var s = page.homeSteps.slice(); s.splice(index, 1); page.homeSteps = s }
+                                onClicked: Qt.callLater(page.removeHomeStep, index)
                             }
                         }
                     }
@@ -240,7 +249,7 @@ Item {
                         PillButton {
                             label: qsTranslate("UI", "Save shortcut"); highlight: true
                             enabled: page.homeSteps.length > 0
-                            onClicked: t3.setHomeMacro(page.homeBtn, page.homeName, page.homeSteps, page.homeMode)
+                            onClicked: Qt.callLater(function () { t3.setHomeMacro(page.homeBtn, page.homeName, page.homeSteps, page.homeMode) })
                         }
                         PillButton {
                             label: qsTranslate("UI", "Remove")
@@ -293,15 +302,12 @@ Item {
                             TapHandler { onTapped: { page.selStep = index; page.syncPicker() } }
                         }
                         Label { text: qsTranslate("UI", "hold") }
-                        NumField { value: modelData.hold; onCommitted: function (v) { page.setStep(index, "hold", Math.max(10, v)) } }
+                        NumField { value: modelData.hold; onCommitted: function (v) { page.setStepLater(index, "hold", Math.max(10, v)) } }
                         Label { text: qsTranslate("UI", "wait") }
-                        NumField { value: modelData.delay; onCommitted: function (v) { page.setStep(index, "delay", v) } }
+                        NumField { value: modelData.delay; onCommitted: function (v) { page.setStepLater(index, "delay", v) } }
                         PillButton {
                             label: "✕"
-                            onClicked: {
-                                var s = page.steps.slice(); s.splice(index, 1); page.steps = s
-                                page.selStep = Math.max(0, Math.min(page.selStep, s.length - 1)); page.syncPicker()
-                            }
+                            onClicked: Qt.callLater(page.removeStep, index)
                         }
                     }
                 }
@@ -354,7 +360,7 @@ Item {
                     PillButton {
                         label: qsTranslate("UI", "Save to %1").arg(page.selKey); highlight: true
                         enabled: page.steps.length > 0 && !t3.recording
-                        onClicked: t3.setMacro(page.selKey, page.steps, page.holdMode, page.loop, page.loopTime)
+                        onClicked: Qt.callLater(function () { t3.setMacro(page.selKey, page.steps, page.holdMode, page.loop, page.loopTime) })
                     }
                     PillButton {
                         label: qsTranslate("UI", "Clear %1").arg(page.selKey)
