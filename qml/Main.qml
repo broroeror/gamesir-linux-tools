@@ -20,7 +20,7 @@ Window {
     property bool settingsOpen: false
     // Which device the app drives: the controller shell or the G502 X mouse. The
     // device picker flips this, which swaps the nav tabs + content below.
-    property string activeDevice: "controller"       // "controller" | "mouse"
+    property string activeDevice: "controller"       // "controller" | "mouse" | "t3pro"
     // Name of the mouse profile currently being edited — used by the reset
     // button's label, confirm prompt and tooltip so they always agree.
     readonly property string selectedProfileLabel: {
@@ -48,7 +48,9 @@ Window {
           .concat(bridge.lightingStyle !== "none" ? ["Lights"] : [])
           .concat(bridge.hasMacros ? ["Macros"] : [])
     readonly property var mouseTabs: ["Buttons", "DPI", "Macros"]
-    readonly property var tabs: activeDevice === "mouse" ? mouseTabs : controllerTabs
+    readonly property var t3Tabs: ["Lights", "Rebinds", "Macros", "Motion", "Vibration", "Device"]
+    readonly property var tabs: activeDevice === "mouse" ? mouseTabs
+                              : activeDevice === "t3pro" ? t3Tabs : controllerTabs
     readonly property var tabLabels: ({
         "Rebinds": qsTranslate("UI", "Rebinds"),
         "Sticks": qsTranslate("UI", "Sticks"),
@@ -112,6 +114,19 @@ Window {
     Connections {
         target: bridge
         function onControllerChanged() { win.currentTab = 0; Theme.vComp = 1 }
+    }
+    // Original Tarantula Pro: open its tab when it is the only device, and fall
+    // back to the controller view when its dongle goes away.
+    Connections {
+        target: t3
+        function onPresenceChanged() {
+            if (!t3.present && win.activeDevice === "t3pro")
+                win.activeDevice = "controller"
+            else if (t3.present && bridge.controllers.length === 0 && win.activeDevice === "controller") {
+                win.activeDevice = "t3pro"; win.currentTab = 0
+            }
+        }
+        function onMessage(text, isError) { t3Toast.show(text, isError) }
     }
     function setDensity(d) { Theme.density = d; appearance.density = d }
 
@@ -392,10 +407,13 @@ Window {
                     names: win.controllerNames
                     mousePresent: mouse.present
                     mouseActive: win.activeDevice === "mouse"
+                    t3Present: t3.present
+                    t3Active: win.activeDevice === "t3pro"
                     onPickController: function (id) {
                         bridge.selectController(id); win.activeDevice = "controller"
                     }
                     onPickMouse: win.activeDevice = "mouse"
+                    onPickT3: { win.activeDevice = "t3pro"; win.currentTab = 0 }
                 }
 
                 // Expand only once the full-width bar actually fits. MEASURED: expanded
@@ -564,6 +582,39 @@ Window {
                         anchors.verticalCenter: parent.verticalCenter
                         visible: mouse.present
                         text: mouse.wireless ? qsTranslate("UI", "Wireless") : qsTranslate("UI", "Wired")
+                        color: Theme.textDim
+                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                    }
+                }
+                // Tarantula Pro status: battery + firmware, read over its dongle.
+                Row {
+                    visible: win.activeDevice === "t3pro"
+                    Layout.alignment: Qt.AlignVCenter
+                    spacing: 8
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 8; height: 8; radius: 4
+                        color: t3.present ? Theme.ok : Theme.warn
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: t3.present ? (t3.busy ? qsTranslate("UI", "Saving…") : qsTranslate("UI", "Connected"))
+                                         : qsTranslate("UI", "Not connected")
+                        color: Theme.textDim
+                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: t3.present && t3.battery >= 0
+                        text: t3.battery + "%"
+                        color: t3.battery >= 0 && t3.battery <= 15 ? Theme.warn : Theme.accent
+                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                        font.weight: Font.DemiBold
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: t3.present && t3.firmware.length > 0
+                        text: "fw " + t3.firmware + (t3.bridgeRunning ? qsTranslate("UI", " · gyro bridge on") : "")
                         color: Theme.textDim
                         font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                     }
@@ -864,6 +915,17 @@ Window {
                 }
             }
           }                                         // ---- end controller content ----
+
+          Item {                                    // ---- Tarantula Pro content ----
+              anchors.fill: parent
+              visible: win.activeDevice === "t3pro"
+              T3LightsPage { anchors.fill: parent; visible: win.currentTab === 0 }
+              T3RemapPage { anchors.fill: parent; visible: win.currentTab === 1 }
+              T3MacrosPage { anchors.fill: parent; visible: win.currentTab === 2 }
+              T3MotionPage { anchors.fill: parent; visible: win.currentTab === 3 }
+              T3VibrationPage { anchors.fill: parent; visible: win.currentTab === 4 }
+              T3DevicePage { anchors.fill: parent; visible: win.currentTab === 5 }
+          }
 
           Item {                                    // ---- mouse content ----
               anchors.fill: parent
@@ -1368,5 +1430,34 @@ Window {
                     mouseToastTimer.stop()
             }
         }
+    }
+
+    // Tarantula Pro save results (each change is written, saved and read back).
+    Rectangle {
+        id: t3Toast
+        property string text: ""
+        property bool err: false
+        function show(t, e) { text = t; err = e; t3ToastTimer.restart() }
+        visible: win.activeDevice === "t3pro" && text.length > 0
+        z: 9999
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 30
+        radius: Theme.radius
+        implicitWidth: Math.min(win.width - 60, t3ToastText.implicitWidth + 34)
+        implicitHeight: 40
+        color: Theme.card
+        border.width: 1
+        border.color: t3Toast.err ? Theme.warn : Theme.ok
+        Text {
+            id: t3ToastText
+            anchors.centerIn: parent; width: parent.width - 24
+            horizontalAlignment: Text.AlignHCenter; elide: Text.ElideRight
+            text: t3Toast.text
+            color: t3Toast.err ? Theme.warn : Theme.ok
+            font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
+            font.weight: Font.DemiBold
+        }
+        Timer { id: t3ToastTimer; interval: 3500; onTriggered: t3Toast.text = "" }
     }
 }

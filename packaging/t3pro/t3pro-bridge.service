@@ -1,0 +1,12 @@
+[Unit]
+Description=GameSir Tarantula Pro -> virtual DualShock 4 (gyro) bridge
+StartLimitIntervalSec=60
+StartLimitBurst=10
+
+[Service]
+ExecStart=/usr/bin/python3 -I @REPO@/tools/t3pro_bridge.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
