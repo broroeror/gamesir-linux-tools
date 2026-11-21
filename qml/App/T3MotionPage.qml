@@ -84,14 +84,15 @@ Item {
                     Pills {
                         width: parent.width
                         value: page.m.activation || 0
-                        options: [[0, qsTranslate("UI", "Off")], [1, qsTranslate("UI", "While holding a button")],
-                                  [2, qsTranslate("UI", "On/off with a button")], [3, qsTranslate("UI", "Always on")]]
+                        // values follow the firmware's trigger enum (SDK): 1 one-shot = toggle, 2 hold
+                        options: [[0, qsTranslate("UI", "Off")], [2, qsTranslate("UI", "While holding a button")],
+                                  [1, qsTranslate("UI", "On/off with a button")], [3, qsTranslate("UI", "Always on")]]
                         onChosen: function (v) { page.set("activation", v) }
                     }
                     Label {
                         width: parent.width; wrapMode: Text.WordWrap
-                        text: page.m.activation === 1 ? qsTranslate("UI", "The gyro works only while the activation button is held.")
-                            : page.m.activation === 2 ? qsTranslate("UI", "Each press of the activation button turns the gyro on or off.")
+                        text: page.m.activation === 2 ? qsTranslate("UI", "The gyro works only while the activation button is held.")
+                            : page.m.activation === 1 ? qsTranslate("UI", "Each press of the activation button turns the gyro on or off.")
                             : page.m.activation === 3 ? qsTranslate("UI", "The gyro is always active.")
                             : qsTranslate("UI", "The controller does not use the gyro by itself.")
                     }

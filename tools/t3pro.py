@@ -164,13 +164,16 @@ def parse_macro_step(s):
     if kind == 'key':
         return {'keys': [n if n.startswith('KEY_') else 'KEY_' + n for n in names],
                 'hold': hold, 'delay': delay}
-    raise ValueError(f'step must start with pad: or key: ({s!r})')
+    if kind == 'mouse':
+        return {'mouse': names, 'hold': hold, 'delay': delay}
+    raise ValueError(f'step must start with pad:, key: or mouse: ({s!r})')
 
 
 def cmd_home_macro(t, a):
     import t3pro_macros as hm
     cfg = hm.load_config()
-    macros = cfg.setdefault('home_macros', {})
+    macros = cfg.setdefault('button_macros' if a.solo else 'home_macros', {})
+    pre = '' if a.solo else 'HOME+'
     if not a.button:
         if not macros:
             print('no HOME macros configured')
@@ -179,7 +182,7 @@ def cmd_home_macro(t, a):
             desc = ' , '.join('+'.join(s.get('pad', []) + s.get('keys', [])) + f" {s.get('hold', 60)}ms"
                               + (f" wait {s.get('delay', 40)}ms" if s.get('delay', 40) else '') for s in steps)
             name = m.get('name', '') if isinstance(m, dict) else ''
-            print(f'HOME+{k}: {desc}' + (f'   ({name})' if name else ''))
+            print(f'{pre}{k}: {desc}' + (f'   ({name})' if name else ''))
         return
     btn = a.button.upper()
     if btn not in hm.CHORD_KEYS:
@@ -187,10 +190,10 @@ def cmd_home_macro(t, a):
     if a.remove:
         macros.pop(btn, None)
         hm.save_config(cfg)
-        print(f'HOME+{btn} removed')
+        print(f'{pre}{btn} removed')
         return
     if not a.steps:
-        sys.exit('give steps, e.g.  key:LEFTCTRL+2:80   or   pad:X:60@120 pad:Y:60')
+        sys.exit('give steps, e.g.  key:LEFTCTRL+2:80   pad:HOME+A:80   mouse:LEFT:30')
     try:
         steps = [parse_macro_step(s) for s in a.steps]
         hm.validate_steps(steps)
@@ -198,7 +201,7 @@ def cmd_home_macro(t, a):
         sys.exit(str(e))
     macros[btn] = {'name': a.name or '', 'steps': steps}
     hm.save_config(cfg)
-    print(f'HOME+{btn} saved; the running bridge picks it up within a second')
+    print(f'{pre}{btn} saved; the running bridge picks it up within a second')
 
 
 def cmd_rumble(t, a):
@@ -232,6 +235,7 @@ def main():
     hmp.add_argument('steps', nargs='*', help='pad:BTN[+BTN]:HOLD[@DELAY] or key:KEY[+KEY]:HOLD[@DELAY]')
     hmp.add_argument('--name')
     hmp.add_argument('--remove', action='store_true')
+    hmp.add_argument('--solo', action='store_true', help='fire on the button alone (no HOME)')
     r = sub.add_parser('rumble'); r.add_argument('left', type=int, nargs='?', default=160)
     r.add_argument('right', type=int, nargs='?', default=160)
     a = ap.parse_args()

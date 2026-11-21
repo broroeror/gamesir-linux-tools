@@ -215,6 +215,30 @@ def grab_xpad():
     return None, None
 
 
+SIGNAL_EVKEYS = {}       # evdev key code -> back button, filled in main()
+
+
+def open_dongle_keyboard():
+    """The dongle's HID keyboard interface (where pad keyboard remaps and the
+    back buttons' signal keys arrive). Read without grabbing."""
+    for name in sorted(os.listdir('/sys/class/input')):
+        if not name.startswith('event'):
+            continue
+        base = f'/sys/class/input/{name}/device'
+        try:
+            vid = open(f'{base}/id/vendor').read().strip()
+            pid = open(f'{base}/id/product').read().strip()
+            dname = open(f'{base}/name').read().strip()
+        except OSError:
+            continue
+        if vid == '3537' and pid == '103e' and dname.endswith('Keyboard'):
+            try:
+                return os.open(f'/dev/input/{name}', os.O_RDONLY | os.O_NONBLOCK)
+            except OSError:
+                return None
+    return None
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--no-grab', action='store_true', help='leave the real XInput pad visible')
@@ -247,6 +271,13 @@ def main():
     mapper = Mapper(a.gyro_lsb, a.invert_yaw)
     chords = t3pro_macros.HomeChords(log=lambda m: print(m, flush=True))
     last_e = None
+    from evdev import ecodes
+    for btn, key in p.SIGNAL_KEYS.items():
+        SIGNAL_EVKEYS[ecodes.ecodes['KEY_' + key]] = btn
+    kfd = open_dongle_keyboard()
+    print(f'dongle keyboard: {"watching" if kfd is not None else "not found"}', flush=True)
+    EV_FMT = 'llHHi'
+    EV_SZ = struct.calcsize(EV_FMT)
     print(f'bridge up: pad fw {info["firmware"]}, battery {info["battery"]}%, '
           f'xpad grab: {gname or "off"}', flush=True)
 
@@ -272,10 +303,21 @@ def main():
     last_keep = time.monotonic()
     try:
         while not stop:
-            rl, _, _ = select.select([pad.fd, uhid.fd], [], [],
+            rl, _, _ = select.select([pad.fd, uhid.fd] + ([kfd] if kfd is not None else []), [], [],
                                      0.005 if (chords.busy() or chords.phase != 'idle') else 0.5)
             if uhid.fd in rl:
                 uhid.handle(on_output)
+            if kfd is not None and kfd in rl:
+                try:
+                    data = os.read(kfd, EV_SZ * 64)
+                except BlockingIOError:
+                    data = b''
+                except OSError:
+                    data, kfd = b'', None
+                for off in range(0, len(data) - EV_SZ + 1, EV_SZ):
+                    _, _, etype, code, value = struct.unpack_from(EV_FMT, data, off)
+                    if etype == ecodes.EV_KEY and value == 1 and code in SIGNAL_EVKEYS:
+                        chords.trigger_solo(SIGNAL_EVKEYS[code], time.monotonic())
             if pad.fd in rl:
                 while True:
                     try:
@@ -309,6 +351,8 @@ def main():
         except (p.ProtocolError, OSError):
             pass
         chords.close()
+        if kfd is not None:
+            os.close(kfd)
         uhid.close()
         try:
             pad.close()

@@ -19,6 +19,7 @@ Item {
     property int loopTime: 1000
 
     property string homeBtn: "A"
+    property string homeMode: "chord"    // "chord" = HOME + button, "button" = the button alone
     property string homeName: ""
     property var homeSteps: []
 
@@ -49,10 +50,11 @@ Item {
         }
         return out
     }
-    function loadHome(b) {
+    function loadHome(b, mode) {
+        if (mode !== undefined) homeMode = mode
         homeBtn = b; homeName = ""; homeSteps = []
         for (var i = 0; i < t3.homeMacros.length; i++)
-            if (t3.homeMacros[i].button === b) {
+            if (t3.homeMacros[i].button === b && t3.homeMacros[i].mode === homeMode) {
                 homeName = t3.homeMacros[i].name
                 homeSteps = clone(t3.homeMacros[i].steps)
             }
@@ -129,11 +131,11 @@ Item {
                 // ======================= HOME shortcuts =======================
                 Card {
                     Layout.fillWidth: true
-                    title: qsTranslate("UI", "HOME + button shortcuts")
+                    title: qsTranslate("UI", "PC shortcuts (run by the bridge)")
                     Text {
                         width: parent.width; wrapMode: Text.WordWrap
                         text: t3.bridgeRunning
-                            ? qsTranslate("UI", "Hold HOME and press the button. HOME alone still opens Steam. Run by the t3pro-bridge service; changes apply within a second.")
+                            ? qsTranslate("UI", "HOME + button: hold HOME and press the button (HOME alone still opens Steam). Button alone: the button fires the shortcut by itself — it can even send HOME + A. Run by the t3pro-bridge service; changes apply within a second.")
                             : qsTranslate("UI", "The t3pro-bridge service is not running, so these shortcuts are inactive.")
                         color: t3.bridgeRunning ? Theme.textFaint : Theme.warn
                         font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
@@ -144,9 +146,9 @@ Item {
                             required property var modelData
                             spacing: 8
                             PillButton {
-                                label: "HOME+" + modelData.button
-                                highlight: page.homeBtn === modelData.button
-                                onClicked: page.loadHome(modelData.button)
+                                label: (modelData.mode === "chord" ? "HOME+" : "") + modelData.button
+                                highlight: page.homeBtn === modelData.button && page.homeMode === modelData.mode
+                                onClicked: page.loadHome(modelData.button, modelData.mode)
                             }
                             Label {
                                 text: (modelData.name ? modelData.name + ": " : "") +
@@ -157,13 +159,28 @@ Item {
                     }
                     Rectangle { width: parent.width; height: 1; color: Theme.cardBorder }
                     Row {
+                        spacing: 6
+                        Label { text: qsTranslate("UI", "Trigger") + "  " }
+                        PillButton { label: qsTranslate("UI", "HOME + button"); highlight: page.homeMode === "chord"
+                                     onClicked: page.loadHome(page.homeBtn, "chord") }
+                        PillButton { label: qsTranslate("UI", "Button alone"); highlight: page.homeMode === "button"
+                                     onClicked: page.loadHome(t3.soloKeys.indexOf(page.homeBtn) >= 0 ? page.homeBtn : "R4", "button") }
+                    }
+                    Text {
+                        width: parent.width; wrapMode: Text.WordWrap
+                        visible: page.homeMode === "button"
+                        text: qsTranslate("UI", "Back buttons only. Saving maps the button on the controller to a spare key (L4 = F13 … T3 = F21) that the bridge turns into this shortcut; any pad macro or remap on it is replaced. Removing the shortcut maps the button back to itself.")
+                        color: Theme.warn; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                    }
+                    Row {
                         spacing: 8
-                        Label { text: "HOME +" }
+                        Label { text: page.homeMode === "chord" ? "HOME +" : qsTranslate("UI", "Button") }
                         DropdownButton {
                             width: 100
-                            model: t3.chordKeys
-                            currentIndex: Math.max(0, t3.chordKeys.indexOf(page.homeBtn))
-                            onActivated: function (i) { page.loadHome(t3.chordKeys[i]) }
+                            readonly property var keys: page.homeMode === "button" ? t3.soloKeys : t3.chordKeys
+                            model: keys
+                            currentIndex: Math.max(0, keys.indexOf(page.homeBtn))
+                            onActivated: function (i) { page.loadHome(keys[i]) }
                         }
                         QQC.TextField {
                             width: 190
@@ -183,14 +200,14 @@ Item {
                             Label { text: (index + 1) + "."; width: 18 }
                             DropdownButton {
                                 width: 100
-                                model: [qsTranslate("UI", "Controller"), qsTranslate("UI", "Keyboard")]
-                                currentIndex: modelData.kind === "key" ? 1 : 0
-                                onActivated: function (i) { page.setHomeStep(index, "kind", i === 1 ? "key" : "pad") }
+                                model: [qsTranslate("UI", "Controller"), qsTranslate("UI", "Keyboard"), qsTranslate("UI", "Mouse")]
+                                currentIndex: modelData.kind === "key" ? 1 : modelData.kind === "mouse" ? 2 : 0
+                                onActivated: function (i) { page.setHomeStep(index, "kind", ["pad", "key", "mouse"][i]) }
                             }
                             QQC.TextField {
                                 width: 130
                                 text: modelData.names
-                                placeholderText: modelData.kind === "key" ? "LEFTCTRL+2" : "X+Y"
+                                placeholderText: modelData.kind === "key" ? "LEFTCTRL+2" : modelData.kind === "mouse" ? "LEFT" : "HOME+A"
                                 color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                                 background: Rectangle { color: Theme.bg; radius: 6; border.color: Theme.cardBorder; border.width: 1 }
                                 onEditingFinished: page.setHomeStep(index, "names", text)
@@ -205,7 +222,7 @@ Item {
                     }
                     Text {
                         width: parent.width; wrapMode: Text.WordWrap
-                        text: qsTranslate("UI", "Per step: buttons or keys, then hold ms and wait ms. Keys use Linux names, e.g. LEFTCTRL+2, F12, LEFTALT+TAB.")
+                        text: qsTranslate("UI", "Per step: what to press, then hold ms and wait ms. Controller: A B X Y LB RB LT RT L3 R3 VIEW MENU UP DOWN LEFT RIGHT HOME CAMERA. Keyboard: Linux names, e.g. LEFTCTRL+2, F12, LEFTALT+TAB. Mouse: LEFT RIGHT MIDDLE SIDE EXTRA WHEEL_UP WHEEL_DOWN.")
                         color: Theme.textFaint; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                     }
                     Row {
@@ -215,13 +232,13 @@ Item {
                             onClicked: { var s = page.homeSteps.slice(); s.push({kind: "pad", names: "", hold: 60, delay: 40}); page.homeSteps = s }
                         }
                         PillButton {
-                            label: qsTranslate("UI", "Save HOME+%1").arg(page.homeBtn); highlight: true
+                            label: qsTranslate("UI", "Save shortcut"); highlight: true
                             enabled: page.homeSteps.length > 0
-                            onClicked: t3.setHomeMacro(page.homeBtn, page.homeName, page.homeSteps)
+                            onClicked: t3.setHomeMacro(page.homeBtn, page.homeName, page.homeSteps, page.homeMode)
                         }
                         PillButton {
                             label: qsTranslate("UI", "Remove")
-                            onClicked: { t3.removeHomeMacro(page.homeBtn); page.loadHome(page.homeBtn) }
+                            onClicked: { t3.removeHomeMacro(page.homeBtn, page.homeMode); page.loadHome(page.homeBtn) }
                         }
                     }
                 }

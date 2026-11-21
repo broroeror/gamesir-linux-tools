@@ -294,17 +294,27 @@ class T3ProBridge(QObject):
     def chordKeys(self):
         return list(hm.CHORD_KEYS)
 
+    @Property(list, constant=True)
+    def soloKeys(self):
+        return list(p.SIGNAL_KEYS)
+
     @Property(list, notify=stateChanged)
     def homeMacros(self):
+        """Software macros run by the bridge: mode 'chord' = HOME + button,
+        mode 'button' = the button alone."""
         out = []
-        for k, m in sorted(hm.load_config().get('home_macros', {}).items()):
-            steps = m.get('steps', []) if isinstance(m, dict) else m
-            out.append({'button': k, 'name': m.get('name', '') if isinstance(m, dict) else '',
-                        'steps': [{'kind': 'key' if s.get('keys') else 'pad',
-                                   'names': '+'.join(x.replace('KEY_', '') for x in
-                                                     (s.get('keys') or s.get('pad', []))),
-                                   'hold': int(s.get('hold', 60)), 'delay': int(s.get('delay', 40))}
-                                  for s in steps]})
+        cfg = hm.load_config()
+        for mode, section in (('chord', 'home_macros'), ('button', 'button_macros')):
+            for k, m in sorted(cfg.get(section, {}).items()):
+                steps = m.get('steps', []) if isinstance(m, dict) else m
+                rows = []
+                for s in steps:
+                    kind = 'key' if s.get('keys') else 'mouse' if s.get('mouse') else 'pad'
+                    names = s.get('keys') or s.get('mouse') or s.get('pad', [])
+                    rows.append({'kind': kind, 'names': '+'.join(x.replace('KEY_', '') for x in names),
+                                 'hold': int(s.get('hold', 60)), 'delay': int(s.get('delay', 40))})
+                out.append({'button': k, 'mode': mode,
+                            'name': m.get('name', '') if isinstance(m, dict) else '', 'steps': rows})
         return out
 
     @Property(bool, notify=stateChanged)
@@ -571,15 +581,17 @@ class T3ProBridge(QObject):
         self._rec_stop.set()
 
     # ---- HOME + button shortcuts (bridge config) ---------------------------
-    @Slot(str, str, list)
-    def setHomeMacro(self, button, name, steps):
-        """steps: [{kind: 'pad'|'key', names: 'A+B' / 'LEFTCTRL+2', hold, delay}]"""
+    @Slot(str, str, list, str)
+    def setHomeMacro(self, button, name, steps, mode):
+        """steps: [{kind: 'pad'|'key'|'mouse', names: 'HOME+A' / 'LEFTCTRL+2' / 'LEFT', hold, delay}]"""
         out = []
         for s in steps:
             names = [n.strip().upper() for n in str(s.get('names', '')).split('+') if n.strip()]
             st = {'hold': int(s.get('hold', 60)), 'delay': int(s.get('delay', 40))}
             if s.get('kind') == 'key':
                 st['keys'] = [n if n.startswith('KEY_') else 'KEY_' + n for n in names]
+            elif s.get('kind') == 'mouse':
+                st['mouse'] = names
             else:
                 st['pad'] = names
             out.append(st)
@@ -588,16 +600,35 @@ class T3ProBridge(QObject):
         except ValueError as e:
             self.message.emit(str(e), True)
             return
+        button = button.upper()
+        if mode == 'button' and button not in p.SIGNAL_KEYS:
+            self.message.emit(tr('Only the back buttons (L4, R4, C1–C4, T1–T3) can fire a shortcut alone.'), True)
+            return
         cfg = hm.load_config()
-        cfg.setdefault('home_macros', {})[button.upper()] = {'name': name, 'steps': out}
+        section = 'button_macros' if mode == 'button' else 'home_macros'
+        cfg.setdefault(section, {})[button] = {'name': name, 'steps': out}
         hm.save_config(cfg)
         self.stateChanged.emit()
-        self.message.emit(tr('Shortcut saved'), False)
+        if mode != 'button':
+            self.message.emit(tr('Shortcut saved'), False)
+            return
 
-    @Slot(str)
-    def removeHomeMacro(self, button):
+        def job(t):          # the back button sends its signal key to the bridge
+            t.request(0x01, 0x01, bytes([p.KEYS[button], 0xFF]) + bytes(14))
+            t.set_key_mapping(button, [p.SIGNAL_KEYS[button]], kind='kb')
+            t.save()
+            time.sleep(0.15)
+            remap = t.get_remap(button)
+            return {'state': {'remaps': {button: remap},
+                              'macros': {button: self._read_macro(t, button, remap)}}}
+        self._submit(job, 'Shortcut saved')
+
+    @Slot(str, str)
+    def removeHomeMacro(self, button, mode):
         cfg = hm.load_config()
-        cfg.get('home_macros', {}).pop(button.upper(), None)
+        cfg.get('button_macros' if mode == 'button' else 'home_macros', {}).pop(button.upper(), None)
         hm.save_config(cfg)
         self.stateChanged.emit()
+        if mode == 'button' and button.upper() in p.SIGNAL_KEYS:
+            self.resetRemap(button.upper())       # back to sending itself
         self.message.emit(tr('Shortcut removed'), False)

@@ -2943,5 +2943,45 @@ Deadband sẽ thử lại khi bạn chọn Cấu hình tay cầm.</translation>
         <source>● Record on the controller</source>
         <translation>● Record on the controller</translation>
     </message>
+    <message>
+        <source>PC shortcuts (run by the bridge)</source>
+        <translation>PC shortcuts (run by the bridge)</translation>
+    </message>
+    <message>
+        <source>HOME + button: hold HOME and press the button (HOME alone still opens Steam). Button alone: the button fires the shortcut by itself — it can even send HOME + A. Run by the t3pro-bridge service; changes apply within a second.</source>
+        <translation>HOME + button: hold HOME and press the button (HOME alone still opens Steam). Button alone: the button fires the shortcut by itself — it can even send HOME + A. Run by the t3pro-bridge service; changes apply within a second.</translation>
+    </message>
+    <message>
+        <source>Trigger</source>
+        <translation>Trigger</translation>
+    </message>
+    <message>
+        <source>HOME + button</source>
+        <translation>HOME + button</translation>
+    </message>
+    <message>
+        <source>Button alone</source>
+        <translation>Button alone</translation>
+    </message>
+    <message>
+        <source>The button must stay mapped to itself on the controller (no pad macro or remap on it), otherwise the bridge never sees it. Best on a back button (L4, R4, C1–C4, T1–T3).</source>
+        <translation>The button must stay mapped to itself on the controller (no pad macro or remap on it), otherwise the bridge never sees it. Best on a back button (L4, R4, C1–C4, T1–T3).</translation>
+    </message>
+    <message>
+        <source>Per step: what to press, then hold ms and wait ms. Controller: A B X Y LB RB LT RT L3 R3 VIEW MENU UP DOWN LEFT RIGHT HOME CAMERA. Keyboard: Linux names, e.g. LEFTCTRL+2, F12, LEFTALT+TAB. Mouse: LEFT RIGHT MIDDLE SIDE EXTRA WHEEL_UP WHEEL_DOWN.</source>
+        <translation>Per step: what to press, then hold ms and wait ms. Controller: A B X Y LB RB LT RT L3 R3 VIEW MENU UP DOWN LEFT RIGHT HOME CAMERA. Keyboard: Linux names, e.g. LEFTCTRL+2, F12, LEFTALT+TAB. Mouse: LEFT RIGHT MIDDLE SIDE EXTRA WHEEL_UP WHEEL_DOWN.</translation>
+    </message>
+    <message>
+        <source>Save shortcut</source>
+        <translation>Save shortcut</translation>
+    </message>
+    <message>
+        <source>Only the back buttons (L4, R4, C1–C4, T1–T3) can fire a shortcut alone.</source>
+        <translation>Only the back buttons (L4, R4, C1–C4, T1–T3) can fire a shortcut alone.</translation>
+    </message>
+    <message>
+        <source>Back buttons only. Saving maps the button on the controller to a spare key (L4 = F13 … T3 = F21) that the bridge turns into this shortcut; any pad macro or remap on it is replaced. Removing the shortcut maps the button back to itself.</source>
+        <translation>Back buttons only. Saving maps the button on the controller to a spare key (L4 = F13 … T3 = F21) that the bridge turns into this shortcut; any pad macro or remap on it is replaced. Removing the shortcut maps the button back to itself.</translation>
+    </message>
 </context>
 </TS>

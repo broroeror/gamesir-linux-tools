@@ -89,7 +89,14 @@ KB_KEYS = {
     'NUMLOCK': 83, 'KPSLASH': 84, 'KPASTERISK': 85, 'KPMINUS': 86, 'KPPLUS': 87, 'KPDOT': 99,
     'KPENTER': 88, 'KP0': 98, 'KP1': 89, 'KP2': 90, 'KP3': 91, 'KP4': 92, 'KP5': 93,
     'KP6': 94, 'KP7': 95, 'KP8': 96, 'KP9': 97,
+    'F13': 104, 'F14': 105, 'F15': 106, 'F16': 107, 'F17': 108, 'F18': 109,
+    'F19': 110, 'F20': 111, 'F21': 112, 'F22': 113, 'F23': 114, 'F24': 115,
 }
+# A back button mapped to itself produces no output at all (not even in the
+# mapped state stream), so a PC-side "button alone" shortcut maps it to an
+# otherwise unused key instead; the bridge watches the dongle's keyboard for
+# it. Hardware-checked: R4 -> usage 0x68 arrived as KEY_F13.
+SIGNAL_KEYS = {k: f'F{13 + i}' for i, k in enumerate(('L4', 'R4', 'C1', 'C2', 'C3', 'C4', 'T1', 'T2', 'T3'))}
 KB_NAMES = {v: k for k, v in KB_KEYS.items()}
 MOUSE_BUTTONS = ['LEFT', 'RIGHT', 'MIDDLE', 'BACK', 'FORWARD']   # bits 0-4 (app: 5 then 4)
 MOUSE_WHEEL = {'WHEEL_UP': 1, 'WHEEL_DOWN': 255}
@@ -504,7 +511,9 @@ class Tarantula:
         """Mapping + curve as GameSir Connect's motion page shows them.
         output: 0 off, 1 left stick, 2 right stick, 3 keys, 4 mouse.
         kind: 0 aim, 1 tilt. axes: 0 yaw, 1 roll, 2 combined.
-        activation: 0 off, 1 while the button is held, 2 toggle, 3 always."""
+        activation: 0 off, 1 toggle (on/off per press), 2 while the button is held,
+        3 always -- the SDK trigger enum (one-shot / hold), checked on the pad;
+        GameSir Connect's own labels for 1 and 2 read the other way round."""
         m = self.get_motion_mapping() + bytes(11)
         out = dict(zip(self.MOTION_FIELDS, m[:11]))
         c = self.request(0x04, 0x02) + bytes(19)

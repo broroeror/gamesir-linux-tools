@@ -9,9 +9,16 @@ Config (~/.config/t3pro/bridge.json):
                         {"pad": ["Y"], "hold": 60}]}
     }}
 
-A step presses `pad` buttons (sent through the virtual DS4) and/or `keys`
-(evdev KEY_* names, sent through a virtual keyboard) for `hold` ms, then
+A step presses `pad` buttons (sent through the virtual DS4, HOME included),
+`keys` (evdev KEY_* names, virtual keyboard) and/or `mouse` (LEFT RIGHT
+MIDDLE SIDE EXTRA WHEEL_UP WHEEL_DOWN, virtual mouse) for `hold` ms, then
 waits `delay` ms (default 40) before the next step.
+
+"button_macros" has the same shape but fires on a back button alone (no
+HOME): handy to make one back button do what HOME + A does. A back button
+mapped to itself sends nothing, so the GUI maps it on the pad to a signal key
+(L4 -> F13 ... T3 -> F21, see protocol.SIGNAL_KEYS) and the bridge watches the
+dongle's keyboard for that key (trigger_solo).
 
 Behaviour:
 * HOME + a button that has a macro runs the macro. Neither HOME nor that
@@ -37,6 +44,7 @@ CHORD_KEYS = tuple(k for k in PAD_BITS if k not in ('HOME', 'M'))
 HOLD_PASS = 0.4
 HOME_TAP = 0.08
 CONFIG = os.path.expanduser('~/.config/t3pro/bridge.json')
+MOUSE_NAMES = ('LEFT', 'RIGHT', 'MIDDLE', 'SIDE', 'EXTRA', 'WHEEL_UP', 'WHEEL_DOWN')
 
 
 def load_config(path=CONFIG):
@@ -64,8 +72,11 @@ def validate_steps(steps):
         for k in s.get('keys', []):
             if k not in ecodes.ecodes:
                 raise ValueError(f'unknown key {k!r} (use evdev names like KEY_LEFTCTRL)')
-        if not s.get('pad') and not s.get('keys'):
-            raise ValueError('a step needs "pad" and/or "keys"')
+        for m in s.get('mouse', []):
+            if m not in MOUSE_NAMES:
+                raise ValueError(f'unknown mouse output {m!r} (use {", ".join(MOUSE_NAMES)})')
+        if not s.get('pad') and not s.get('keys') and not s.get('mouse'):
+            raise ValueError('a step needs "pad", "keys" and/or "mouse"')
 
 
 class HomeChords:
@@ -73,6 +84,7 @@ class HomeChords:
         self.path = path
         self.log = log
         self.macros = {}
+        self.solo = {}               # button alone -> steps
         self._mtime = None
         self._checked = 0.0
         self.reload(force=True)
@@ -84,6 +96,7 @@ class HomeChords:
         self.forced = {}             # pad button -> refcount
         self.events = []             # (t, action, payload)
         self._kbd = None
+        self._mouse = None
 
     # -- config ---------------------------------------------------------------
     def reload(self, force=False):
@@ -104,29 +117,43 @@ class HomeChords:
             self.gain = max(0.0, min(2.0, float(cfg.get('rumble_gain', 1.0))))
         except (TypeError, ValueError):
             self.gain = 1.0
-        for key, m in cfg.get('home_macros', {}).items():
-            steps = m.get('steps', []) if isinstance(m, dict) else m
-            try:
-                validate_steps(steps)
-            except (ValueError, ImportError) as e:
-                self.log(f'home macro {key}: ignored ({e})')
-                continue
-            if key in CHORD_KEYS and steps:
-                macros[key] = steps
-        self.macros = macros
-        self.log(f'home macros loaded: {", ".join(sorted(macros)) or "none"}')
+        solo = {}
+        for section, dest in (('home_macros', macros), ('button_macros', solo)):
+            for key, m in cfg.get(section, {}).items():
+                steps = m.get('steps', []) if isinstance(m, dict) else m
+                try:
+                    validate_steps(steps)
+                except (ValueError, ImportError) as e:
+                    self.log(f'{section} {key}: ignored ({e})')
+                    continue
+                if key in CHORD_KEYS and steps:
+                    dest[key] = steps
+        self.macros, self.solo = macros, solo
+        self.log(f'home macros: {", ".join(sorted(macros)) or "none"}; '
+                 f'button macros: {", ".join(sorted(solo)) or "none"}')
 
     # -- keyboard -------------------------------------------------------------
     def kbd(self):
         if self._kbd is None:
             from evdev import UInput, ecodes
-            keys = [v for k, v in ecodes.ecodes.items() if k.startswith('KEY_')]
+            # real key codes only: KEY_MAX / KEY_CNT are bounds, not keys (EINVAL)
+            keys = sorted({v for k, v in ecodes.ecodes.items()
+                           if k.startswith('KEY_') and 0 < v < ecodes.KEY_MAX and k not in ('KEY_MAX', 'KEY_CNT')})
             self._kbd = UInput({ecodes.EV_KEY: keys}, name='t3pro macro keyboard')
         return self._kbd
 
+    def mouse(self):
+        if self._mouse is None:
+            from evdev import UInput, ecodes as E
+            self._mouse = UInput({E.EV_KEY: [E.BTN_LEFT, E.BTN_RIGHT, E.BTN_MIDDLE, E.BTN_SIDE, E.BTN_EXTRA],
+                                  E.EV_REL: [E.REL_X, E.REL_Y, E.REL_WHEEL]},
+                                 name='t3pro macro mouse')
+        return self._mouse
+
     def close(self):
-        if self._kbd is not None:
-            self._kbd.close()
+        for dev in (self._kbd, self._mouse):
+            if dev is not None:
+                dev.close()
 
     # -- scheduling -----------------------------------------------------------
     def _schedule(self, steps, t):
@@ -161,6 +188,17 @@ class HomeChords:
                 for k in seq:
                     kb.write(ecodes.EV_KEY, ecodes.ecodes[k], 1 if action == 'down' else 0)
                 kb.syn()
+            if s.get('mouse'):
+                from evdev import ecodes as E
+                ms = self.mouse()
+                for m in s['mouse']:
+                    if m == 'WHEEL_UP' and action == 'down':
+                        ms.write(E.EV_REL, E.REL_WHEEL, 1)
+                    elif m == 'WHEEL_DOWN' and action == 'down':
+                        ms.write(E.EV_REL, E.REL_WHEEL, -1)
+                    elif not m.startswith('WHEEL'):
+                        ms.write(E.EV_KEY, getattr(E, 'BTN_' + m), 1 if action == 'down' else 0)
+                ms.syn()
         return changed
 
     # -- per-frame ------------------------------------------------------------
@@ -192,6 +230,13 @@ class HomeChords:
             self.phase = 'idle'
         self.suppressed &= cur
         self.prev = cur
+
+    def trigger_solo(self, name, now):
+        """A back button's signal key arrived from the dongle keyboard."""
+        self.reload()
+        if name in self.solo:
+            self.log(f'macro {name}')
+            self._schedule(self.solo[name], now)
 
     def render(self, e):
         """Pad frame as the host should see it."""

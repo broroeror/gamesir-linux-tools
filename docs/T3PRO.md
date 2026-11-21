@@ -77,8 +77,8 @@ C >= 20 (the pad's 8/12/20 Hz). `toggle` 1 = press-to-latch.
 ### Motion (gyro handled by the pad)
 Mapping (`04 03`/`04 04`, 11 bytes): `angle, range, output (0 off, 1 left
 stick, 2 right stick, 3 keys, 4 mouse), kind (0 aim, 1 tilt), axes (0 yaw,
-1 roll, 2 combined), activation key, activation (0 off, 1 hold, 2 toggle,
-3 always), sensX, sensY, invertX, invertY`.
+1 roll, 2 combined), activation key, activation (0 off, 1 toggle, 2 while held,
+3 always; hardware-checked, the app's labels for 1/2 are swapped), sensX, sensY, invertX, invertY`.
 Curve (`04 01`/`04 02`, 19 bytes): `page, key, trigger, h, s, v, ratio,
 deadzone, anti-deadzone, x1, y1, x2, y2, x3, y3, end-deadzone,
 end-anti-deadzone, curveType, curvature`.

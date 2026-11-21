@@ -2943,5 +2943,45 @@ O Deadband tentará novamente ao selecionar Configurar controle.</translation>
         <source> · gyro bridge on</source>
         <translation> · ponte do gyro ativa</translation>
     </message>
+    <message>
+        <source>PC shortcuts (run by the bridge)</source>
+        <translation>Atalhos de PC (executados pela ponte)</translation>
+    </message>
+    <message>
+        <source>HOME + button: hold HOME and press the button (HOME alone still opens Steam). Button alone: the button fires the shortcut by itself — it can even send HOME + A. Run by the t3pro-bridge service; changes apply within a second.</source>
+        <translation>HOME + botão: segure HOME e aperte o botão (o HOME sozinho continua abrindo a Steam). Só o botão: o botão dispara o atalho sozinho — pode até enviar HOME + A. Executado pelo serviço t3pro-bridge; mudanças valem em até 1 segundo.</translation>
+    </message>
+    <message>
+        <source>Trigger</source>
+        <translation>Acionar com</translation>
+    </message>
+    <message>
+        <source>HOME + button</source>
+        <translation>HOME + botão</translation>
+    </message>
+    <message>
+        <source>Button alone</source>
+        <translation>Só o botão</translation>
+    </message>
+    <message>
+        <source>The button must stay mapped to itself on the controller (no pad macro or remap on it), otherwise the bridge never sees it. Best on a back button (L4, R4, C1–C4, T1–T3).</source>
+        <translation>O botão precisa continuar mapeado para ele mesmo no controle (sem macro nem mapeamento no controle), senão a ponte não o enxerga. Ideal num botão traseiro (L4, R4, C1–C4, T1–T3).</translation>
+    </message>
+    <message>
+        <source>Per step: what to press, then hold ms and wait ms. Controller: A B X Y LB RB LT RT L3 R3 VIEW MENU UP DOWN LEFT RIGHT HOME CAMERA. Keyboard: Linux names, e.g. LEFTCTRL+2, F12, LEFTALT+TAB. Mouse: LEFT RIGHT MIDDLE SIDE EXTRA WHEEL_UP WHEEL_DOWN.</source>
+        <translation>Por passo: o que apertar, depois ms segurando e ms de espera. Controle: A B X Y LB RB LT RT L3 R3 VIEW MENU UP DOWN LEFT RIGHT HOME CAMERA. Teclado: nomes do Linux, ex.: LEFTCTRL+2, F12, LEFTALT+TAB. Mouse: LEFT RIGHT MIDDLE SIDE EXTRA WHEEL_UP WHEEL_DOWN.</translation>
+    </message>
+    <message>
+        <source>Save shortcut</source>
+        <translation>Salvar atalho</translation>
+    </message>
+    <message>
+        <source>Only the back buttons (L4, R4, C1–C4, T1–T3) can fire a shortcut alone.</source>
+        <translation>Só os botões traseiros (L4, R4, C1–C4, T1–T3) podem disparar um atalho sozinhos.</translation>
+    </message>
+    <message>
+        <source>Back buttons only. Saving maps the button on the controller to a spare key (L4 = F13 … T3 = F21) that the bridge turns into this shortcut; any pad macro or remap on it is replaced. Removing the shortcut maps the button back to itself.</source>
+        <translation>Só botões traseiros. Ao salvar, o botão é mapeado no controle para uma tecla livre (L4 = F13 … T3 = F21), que a ponte transforma neste atalho; macro ou mapeamento que existir nele é substituído. Remover o atalho faz o botão voltar a ele mesmo.</translation>
+    </message>
 </context>
 </TS>
