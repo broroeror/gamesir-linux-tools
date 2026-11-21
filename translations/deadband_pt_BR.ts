@@ -2968,8 +2968,8 @@ O Deadband tentará novamente ao selecionar Configurar controle.</translation>
         <translation>O botão precisa continuar mapeado para ele mesmo no controle (sem macro nem mapeamento no controle), senão a ponte não o enxerga. Ideal num botão traseiro (L4, R4, C1–C4, T1–T3).</translation>
     </message>
     <message>
-        <source>Per step: what to press, then hold ms and wait ms. Controller: A B X Y LB RB LT RT L3 R3 VIEW MENU UP DOWN LEFT RIGHT HOME CAMERA. Keyboard: Linux names, e.g. LEFTCTRL+2, F12, LEFTALT+TAB. Mouse: LEFT RIGHT MIDDLE SIDE EXTRA WHEEL_UP WHEEL_DOWN.</source>
-        <translation>Por passo: o que apertar, depois ms segurando e ms de espera. Controle: A B X Y LB RB LT RT L3 R3 VIEW MENU UP DOWN LEFT RIGHT HOME CAMERA. Teclado: nomes do Linux, ex.: LEFTCTRL+2, F12, LEFTALT+TAB. Mouse: LEFT RIGHT MIDDLE SIDE EXTRA WHEEL_UP WHEEL_DOWN.</translation>
+        <source>Per step: what to press, then hold ms and wait ms. Controller: A B X Y LB RB LT RT L3 R3 VIEW MENU UP DOWN LEFT RIGHT HOME CAMERA. Keyboard: Linux names, e.g. LEFTCTRL+2, F12, LEFTALT+TAB. Mouse: LEFT RIGHT MIDDLE SIDE EXTRA WHEEL_UP WHEEL_DOWN. Steam: QAM (quick access menu) or MENU — needs the Tarantula Pro Decky plugin, works whatever app is in front (button alone only).</source>
+        <translation>Por passo: o que apertar, depois ms segurando e ms de espera. Controle: A B X Y LB RB LT RT L3 R3 VIEW MENU UP DOWN LEFT RIGHT HOME CAMERA. Teclado: nomes do Linux, ex.: LEFTCTRL+2, F12, LEFTALT+TAB. Mouse: LEFT RIGHT MIDDLE SIDE EXTRA WHEEL_UP WHEEL_DOWN. Steam: QAM (menu de acesso rápido) ou MENU — precisa do plugin Decky do Tarantula Pro e funciona com qualquer app em primeiro plano (só no modo Só o botão).</translation>
     </message>
     <message>
         <source>Save shortcut</source>

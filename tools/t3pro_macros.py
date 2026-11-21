@@ -45,6 +45,10 @@ HOLD_PASS = 0.4
 HOME_TAP = 0.08
 CONFIG = os.path.expanduser('~/.config/t3pro/bridge.json')
 MOUSE_NAMES = ('LEFT', 'RIGHT', 'MIDDLE', 'SIDE', 'EXTRA', 'WHEEL_UP', 'WHEEL_DOWN')
+# {"steam": "qam" | "menu"}: opens Steam's quick access / main menu. Run by the
+# Tarantula Pro Decky plugin (inside Steam's UI, so it works whatever app has
+# keyboard focus); the bridge itself skips these steps.
+STEAM_ACTIONS = ('qam', 'menu')
 
 
 def load_config(path=CONFIG):
@@ -75,8 +79,10 @@ def validate_steps(steps):
         for m in s.get('mouse', []):
             if m not in MOUSE_NAMES:
                 raise ValueError(f'unknown mouse output {m!r} (use {", ".join(MOUSE_NAMES)})')
-        if not s.get('pad') and not s.get('keys') and not s.get('mouse'):
-            raise ValueError('a step needs "pad", "keys" and/or "mouse"')
+        if s.get('steam') is not None and s['steam'] not in STEAM_ACTIONS:
+            raise ValueError(f'unknown Steam action {s["steam"]!r} (use {", ".join(STEAM_ACTIONS)})')
+        if not s.get('pad') and not s.get('keys') and not s.get('mouse') and not s.get('steam'):
+            raise ValueError('a step needs "pad", "keys", "mouse" and/or "steam"')
 
 
 class HomeChords:

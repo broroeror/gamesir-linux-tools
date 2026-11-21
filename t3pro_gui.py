@@ -309,8 +309,10 @@ class T3ProBridge(QObject):
                 steps = m.get('steps', []) if isinstance(m, dict) else m
                 rows = []
                 for s in steps:
-                    kind = 'key' if s.get('keys') else 'mouse' if s.get('mouse') else 'pad'
-                    names = s.get('keys') or s.get('mouse') or s.get('pad', [])
+                    kind = ('steam' if s.get('steam') else 'key' if s.get('keys')
+                            else 'mouse' if s.get('mouse') else 'pad')
+                    names = ([s['steam'].upper()] if s.get('steam') else
+                             s.get('keys') or s.get('mouse') or s.get('pad', []))
                     rows.append({'kind': kind, 'names': '+'.join(x.replace('KEY_', '') for x in names),
                                  'hold': int(s.get('hold', 60)), 'delay': int(s.get('delay', 40))})
                 out.append({'button': k, 'mode': mode,
@@ -608,6 +610,8 @@ class T3ProBridge(QObject):
                 st['keys'] = [n if n.startswith('KEY_') else 'KEY_' + n for n in names]
             elif s.get('kind') == 'mouse':
                 st['mouse'] = names
+            elif s.get('kind') == 'steam':
+                st['steam'] = (names[0] if names else 'QAM').lower()
             else:
                 st['pad'] = names
             out.append(st)

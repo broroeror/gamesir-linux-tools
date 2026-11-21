@@ -215,14 +215,15 @@ Item {
                             Label { text: (index + 1) + "."; width: 18 }
                             DropdownButton {
                                 width: 100
-                                model: [qsTranslate("UI", "Controller"), qsTranslate("UI", "Keyboard"), qsTranslate("UI", "Mouse")]
-                                currentIndex: modelData.kind === "key" ? 1 : modelData.kind === "mouse" ? 2 : 0
-                                onActivated: function (i) { page.setHomeStepLater(index, "kind", ["pad", "key", "mouse"][i]) }
+                                model: [qsTranslate("UI", "Controller"), qsTranslate("UI", "Keyboard"), qsTranslate("UI", "Mouse"), "Steam"]
+                                currentIndex: modelData.kind === "key" ? 1 : modelData.kind === "mouse" ? 2 : modelData.kind === "steam" ? 3 : 0
+                                onActivated: function (i) { page.setHomeStepLater(index, "kind", ["pad", "key", "mouse", "steam"][i]) }
                             }
                             QQC.TextField {
                                 width: 130
                                 text: modelData.names
-                                placeholderText: modelData.kind === "key" ? "LEFTCTRL+2" : modelData.kind === "mouse" ? "LEFT" : "HOME+A"
+                                placeholderText: modelData.kind === "key" ? "LEFTCTRL+2" : modelData.kind === "mouse" ? "LEFT"
+                                               : modelData.kind === "steam" ? "QAM / MENU" : "HOME+A"
                                 color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                                 background: Rectangle { color: Theme.bg; radius: 6; border.color: Theme.cardBorder; border.width: 1 }
                                 onEditingFinished: page.setHomeStepLater(index, "names", text)
@@ -237,7 +238,7 @@ Item {
                     }
                     Text {
                         width: parent.width; wrapMode: Text.WordWrap
-                        text: qsTranslate("UI", "Per step: what to press, then hold ms and wait ms. Controller: A B X Y LB RB LT RT L3 R3 VIEW MENU UP DOWN LEFT RIGHT HOME CAMERA. Keyboard: Linux names, e.g. LEFTCTRL+2, F12, LEFTALT+TAB. Mouse: LEFT RIGHT MIDDLE SIDE EXTRA WHEEL_UP WHEEL_DOWN.")
+                        text: qsTranslate("UI", "Per step: what to press, then hold ms and wait ms. Controller: A B X Y LB RB LT RT L3 R3 VIEW MENU UP DOWN LEFT RIGHT HOME CAMERA. Keyboard: Linux names, e.g. LEFTCTRL+2, F12, LEFTALT+TAB. Mouse: LEFT RIGHT MIDDLE SIDE EXTRA WHEEL_UP WHEEL_DOWN. Steam: QAM (quick access menu) or MENU — needs the Tarantula Pro Decky plugin, works whatever app is in front (button alone only).")
                         color: Theme.textFaint; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                     }
                     Row {
