@@ -892,7 +892,8 @@ def transition_g7_identity(ctrl):
         devices = _rescan()
         current = next((item for item in devices if item['id'] == ctrl['id']), None)
         if current is not None:
-            if current['pid'] in g7pro.CONFIG_PIDS:
+            if (current['pid'] in g7pro.CONFIG_PIDS
+                    or g7pro.is_candidate(current['pid'], current.get('product'))):
                 state['config_status'] = 'Connecting configuration…'
                 state['config_phase'] = 'claiming'
                 return True
