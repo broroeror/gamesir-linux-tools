@@ -2415,5 +2415,533 @@ Deadband sẽ thử lại khi bạn chọn Cấu hình tay cầm.</translation>
         <source>20 min</source>
         <translation>20 phút</translation>
     </message>
+    <message>
+        <source> · gyro bridge on</source>
+        <translation> · gyro bridge on</translation>
+    </message>
+    <message>
+        <source>(choose)</source>
+        <translation>(choose)</translation>
+    </message>
+    <message>
+        <source>+ Step</source>
+        <translation>+ Step</translation>
+    </message>
+    <message>
+        <source>100% passes what the game asks for. Above 100% boosts weak rumble (capped at the motor's maximum).</source>
+        <translation>100% passes what the game asks for. Above 100% boosts weak rumble (capped at the motor's maximum).</translation>
+    </message>
+    <message>
+        <source>A / B / X / Y</source>
+        <translation>A / B / X / Y</translation>
+    </message>
+    <message>
+        <source>Activation button: &lt;b&gt;%1&lt;/b&gt; — click a button on the drawing</source>
+        <translation>Activation button: &lt;b&gt;%1&lt;/b&gt; — click a button on the drawing</translation>
+    </message>
+    <message>
+        <source>Address</source>
+        <translation>Address</translation>
+    </message>
+    <message>
+        <source>Aim (turn the controller)</source>
+        <translation>Aim (turn the controller)</translation>
+    </message>
+    <message>
+        <source>Axes</source>
+        <translation>Axes</translation>
+    </message>
+    <message>
+        <source>Back to default</source>
+        <translation>Back to default</translation>
+    </message>
+    <message>
+        <source>Bar</source>
+        <translation>Bar</translation>
+    </message>
+    <message>
+        <source>Battery</source>
+        <translation>Battery</translation>
+    </message>
+    <message>
+        <source>Breathing</source>
+        <translation>Breathing</translation>
+    </message>
+    <message>
+        <source>Button %1</source>
+        <translation>Button %1</translation>
+    </message>
+    <message>
+        <source>Button layout</source>
+        <translation>Button layout</translation>
+    </message>
+    <message>
+        <source>Button layout saved</source>
+        <translation>Button layout saved</translation>
+    </message>
+    <message>
+        <source>Button saved</source>
+        <translation>Button saved</translation>
+    </message>
+    <message>
+        <source>Capture</source>
+        <translation>Capture</translation>
+    </message>
+    <message>
+        <source>Clear %1</source>
+        <translation>Clear %1</translation>
+    </message>
+    <message>
+        <source>Click A, B, X, Y, HOME or the light bar to change its colour.</source>
+        <translation>Click A, B, X, Y, HOME or the light bar to change its colour.</translation>
+    </message>
+    <message>
+        <source>Click a zone to colour all its LEDs, or a single dot to colour just that one.</source>
+        <translation>Click a zone to colour all its LEDs, or a single dot to colour just that one.</translation>
+    </message>
+    <message>
+        <source>Colour</source>
+        <translation>Colour</translation>
+    </message>
+    <message>
+        <source>Colour saved</source>
+        <translation>Colour saved</translation>
+    </message>
+    <message>
+        <source>Combined</source>
+        <translation>Combined</translation>
+    </message>
+    <message>
+        <source>Controller</source>
+        <translation>Controller</translation>
+    </message>
+    <message>
+        <source>Discard changes</source>
+        <translation>Discard changes</translation>
+    </message>
+    <message>
+        <source>Each layout keeps its own A/B/X/Y colours: Xbox uses the ABXY zone, Switch uses the BAYX zone. The same layout switch is on the controller (hold the gear button).</source>
+        <translation>Each layout keeps its own A/B/X/Y colours: Xbox uses the ABXY zone, Switch uses the BAYX zone. The same layout switch is on the controller (hold the gear button).</translation>
+    </message>
+    <message>
+        <source>Each press of the activation button turns the gyro on or off.</source>
+        <translation>Each press of the activation button turns the gyro on or off.</translation>
+    </message>
+    <message>
+        <source>Effect</source>
+        <translation>Effect</translation>
+    </message>
+    <message>
+        <source>Factory defaults restored (backup saved first)</source>
+        <translation>Factory defaults restored (backup saved first)</translation>
+    </message>
+    <message>
+        <source>Factory defaults: original colours and effect, Xbox layout, every button back to itself (C1/C2 = View, C3/C4 = Menu, T3 = Capture), all macros cleared, controller gyro off, vibration 75 %. A full backup is saved to ~/.local/share/t3pro first. Sticks and triggers are not touched; for those use the controller's own reset (hold View + Menu + M until the logo blinks).</source>
+        <translation>Factory defaults: original colours and effect, Xbox layout, every button back to itself (C1/C2 = View, C3/C4 = Menu, T3 = Capture), all macros cleared, controller gyro off, vibration 75 %. A full backup is saved to ~/.local/share/t3pro first. Sticks and triggers are not touched; for those use the controller's own reset (hold View + Menu + M until the logo blinks).</translation>
+    </message>
+    <message>
+        <source>Firmware</source>
+        <translation>Firmware</translation>
+    </message>
+    <message>
+        <source>Game rumble gain (t3pro-bridge)</source>
+        <translation>Game rumble gain (t3pro-bridge)</translation>
+    </message>
+    <message>
+        <source>Green dot = button with a custom setting. HOME and M are reserved by the controller.</source>
+        <translation>Green dot = button with a custom setting. HOME and M are reserved by the controller.</translation>
+    </message>
+    <message>
+        <source>Gyro bridge (virtual DualShock 4)</source>
+        <translation>Gyro bridge (virtual DualShock 4)</translation>
+    </message>
+    <message>
+        <source>Gyro settings saved</source>
+        <translation>Gyro settings saved</translation>
+    </message>
+    <message>
+        <source>HOME + button shortcuts</source>
+        <translation>HOME + button shortcuts</translation>
+    </message>
+    <message>
+        <source>HOME + button shortcuts and the rumble gain belong to the bridge and are kept.</source>
+        <translation>HOME + button shortcuts and the rumble gain belong to the bridge and are kept.</translation>
+    </message>
+    <message>
+        <source>Hold HOME and press the button. HOME alone still opens Steam. Run by the t3pro-bridge service; changes apply within a second.</source>
+        <translation>Hold HOME and press the button. HOME alone still opens Steam. Run by the t3pro-bridge service; changes apply within a second.</translation>
+    </message>
+    <message>
+        <source>Horizontal sensitivity</source>
+        <translation>Horizontal sensitivity</translation>
+    </message>
+    <message>
+        <source>How it plays</source>
+        <translation>How it plays</translation>
+    </message>
+    <message>
+        <source>Invert horizontal</source>
+        <translation>Invert horizontal</translation>
+    </message>
+    <message>
+        <source>Invert vertical</source>
+        <translation>Invert vertical</translation>
+    </message>
+    <message>
+        <source>L4 / R4, C1–C4 and T1–T3 are on the back of the controller</source>
+        <translation>L4 / R4, C1–C4 and T1–T3 are on the back of the controller</translation>
+    </message>
+    <message>
+        <source>LED %1</source>
+        <translation>LED %1</translation>
+    </message>
+    <message>
+        <source>Left click</source>
+        <translation>Left click</translation>
+    </message>
+    <message>
+        <source>Lights saved</source>
+        <translation>Lights saved</translation>
+    </message>
+    <message>
+        <source>Macro button</source>
+        <translation>Macro button</translation>
+    </message>
+    <message>
+        <source>Macro cleared</source>
+        <translation>Macro cleared</translation>
+    </message>
+    <message>
+        <source>Macro on %1 (stored in the controller)</source>
+        <translation>Macro on %1 (stored in the controller)</translation>
+    </message>
+    <message>
+        <source>Macro read back with a different number of steps</source>
+        <translation>Macro read back with a different number of steps</translation>
+    </message>
+    <message>
+        <source>Macro saved</source>
+        <translation>Macro saved</translation>
+    </message>
+    <message>
+        <source>Media keys.</source>
+        <translation>Media keys.</translation>
+    </message>
+    <message>
+        <source>Mic mute</source>
+        <translation>Mic mute</translation>
+    </message>
+    <message>
+        <source>Middle click</source>
+        <translation>Middle click</translation>
+    </message>
+    <message>
+        <source>Mode</source>
+        <translation>Mode</translation>
+    </message>
+    <message>
+        <source>Model</source>
+        <translation>Model</translation>
+    </message>
+    <message>
+        <source>Motor level (stored in the pad)</source>
+        <translation>Motor level (stored in the pad)</translation>
+    </message>
+    <message>
+        <source>Mouse buttons and/or the wheel.</source>
+        <translation>Mouse buttons and/or the wheel.</translation>
+    </message>
+    <message>
+        <source>Mute</source>
+        <translation>Mute</translation>
+    </message>
+    <message>
+        <source>Next</source>
+        <translation>Next</translation>
+    </message>
+    <message>
+        <source>None</source>
+        <translation>None</translation>
+    </message>
+    <message>
+        <source>Nothing</source>
+        <translation>Nothing</translation>
+    </message>
+    <message>
+        <source>On/off with a button</source>
+        <translation>On/off with a button</translation>
+    </message>
+    <message>
+        <source>Once per press</source>
+        <translation>Once per press</translation>
+    </message>
+    <message>
+        <source>Only the back buttons (L4, R4, C1–C4, T1–T3) can hold a macro. Green dot = macro saved.</source>
+        <translation>Only the back buttons (L4, R4, C1–C4, T1–T3) can hold a macro. Green dot = macro saved.</translation>
+    </message>
+    <message>
+        <source>Original colours restored</source>
+        <translation>Original colours restored</translation>
+    </message>
+    <message>
+        <source>Original colours: Xbox-style A/B/X/Y (green, red, blue, yellow), white buttons in the Switch layout, white HOME, blue bar, Phantom effect.</source>
+        <translation>Original colours: Xbox-style A/B/X/Y (green, red, blue, yellow), white buttons in the Switch layout, white HOME, blue bar, Phantom effect.</translation>
+    </message>
+    <message>
+        <source>Per step: buttons or keys, then hold ms and wait ms. Keys use Linux names, e.g. LEFTCTRL+2, F12, LEFTALT+TAB.</source>
+        <translation>Per step: buttons or keys, then hold ms and wait ms. Keys use Linux names, e.g. LEFTCTRL+2, F12, LEFTALT+TAB.</translation>
+    </message>
+    <message>
+        <source>Phantom</source>
+        <translation>Phantom</translation>
+    </message>
+    <message>
+        <source>Pick a button</source>
+        <translation>Pick a button</translation>
+    </message>
+    <message>
+        <source>Pick modifiers (Ctrl, Shift, Alt, Win) plus up to 3 keys.</source>
+        <translation>Pick modifiers (Ctrl, Shift, Alt, Win) plus up to 3 keys.</translation>
+    </message>
+    <message>
+        <source>Pick up to %1 buttons pressed together.</source>
+        <translation>Pick up to %1 buttons pressed together.</translation>
+    </message>
+    <message>
+        <source>Play/Pause</source>
+        <translation>Play/Pause</translation>
+    </message>
+    <message>
+        <source>Previous</source>
+        <translation>Previous</translation>
+    </message>
+    <message>
+        <source>Radar</source>
+        <translation>Radar</translation>
+    </message>
+    <message>
+        <source>Read again from the controller</source>
+        <translation>Read again from the controller</translation>
+    </message>
+    <message>
+        <source>Recording… press the sequence on the controller (real timings are kept). Press HOME or Stop to finish. Nothing is saved until you press Save.</source>
+        <translation>Recording… press the sequence on the controller (real timings are kept). Press HOME or Stop to finish. Nothing is saved until you press Save.</translation>
+    </message>
+    <message>
+        <source>Repeat, cycle every</source>
+        <translation>Repeat, cycle every</translation>
+    </message>
+    <message>
+        <source>Response</source>
+        <translation>Response</translation>
+    </message>
+    <message>
+        <source>Restore</source>
+        <translation>Restore</translation>
+    </message>
+    <message>
+        <source>Restore factory defaults</source>
+        <translation>Restore factory defaults</translation>
+    </message>
+    <message>
+        <source>Restore original colours</source>
+        <translation>Restore original colours</translation>
+    </message>
+    <message>
+        <source>Right click</source>
+        <translation>Right click</translation>
+    </message>
+    <message>
+        <source>Save HOME+%1</source>
+        <translation>Save HOME+%1</translation>
+    </message>
+    <message>
+        <source>Save gyro settings</source>
+        <translation>Save gyro settings</translation>
+    </message>
+    <message>
+        <source>Save to %1</source>
+        <translation>Save to %1</translation>
+    </message>
+    <message>
+        <source>Saving a macro replaces the button's own mapping. Clearing it maps the button back to itself.</source>
+        <translation>Saving a macro replaces the button's own mapping. Clearing it maps the button back to itself.</translation>
+    </message>
+    <message>
+        <source>Saving a remap on this button removes its macro.</source>
+        <translation>Saving a remap on this button removes its macro.</translation>
+    </message>
+    <message>
+        <source>Saving…</source>
+        <translation>Saving…</translation>
+    </message>
+    <message>
+        <source>Sends</source>
+        <translation>Sends</translation>
+    </message>
+    <message>
+        <source>Shortcut removed</source>
+        <translation>Shortcut removed</translation>
+    </message>
+    <message>
+        <source>Shortcut saved</source>
+        <translation>Shortcut saved</translation>
+    </message>
+    <message>
+        <source>Solid</source>
+        <translation>Solid</translation>
+    </message>
+    <message>
+        <source>Step %1 sends:</source>
+        <translation>Step %1 sends:</translation>
+    </message>
+    <message>
+        <source>Stop recording</source>
+        <translation>Stop recording</translation>
+    </message>
+    <message>
+        <source>Streamer</source>
+        <translation>Streamer</translation>
+    </message>
+    <message>
+        <source>Switch layout (BAYX)</source>
+        <translation>Switch layout (BAYX)</translation>
+    </message>
+    <message>
+        <source>Tarantula Pro not found. Plug its 2.4 GHz dongle in and switch the pad to XInput mode.</source>
+        <translation>Tarantula Pro not found. Plug its 2.4 GHz dongle in and switch the pad to XInput mode.</translation>
+    </message>
+    <message>
+        <source>Tarantula Pro not found. Plug its dongle in (XInput mode).</source>
+        <translation>Tarantula Pro not found. Plug its dongle in (XInput mode).</translation>
+    </message>
+    <message>
+        <source>Test rumble</source>
+        <translation>Test rumble</translation>
+    </message>
+    <message>
+        <source>The bar shows its own colour only in Solid mode; animated effects draw their own colours there.</source>
+        <translation>The bar shows its own colour only in Solid mode; animated effects draw their own colours there.</translation>
+    </message>
+    <message>
+        <source>The controller does not use the gyro by itself.</source>
+        <translation>The controller does not use the gyro by itself.</translation>
+    </message>
+    <message>
+        <source>The gyro bridge already gives Steam the raw gyro. If Steam gyro is also on, both will move the camera — use one or the other.</source>
+        <translation>The gyro bridge already gives Steam the raw gyro. If Steam gyro is also on, both will move the camera — use one or the other.</translation>
+    </message>
+    <message>
+        <source>The gyro is always active.</source>
+        <translation>The gyro is always active.</translation>
+    </message>
+    <message>
+        <source>The gyro works only while the activation button is held.</source>
+        <translation>The gyro works only while the activation button is held.</translation>
+    </message>
+    <message>
+        <source>The motors have 5 levels (0, 25, 50, 75, 100 %). Applies everywhere, also without the bridge.</source>
+        <translation>The motors have 5 levels (0, 25, 50, 75, 100 %). Applies everywhere, also without the bridge.</translation>
+    </message>
+    <message>
+        <source>The pad kept a different vibration level</source>
+        <translation>The pad kept a different vibration level</translation>
+    </message>
+    <message>
+        <source>The pad kept different light settings</source>
+        <translation>The pad kept different light settings</translation>
+    </message>
+    <message>
+        <source>The pad stored a different colour</source>
+        <translation>The pad stored a different colour</translation>
+    </message>
+    <message>
+        <source>The t3pro-bridge service is not running, so these shortcuts are inactive.</source>
+        <translation>The t3pro-bridge service is not running, so these shortcuts are inactive.</translation>
+    </message>
+    <message>
+        <source>Tilt (steering)</source>
+        <translation>Tilt (steering)</translation>
+    </message>
+    <message>
+        <source>Tilt range</source>
+        <translation>Tilt range</translation>
+    </message>
+    <message>
+        <source>Toggle: one press holds it down, the next releases it</source>
+        <translation>Toggle: one press holds it down, the next releases it</translation>
+    </message>
+    <message>
+        <source>Turbo</source>
+        <translation>Turbo</translation>
+    </message>
+    <message>
+        <source>Vertical sensitivity</source>
+        <translation>Vertical sensitivity</translation>
+    </message>
+    <message>
+        <source>Vibration level saved</source>
+        <translation>Vibration level saved</translation>
+    </message>
+    <message>
+        <source>Volume +</source>
+        <translation>Volume +</translation>
+    </message>
+    <message>
+        <source>Volume −</source>
+        <translation>Volume −</translation>
+    </message>
+    <message>
+        <source>Wheel down</source>
+        <translation>Wheel down</translation>
+    </message>
+    <message>
+        <source>Wheel up</source>
+        <translation>Wheel up</translation>
+    </message>
+    <message>
+        <source>While held</source>
+        <translation>While held</translation>
+    </message>
+    <message>
+        <source>While holding a button</source>
+        <translation>While holding a button</translation>
+    </message>
+    <message>
+        <source>Zones</source>
+        <translation>Zones</translation>
+    </message>
+    <message>
+        <source>all LEDs</source>
+        <translation>all LEDs</translation>
+    </message>
+    <message>
+        <source>hold</source>
+        <translation>hold</translation>
+    </message>
+    <message>
+        <source>name (optional)</source>
+        <translation>name (optional)</translation>
+    </message>
+    <message>
+        <source>running</source>
+        <translation>running</translation>
+    </message>
+    <message>
+        <source>stopped</source>
+        <translation>stopped</translation>
+    </message>
+    <message>
+        <source>toggle</source>
+        <translation>toggle</translation>
+    </message>
+    <message>
+        <source>wait</source>
+        <translation>wait</translation>
+    </message>
+    <message>
+        <source>● Record on the controller</source>
+        <translation>● Record on the controller</translation>
+    </message>
 </context>
 </TS>

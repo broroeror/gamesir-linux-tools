@@ -66,6 +66,115 @@ LIGHT_MODES = {'off': 0, 'solid': 1, 'breathing': 2, 'phantom': 3,
 LIGHT_ZONES = (0x00, 0x04, 0x05, 0x06)
 
 TRIGGER = {'off': 0, 'oneshot': 1, 'hold': 2, 'always': 3}
+MAP_KEYBOARD, MAP_MOUSE, MAP_MEDIA = 2, 3, 4
+
+# Keyboard / mouse / media outputs, as GameSir Connect encodes them (main.js):
+#  keyboard: codes = [modifier bits, usage1, usage2, usage3]  (HID usage ids)
+#  mouse:    codes = [0, 0, wheel (1 up, 255 down, 128 both), button bits]
+#  media:    codes = [0, 0, 0, media bits]
+KB_MODS = ['LCTRL', 'LSHIFT', 'LALT', 'LWIN', 'RCTRL', 'RSHIFT', 'RALT', 'RWIN']
+KB_KEYS = {
+    'ESC': 41, 'F1': 58, 'F2': 59, 'F3': 60, 'F4': 61, 'F5': 62, 'F6': 63, 'F7': 64, 'F8': 65,
+    'F9': 66, 'F10': 67, 'F11': 68, 'F12': 69, 'GRAVE': 53,
+    '1': 30, '2': 31, '3': 32, '4': 33, '5': 34, '6': 35, '7': 36, '8': 37, '9': 38, '0': 39,
+    'MINUS': 45, 'EQUAL': 46, 'BACKSPACE': 42, 'TAB': 43,
+    'Q': 20, 'W': 26, 'E': 8, 'R': 21, 'T': 23, 'Y': 28, 'U': 24, 'I': 12, 'O': 18, 'P': 19,
+    'LEFTBRACE': 47, 'RIGHTBRACE': 48, 'BACKSLASH': 49, 'CAPSLOCK': 57,
+    'A': 4, 'S': 22, 'D': 7, 'F': 9, 'G': 10, 'H': 11, 'J': 13, 'K': 14, 'L': 15,
+    'SEMICOLON': 51, 'APOSTROPHE': 52, 'ENTER': 40,
+    'Z': 29, 'X': 27, 'C': 6, 'V': 25, 'B': 5, 'N': 17, 'M': 16,
+    'COMMA': 54, 'DOT': 55, 'SLASH': 56, 'SPACE': 44,
+    'INSERT': 73, 'HOME': 74, 'PAGEUP': 75, 'DELETE': 76, 'END': 77, 'PAGEDOWN': 78,
+    'UP': 82, 'DOWN': 81, 'LEFT': 80, 'RIGHT': 79, 'PRINT': 70,
+    'NUMLOCK': 83, 'KPSLASH': 84, 'KPASTERISK': 85, 'KPMINUS': 86, 'KPPLUS': 87, 'KPDOT': 99,
+    'KPENTER': 88, 'KP0': 98, 'KP1': 89, 'KP2': 90, 'KP3': 91, 'KP4': 92, 'KP5': 93,
+    'KP6': 94, 'KP7': 95, 'KP8': 96, 'KP9': 97,
+}
+KB_NAMES = {v: k for k, v in KB_KEYS.items()}
+MOUSE_BUTTONS = ['LEFT', 'RIGHT', 'MIDDLE', 'BACK', 'FORWARD']   # bits 0-4 (app: 5 then 4)
+MOUSE_WHEEL = {'WHEEL_UP': 1, 'WHEEL_DOWN': 255}
+MEDIA_KEYS = ['MUTE', 'VOLDOWN', 'VOLUP', 'MICMUTE', 'PLAY', 'PREV', 'STOP', 'NEXT']
+
+
+def encode_output(kind, names):
+    """-> (mappingType, codes) for a remap target or a macro step.
+    kind: 'pad' (up to 4 pad buttons), 'kb' (modifiers + up to 3 keys),
+    'mouse' (buttons and/or wheel), 'media'."""
+    names = [n.upper() for n in names if n]
+    if kind == 'pad':
+        return MAP_JOYSTICK, [KEYS[n] for n in names][:4]
+    if kind == 'kb':
+        mods, keys = 0, []
+        for n in names:
+            if n in KB_MODS:
+                mods |= 1 << KB_MODS.index(n)
+            elif n in KB_KEYS and len(keys) < 3:
+                keys.append(KB_KEYS[n])
+            else:
+                raise ProtocolError(f'unknown or extra keyboard key {n!r}')
+        return MAP_KEYBOARD, [mods] + keys
+    if kind == 'mouse':
+        bits, up, down = 0, False, False
+        for n in names:
+            if n in MOUSE_BUTTONS:
+                bits |= 1 << MOUSE_BUTTONS.index(n)
+            elif n == 'WHEEL_UP':
+                up = True
+            elif n == 'WHEEL_DOWN':
+                down = True
+            else:
+                raise ProtocolError(f'unknown mouse output {n!r}')
+        wheel = 128 if up and down else 1 if up else 255 if down else 0
+        return MAP_MOUSE, [0, 0, wheel, bits]
+    if kind == 'media':
+        bits = 0
+        for n in names:
+            if n not in MEDIA_KEYS:
+                raise ProtocolError(f'unknown media key {n!r}')
+            bits |= 1 << MEDIA_KEYS.index(n)
+        return MAP_MEDIA, [0, 0, 0, bits]
+    raise ProtocolError(f'unknown output kind {kind!r}')
+
+
+def decode_output(mapping_type, codes):
+    """Inverse of encode_output -> (kind, names)."""
+    c = list(codes) + [0, 0, 0, 0]
+    if mapping_type == MAP_KEYBOARD:
+        names = [m for i, m in enumerate(KB_MODS) if c[0] >> i & 1]
+        names += [KB_NAMES.get(k, str(k)) for k in c[1:4] if k]
+        return 'kb', names
+    if mapping_type == MAP_MOUSE:
+        names = [b for i, b in enumerate(MOUSE_BUTTONS) if c[3] >> i & 1]
+        names += {1: ['WHEEL_UP'], 255: ['WHEEL_DOWN'], 128: ['WHEEL_UP', 'WHEEL_DOWN']}.get(c[2], [])
+        return 'mouse', names
+    if mapping_type == MAP_MEDIA:
+        return 'media', [m for i, m in enumerate(MEDIA_KEYS) if c[3] >> i & 1]
+    if mapping_type == MAP_JOYSTICK:
+        return 'pad', [KEY_NAMES.get(k, str(k)) for k in codes]
+    return 'none', []
+TURBO_OFF, TURBO_A, TURBO_B, TURBO_C = 0, 1, 2, 3
+ZONE_HOME, ZONE_BAR, ZONE_ABXY, ZONE_BAYX = 0x00, 0x04, 0x05, 0x06
+
+
+def deg_to_wire(h):
+    """GameSir Connect works in degrees; the wire carries hue 0-255."""
+    return round((h % 360) * 255 / 360)
+
+
+# GameSir Connect's default "T3Pro 1" profile (main.js), used for the factory reset.
+DEFAULT_LIGHT = {'brightness': 50, 'speed': 50, 'mode': 3}
+DEFAULT_COLORS = {                    # (hue deg, sat %, val %)
+    ZONE_ABXY: [(120, 100, 6), (0, 100, 6), (240, 100, 6), (59, 100, 6)],   # A B X Y, Xbox colours
+    ZONE_BAYX: [(0, 0, 6)] * 4,                                              # Switch layout: white
+    ZONE_HOME: [(0, 0, 100)],
+    ZONE_BAR: [(240, 100, 50)],
+}
+DEFAULT_REMAP = {'C1': 'VIEW', 'C2': 'VIEW', 'C3': 'MENU', 'C4': 'MENU', 'T3': 'CAMERA'}
+DEFAULT_VIBRATION = (75, 75)          # app "motor 3" of 0-4
+DEFAULT_MOTION = {'angle': 40, 'range': 40, 'output': 0, 'kind': 0, 'axes': 0, 'key': 0,
+                  'activation': 0, 'sens_x': 50, 'sens_y': 50, 'invert_x': 0, 'invert_y': 0,
+                  'ratio': 50, 'deadzone': 0, 'anti_deadzone': 0, 'curve': [30, 30, 50, 50, 70, 70],
+                  'end_deadzone': 100, 'end_anti_deadzone': 100, 'curve_type': 0, 'curvature': 100}
 MAP_VACANT, MAP_JOYSTICK = 0, 1
 
 # (GRP, OP) pairs observed from the official app. Nothing else is sent.
@@ -248,6 +357,35 @@ class Tarantula:
     def save(self):
         self.request(0x08, 0x03)
 
+    def set_default_colors(self):
+        for zone, leds in DEFAULT_COLORS.items():
+            wire = [(deg_to_wire(h), sat, v) for h, sat, v in leds]
+            wire += [(0, 0, 0)] * (4 - len(wire))
+            self.set_light_color(zone, wire)
+
+    def factory_defaults(self, log=lambda m: None):
+        """Write GameSir Connect's default profile: lights, colours, Xbox layout,
+        every button back to itself (plus the default C/T remaps), macros
+        cleared, gyro mapping off, vibration 75 %. Sticks/triggers are not
+        touched (their write commands were never captured); the pad's own
+        View+Menu+M reset covers those."""
+        log('lights')
+        self.set_light_param(**DEFAULT_LIGHT)
+        self.set_default_colors()
+        self.set_layout(1)
+        log('buttons')
+        for k in APP_KEYS:
+            if k in MACRO_KEYS:
+                self.request(0x01, 0x01, bytes([KEYS[k], 0xFF]) + bytes(14))
+            self.set_key_mapping(k, [DEFAULT_REMAP.get(k, k)])
+            time.sleep(0.01)
+        log('motion')
+        cur = self.get_motion()
+        self.set_motion(dict(cur, **DEFAULT_MOTION, key=KEYS['B']))
+        log('vibration')
+        self.set_vibrate_level(*DEFAULT_VIBRATION)
+        self.save()
+
     def set_light_param(self, brightness, speed, mode):
         self.request(0x07, 0x01, bytes([brightness, speed, mode]))
 
@@ -257,13 +395,48 @@ class Tarantula:
         self.request(0x07, 0x03, payload)
 
     @staticmethod
-    def mapping_body(key, mapping_type, codes, turbo_times=1):
+    def mapping_body(key, mapping_type, codes, toggle=False, turbo=0):
         """16-byte key-mapping body as on the wire:
-        page, trigger, colour[4], key, toggle, turboMode, turboTimes,
-        mappingType, count, codes[4]."""
+        page, trigger, colour[3], key, toggle, turboMode, turboTimes,
+        mappingType, count, codes[4].
+
+        Turbo follows GameSir Connect (main.js key model): turbo is a rate in
+        Hz; above 1 it is stored as turboTimes with turboMode A (<12), B (12-19)
+        or C (>=20). The pad's FAQ names 8 / 12 / 20 Hz. Off is mode 0, times 1."""
         codes = tuple(codes)[:4]
-        return bytes([0, 0, 0, 0, 0, 0, key, 0, 0, turbo_times if codes else 0,
+        if turbo and turbo > 1:
+            times = int(turbo)
+            mode = TURBO_C if times >= 20 else TURBO_B if times >= 12 else TURBO_A
+        else:
+            times, mode = 1, TURBO_OFF
+        return bytes([0, 0, 0, 0, 0, 0, key, 1 if toggle else 0, mode, times,
                       mapping_type, len(codes)]) + bytes(codes) + bytes(4 - len(codes))
+
+    @staticmethod
+    def parse_mapping(body):
+        b = bytes(body) + bytes(16)
+        n = min(b[11], 4)
+        return {'key': b[6], 'toggle': bool(b[7]),
+                'turbo': 0 if b[8] == TURBO_OFF else b[9],
+                'type': b[10], 'codes': list(b[12:12 + n])}
+
+    def set_key_mapping(self, key, names, toggle=False, turbo=0, kind='pad'):
+        """Remap `key` to pad buttons (up to 4 together), keyboard keys, mouse
+        or media output. Empty pad list = the key itself (default)."""
+        k = KEYS[key] if isinstance(key, str) else key
+        if kind == 'pad' and not names:
+            names = [KEY_NAMES[k]]
+        mtype, codes = encode_output(kind, names)
+        self.set_key_mapping_raw(self.mapping_body(k, mtype, codes, toggle, turbo))
+
+    def get_remap(self, key):
+        m = self.parse_mapping(self.get_key_mapping(key))
+        raw = bytes(self.get_key_mapping(key) + bytes(16))
+        n = min(raw[11], 4)
+        kind, names = decode_output(m['type'], list(raw[12:12 + n]) if m['type'] == MAP_JOYSTICK
+                                    else list(raw[12:16]))
+        return {'kind': kind, 'names': names, 'toggle': m['toggle'], 'turbo': m['turbo'],
+                'vacant': m['type'] == MAP_VACANT}
 
     def clear_macro(self, key):
         """Drop the macro and map the key back to itself (its default)."""
@@ -276,11 +449,13 @@ class Tarantula:
         self.request(0x05, 0x01, raw)
 
     def set_macro(self, key, steps, hold_to_trigger=False, loop=False, loop_time_ms=0):
-        """steps: list of (button, start_ms, end_ms). Mirrors the app: first a
-        Clear step, then each step with absolute start/end. Despite the SDK's
-        "In10MS" field names the T3Pro takes MILLISECONDS (the app passes no
-        timeScale for it; hardware-verified: 0-300 / 900-1200 played as A 300 ms,
-        600 ms gap, B 300 ms)."""
+        """steps: list of (buttons, start_ms, end_ms); `buttons` is one name or a
+        list of up to 4 pressed together. Mirrors the app: map the key Vacant,
+        send a Clear step, then each step with absolute start/end. Despite the
+        SDK's "In10MS" field names the T3Pro takes MILLISECONDS (hardware-verified:
+        0-300 / 900-1200 played as A 300 ms, 600 ms gap, B 300 ms).
+        hold_to_trigger: plays while the key is held (else once per press);
+        loop: repeats with a cycle of loop_time_ms."""
         k = KEYS[key]
         if key not in MACRO_KEYS:
             raise ProtocolError(f'{key} cannot hold a macro (allowed: {", ".join(MACRO_KEYS)})')
@@ -289,14 +464,79 @@ class Tarantula:
         # A key runs its macro only when its mapping is Vacant (main.js Ie()).
         self.set_key_mapping_raw(self.mapping_body(k, MAP_VACANT, ()))
         self.request(0x01, 0x01, bytes([k, 0xFF]) + bytes(14))
-        lt = loop_time_ms
+        lt = max(0, min(0xFFFF, int(loop_time_ms)))
         trig = TRIGGER['hold'] if hold_to_trigger else TRIGGER['oneshot']
-        for i, (btn, start, end) in enumerate(steps):
-            s, e = start, end
+        for i, step in enumerate(steps):
+            if len(step) == 4:              # (kind, names, start, end)
+                kind, btns, start, end = step
+            else:                           # (buttons, start, end)
+                btns, start, end = step
+                kind = 'pad'
+            if isinstance(btns, str):
+                btns = [btns]
+            mtype, codes = encode_output(kind, btns)
+            s, e = int(start), int(end)
             body = bytes([k, i, trig, 1 if loop else 0, lt >> 8, lt & 0xFF,
-                          MAP_JOYSTICK, 1, KEYS[btn], 0, 0, 0,
-                          s >> 8, s & 0xFF, e >> 8, e & 0xFF])
+                          mtype, len(codes)]) + bytes(codes) + bytes(4 - len(codes)) + \
+                bytes([s >> 8, s & 0xFF, e >> 8, e & 0xFF])
             self.request(0x01, 0x01, body)
+
+    def get_macro(self, key):
+        """-> {'steps': [(kind, names, start, end)], 'hold': bool, 'loop': bool, 'loop_time': ms}"""
+        steps, hold, loop, lt = [], False, False, 0
+        for i in range(MACRO_MAX_STEPS):
+            s = self.get_macro_step(key, i)
+            if len(s) < 16 or s[6] == MAP_VACANT:
+                break
+            n = min(s[7], 4) or 1
+            kind, names = decode_output(s[6], list(s[8:8 + n]) if s[6] == MAP_JOYSTICK
+                                        else list(s[8:12]))
+            steps.append((kind, names, s[12] << 8 | s[13], s[14] << 8 | s[15]))
+            if i == 0:
+                hold, loop, lt = s[2] == TRIGGER['hold'], bool(s[3]), s[4] << 8 | s[5]
+        return {'steps': steps, 'hold': hold, 'loop': loop, 'loop_time': lt}
+
+    # ---- motion (gyro handled on the pad) --------------------------------
+    MOTION_FIELDS = ('angle', 'range', 'output', 'kind', 'axes', 'key', 'activation',
+                     'sens_x', 'sens_y', 'invert_x', 'invert_y')
+
+    def get_motion(self):
+        """Mapping + curve as GameSir Connect's motion page shows them.
+        output: 0 off, 1 left stick, 2 right stick, 3 keys, 4 mouse.
+        kind: 0 aim, 1 tilt. axes: 0 yaw, 1 roll, 2 combined.
+        activation: 0 off, 1 while the button is held, 2 toggle, 3 always."""
+        m = self.get_motion_mapping() + bytes(11)
+        out = dict(zip(self.MOTION_FIELDS, m[:11]))
+        c = self.request(0x04, 0x02) + bytes(19)
+        p = c[7:17]
+        out.update({'ratio': c[6], 'deadzone': p[0], 'anti_deadzone': p[1],
+                    'curve': [p[2], p[3], p[4], p[5], p[6], p[7]],
+                    'end_deadzone': p[8], 'end_anti_deadzone': p[9],
+                    'curve_type': c[17], 'curvature': c[18], '_curve_raw': bytes(c[:19])})
+        return out
+
+    def set_motion(self, m):
+        mapping = bytes(max(0, min(255, int(m[k]))) for k in self.MOTION_FIELDS)
+        raw = bytearray(m.get('_curve_raw') or bytes(19))
+        raw[6] = int(m['ratio'])
+        pts = [m['deadzone'], m['anti_deadzone']] + list(m['curve']) + \
+            [m['end_deadzone'], m['end_anti_deadzone']]
+        raw[7:17] = bytes(max(0, min(100, int(v))) for v in pts)
+        raw[17], raw[18] = int(m['curve_type']), int(m['curvature'])
+        # same order as the app: curve first, then mapping
+        self.request(0x04, 0x01, bytes(raw))
+        self.request(0x04, 0x03, mapping)
+
+    # ---- d-pad / face-button layout ----------------------------------------
+    def get_layout(self):
+        """1 = Xbox (ABXY), 2 = Switch (BAYX) face-button layout."""
+        return self.get_dpad_param()[2]
+
+    def set_layout(self, layout):
+        cur = bytearray(self.get_dpad_param() + bytes(6))[:6]
+        cur[2] = 2 if layout == 2 else 1
+        cur[5] = 0                      # never leave on-pad macro record mode on
+        self.request(0x09, 0x01, bytes(cur))
 
     def set_gamepad_state_report(self, mode):
         """0 off, 1 original, 2 mapped: streams 06 1a 0a 03 state reports."""

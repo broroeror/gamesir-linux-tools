@@ -48,7 +48,7 @@ Window {
           .concat(bridge.lightingStyle !== "none" ? ["Lights"] : [])
           .concat(bridge.hasMacros ? ["Macros"] : [])
     readonly property var mouseTabs: ["Buttons", "DPI", "Macros"]
-    readonly property var t3Tabs: ["Lights", "Macros", "Vibration"]
+    readonly property var t3Tabs: ["Lights", "Rebinds", "Macros", "Motion", "Vibration", "Device"]
     readonly property var tabs: activeDevice === "mouse" ? mouseTabs
                               : activeDevice === "t3pro" ? t3Tabs : controllerTabs
     readonly property var tabLabels: ({
@@ -614,7 +614,7 @@ Window {
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
                         visible: t3.present && t3.firmware.length > 0
-                        text: "fw " + t3.firmware + (t3.bridgeRunning ? " · gyro bridge on" : "")
+                        text: "fw " + t3.firmware + (t3.bridgeRunning ? qsTranslate("UI", " · gyro bridge on") : "")
                         color: Theme.textDim
                         font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
                     }
@@ -920,8 +920,11 @@ Window {
               anchors.fill: parent
               visible: win.activeDevice === "t3pro"
               T3LightsPage { anchors.fill: parent; visible: win.currentTab === 0 }
-              T3MacrosPage { anchors.fill: parent; visible: win.currentTab === 1 }
-              T3VibrationPage { anchors.fill: parent; visible: win.currentTab === 2 }
+              T3RemapPage { anchors.fill: parent; visible: win.currentTab === 1 }
+              T3MacrosPage { anchors.fill: parent; visible: win.currentTab === 2 }
+              T3MotionPage { anchors.fill: parent; visible: win.currentTab === 3 }
+              T3VibrationPage { anchors.fill: parent; visible: win.currentTab === 4 }
+              T3DevicePage { anchors.fill: parent; visible: win.currentTab === 5 }
           }
 
           Item {                                    // ---- mouse content ----

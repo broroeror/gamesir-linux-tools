@@ -64,6 +64,32 @@ in ISP mode) or anything not in this table.
 B 0, A 1, Y 2, X 3, LB 4, LT 5, L3 6, RB 7, RT 8, R3 9, View 10, Menu 11, D-pad 12-15,
 stick directions 16-31, gyro 32-35, L4 36, R4 37, T1-T3 38-40, C1-C4 41-44, Camera 45.
 
+### Remap outputs (key mapping and macro steps)
+`mappingType` 1 = pad buttons (codes = up to 4 key ids), 2 = keyboard
+(`[modifier bits, usage1, usage2, usage3]`, HID usage ids; bits LCtrl LShift
+LAlt LWin RCtrl RShift RAlt RWin), 3 = mouse (`[0, 0, wheel 1/255/128, button
+bits L R M Back Fwd]`), 4 = media (`[0, 0, 0, bits Mute VolDn VolUp MicMute
+Play Prev Stop Next]`); count = number of code bytes. Keyboard output was
+checked on hardware (L4 -> KEY_A on the dongle's keyboard interface).
+Turbo: `turboMode` 0 off (times 1), else times = Hz with mode A <12, B 12-19,
+C >= 20 (the pad's 8/12/20 Hz). `toggle` 1 = press-to-latch.
+
+### Motion (gyro handled by the pad)
+Mapping (`04 03`/`04 04`, 11 bytes): `angle, range, output (0 off, 1 left
+stick, 2 right stick, 3 keys, 4 mouse), kind (0 aim, 1 tilt), axes (0 yaw,
+1 roll, 2 combined), activation key, activation (0 off, 1 hold, 2 toggle,
+3 always), sensX, sensY, invertX, invertY`.
+Curve (`04 01`/`04 02`, 19 bytes): `page, key, trigger, h, s, v, ratio,
+deadzone, anti-deadzone, x1, y1, x2, y2, x3, y3, end-deadzone,
+end-anti-deadzone, curveType, curvature`.
+
+### Layout and defaults
+D-pad param byte 2 is the face-button layout: 1 Xbox (ABXY zone colours),
+2 Switch (BAYX zone). The vibration level has 5 steps (0/25/50/75/100).
+GameSir Connect's default profile (used by the factory reset): Phantom effect,
+brightness/speed 50, A/B/X/Y green/red/blue/yellow, BAYX white, HOME white,
+bar blue, C1/C2 = View, C3/C4 = Menu, T3 = Capture, gyro off, vibration 75 %.
+
 ### Macros
 - Only L4/R4/T1-T3/C1-C4 take a macro, up to 12 steps.
 - A key plays its macro only when its mapping is **Vacant**.
@@ -94,6 +120,8 @@ stick directions 16-31, gyro 32-35, L4 36, R4 37, T1-T3 38-40, C1-C4 41-44, Came
 Pad frame: x right, y toward the player, z up.
 
 ## Tools
+- `t3pro_gui.py` + `qml/App/T3*.qml`: the Deadband device tab (lights with
+  a live drawing, remaps, macros with recording, gyro, vibration, device/reset).
 - `tools/t3pro.py`: `info`, `backup`, `light`, `color`, `macro`, `vibration`,
   `rumble`. Every write is read back and compared.
 - `tools/t3pro_bridge.py`: turns the mapped state into a virtual DualShock 4 via

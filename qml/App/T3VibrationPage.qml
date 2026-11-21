@@ -42,7 +42,7 @@ Item {
                 Text { text: lSlider.value + "%"; color: Theme.text
                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
             }
-            AccentSlider { id: lSlider; width: parent.width; from: 0; to: 100; onMoved: lvlTimer.restart() }
+            AccentSlider { id: lSlider; width: parent.width; from: 0; to: 100; stepSize: 25; onMoved: lvlTimer.restart() }
             Row {
                 width: parent.width
                 Text { text: qsTranslate("UI", "Right grip"); color: Theme.textDim
@@ -51,10 +51,10 @@ Item {
                 Text { text: rSlider.value + "%"; color: Theme.text
                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontS }
             }
-            AccentSlider { id: rSlider; width: parent.width; from: 0; to: 100; onMoved: lvlTimer.restart() }
+            AccentSlider { id: rSlider; width: parent.width; from: 0; to: 100; stepSize: 25; onMoved: lvlTimer.restart() }
             Text {
                 width: parent.width; wrapMode: Text.WordWrap
-                text: qsTranslate("UI", "Applies everywhere, also without the bridge.")
+                text: qsTranslate("UI", "The motors have 5 levels (0, 25, 50, 75, 100 %). Applies everywhere, also without the bridge.")
                 color: Theme.textFaint; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
             }
         }

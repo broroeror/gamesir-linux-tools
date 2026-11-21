@@ -21,6 +21,18 @@ Item {
         seedPicker()
     }
     function zone() { return t3.zones.length > selZone ? t3.zones[selZone] : null }
+    // zones list order (t3pro_gui.ZONES): 0 = ABXY, 1 = Home, 2 = Bar, 3 = BAYX (Switch layout)
+    function pickFromDrawing(n) {
+        var face = ["A", "B", "X", "Y"].indexOf(n)
+        if (face >= 0) { selZone = t3.layout === 2 ? 3 : 0; selLed = face }
+        else if (n === "HOME") { selZone = 1; selLed = -1 }
+        else if (n === "BAR") { selZone = 2; selLed = -1 }
+        seedPicker()
+    }
+    function drawingSel() {
+        if ((selZone === 0 || selZone === 3) && selLed >= 0) return ["A", "B", "X", "Y"][selLed]
+        return selZone === 1 ? "HOME" : selZone === 2 ? "BAR" : ""
+    }
     function seedPicker() {
         var z = zone(); if (!z) return
         var l = z.leds[Math.max(0, selLed)]
@@ -77,6 +89,41 @@ Item {
                 ColumnLayout {
                     Layout.fillWidth: true; Layout.preferredWidth: 1; Layout.alignment: Qt.AlignTop
                     spacing: 12
+
+                    Card {
+                        title: qsTranslate("UI", "Controller"); Layout.fillWidth: true
+                        T3ControllerView {
+                            width: parent.width; height: width / aspect + topPad
+                            showBackHint: false
+                            selected: page.drawingSel()
+                            pickable: ["A", "B", "X", "Y", "HOME", "BAR"]
+                            onPicked: function (n) { page.pickFromDrawing(n) }
+                        }
+                        Text {
+                            width: parent.width; wrapMode: Text.WordWrap
+                            text: qsTranslate("UI", "Click A, B, X, Y, HOME or the light bar to change its colour.")
+                            color: Theme.textFaint; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                        }
+                        Row {
+                            spacing: 6
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: qsTranslate("UI", "Button layout") + "  "
+                                color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                            }
+                            PillButton { label: "Xbox (ABXY)"; highlight: t3.layout !== 2; onClicked: t3.setLayout(1) }
+                            PillButton { label: "Switch (BAYX)"; highlight: t3.layout === 2; onClicked: t3.setLayout(2) }
+                        }
+                        Text {
+                            width: parent.width; wrapMode: Text.WordWrap
+                            text: qsTranslate("UI", "Each layout keeps its own A/B/X/Y colours: Xbox uses the ABXY zone, Switch uses the BAYX zone. The same layout switch is on the controller (hold the gear button).")
+                            color: Theme.textFaint; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                        }
+                        ConfirmButton {
+                            label: qsTranslate("UI", "Restore original colours")
+                            onConfirmed: t3.restoreDefaultColors()
+                        }
+                    }
 
                     Card {
                         title: qsTranslate("UI", "Effect"); Layout.fillWidth: true
