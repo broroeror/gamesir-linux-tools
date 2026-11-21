@@ -45,10 +45,11 @@ HOLD_PASS = 0.4
 HOME_TAP = 0.08
 CONFIG = os.path.expanduser('~/.config/t3pro/bridge.json')
 MOUSE_NAMES = ('LEFT', 'RIGHT', 'MIDDLE', 'SIDE', 'EXTRA', 'WHEEL_UP', 'WHEEL_DOWN')
-# {"steam": "qam" | "menu"}: opens Steam's quick access / main menu. Run by the
+# {"steam": "qam" | "menu" | "keyboard"}: opens Steam's quick access / main menu,
+# or toggles its on-screen keyboard. Run by the
 # Tarantula Pro Decky plugin (inside Steam's UI, so it works whatever app has
 # keyboard focus); the bridge itself skips these steps.
-STEAM_ACTIONS = ('qam', 'menu')
+STEAM_ACTIONS = ('qam', 'menu', 'keyboard')
 
 
 def load_config(path=CONFIG):

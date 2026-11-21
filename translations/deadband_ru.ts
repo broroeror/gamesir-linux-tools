@@ -2968,8 +2968,8 @@ Deadband повторит попытку при выборе «Настроит�
         <translation>The button must stay mapped to itself on the controller (no pad macro or remap on it), otherwise the bridge never sees it. Best on a back button (L4, R4, C1–C4, T1–T3).</translation>
     </message>
     <message>
-        <source>Per step: what to press, then hold ms and wait ms. Controller: A B X Y LB RB LT RT L3 R3 VIEW MENU UP DOWN LEFT RIGHT HOME CAMERA. Keyboard: Linux names, e.g. LEFTCTRL+2, F12, LEFTALT+TAB. Mouse: LEFT RIGHT MIDDLE SIDE EXTRA WHEEL_UP WHEEL_DOWN. Steam: QAM (quick access menu) or MENU — needs the Tarantula Pro Decky plugin, works whatever app is in front (button alone only).</source>
-        <translation>Per step: what to press, then hold ms and wait ms. Controller: A B X Y LB RB LT RT L3 R3 VIEW MENU UP DOWN LEFT RIGHT HOME CAMERA. Keyboard: Linux names, e.g. LEFTCTRL+2, F12, LEFTALT+TAB. Mouse: LEFT RIGHT MIDDLE SIDE EXTRA WHEEL_UP WHEEL_DOWN. Steam: QAM (quick access menu) or MENU — needs the Tarantula Pro Decky plugin, works whatever app is in front (button alone only).</translation>
+        <source>Per step: what to press, then hold ms and wait ms. Controller: A B X Y LB RB LT RT L3 R3 VIEW MENU UP DOWN LEFT RIGHT HOME CAMERA. Keyboard: Linux names, e.g. LEFTCTRL+2, F12, LEFTALT+TAB. Mouse: LEFT RIGHT MIDDLE SIDE EXTRA WHEEL_UP WHEEL_DOWN. Steam: QAM (quick access menu), MENU or KEYBOARD (on-screen keyboard on/off) — needs the Tarantula Pro Decky plugin, works whatever app is in front (button alone only).</source>
+        <translation>Per step: what to press, then hold ms and wait ms. Controller: A B X Y LB RB LT RT L3 R3 VIEW MENU UP DOWN LEFT RIGHT HOME CAMERA. Keyboard: Linux names, e.g. LEFTCTRL+2, F12, LEFTALT+TAB. Mouse: LEFT RIGHT MIDDLE SIDE EXTRA WHEEL_UP WHEEL_DOWN. Steam: QAM (quick access menu), MENU or KEYBOARD (on-screen keyboard on/off) — needs the Tarantula Pro Decky plugin, works whatever app is in front (button alone only).</translation>
     </message>
     <message>
         <source>Save shortcut</source>
