@@ -21,11 +21,17 @@ Item {
     property bool mouseActive: false
     property string mouseName: "G502 X"
 
+    // Original Tarantula Pro (driven by T3ProBridge via Main).
+    property bool t3Present: false
+    property bool t3Active: false
+    property string t3Name: "Tarantula Pro"
+
     signal pickController(string id)
     signal pickMouse()
+    signal pickT3()
 
     readonly property bool multi: list.length > 1
-    readonly property bool canPick: multi || mousePresent   // dropdown worth opening?
+    readonly property bool canPick: multi || mousePresent || t3Present   // dropdown worth opening?
 
     // A user name wins over the model label. Names are keyed by USB PORT (identical
     // units are indistinguishable over USB — see Main's ctrlNames note).
@@ -35,7 +41,7 @@ Item {
         return (n && n.length) ? n : e.label
     }
 
-    visible: list.length > 0 || mousePresent
+    visible: list.length > 0 || mousePresent || t3Present
     implicitWidth: btn.width
     implicitHeight: btn.height
     onCanPickChanged: if (!canPick) menu.close()
@@ -69,7 +75,12 @@ Item {
                 text: "🖱"; font.pixelSize: 14; color: Theme.accent
             }
             ConnIcon {
-                visible: !root.mouseActive
+                visible: root.t3Active
+                anchors.verticalCenter: parent.verticalCenter
+                wired: false; live: true; tint: Theme.accent
+            }
+            ConnIcon {
+                visible: !root.mouseActive && !root.t3Active
                 anchors.verticalCenter: parent.verticalCenter
                 property var cur: root.entryFor(root.current)
                 wired: cur ? cur.wired : null
@@ -79,7 +90,8 @@ Item {
             Text {
                 id: txt
                 anchors.verticalCenter: parent.verticalCenter
-                text: root.mouseActive ? root.mouseName : root.labelFor(root.current)
+                text: root.mouseActive ? root.mouseName
+                    : root.t3Active ? root.t3Name : root.labelFor(root.current)
                 color: Theme.text
                 width: Math.min(implicitWidth, btn.width - btn.pad)
                 elide: Text.ElideRight
@@ -115,7 +127,7 @@ Item {
                     required property var modelData
                     width: menu.availableWidth
                     height: 32; radius: 6
-                    property bool sel: !root.mouseActive && modelData.id === root.current
+                    property bool sel: !root.mouseActive && !root.t3Active && modelData.id === root.current
                     color: sel ? Theme.accent
                                 : (ihov.hovered ? Theme.cardHover : "transparent")
                     Row {
@@ -177,6 +189,32 @@ Item {
                 }
                 HoverHandler { id: mhov }
                 TapHandler { onTapped: { root.pickMouse(); menu.close() } }
+            }
+            // Tarantula Pro row -- only while its dongle is present.
+            Rectangle {
+                visible: root.t3Present
+                width: menu.availableWidth
+                height: 32; radius: 6
+                property bool sel: root.t3Active
+                color: sel ? Theme.accent : (thov.hovered ? Theme.cardHover : "transparent")
+                Row {
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.left: parent.left; anchors.leftMargin: 10
+                    spacing: 8
+                    ConnIcon {
+                        anchors.verticalCenter: parent.verticalCenter
+                        wired: false; live: true
+                        tint: parent.parent.sel ? Theme.textOnAccent : Theme.accent
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: root.t3Name
+                        color: parent.parent.sel ? Theme.textOnAccent : Theme.text
+                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontM
+                    }
+                }
+                HoverHandler { id: thov }
+                TapHandler { onTapped: { root.pickT3(); menu.close() } }
             }
         }
     }

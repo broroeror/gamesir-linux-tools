@@ -2415,5 +2415,601 @@ O Deadband tentará novamente ao selecionar Configurar controle.</translation>
         <source>20 min</source>
         <translation>20 min</translation>
     </message>
+    <message>
+        <source>(choose)</source>
+        <translation>(escolher)</translation>
+    </message>
+    <message>
+        <source>+ Step</source>
+        <translation>+ Passo</translation>
+    </message>
+    <message>
+        <source>100% passes what the game asks for. Above 100% boosts weak rumble (capped at the motor's maximum).</source>
+        <translation>100% repassa o que o jogo pede. Acima de 100% reforça vibrações fracas (limitado ao máximo do motor).</translation>
+    </message>
+    <message>
+        <source>Activation button: &lt;b&gt;%1&lt;/b&gt; — click a button on the drawing</source>
+        <translation>Botão de ativação: &lt;b&gt;%1&lt;/b&gt; — clique num botão no desenho</translation>
+    </message>
+    <message>
+        <source>Address</source>
+        <translation>Endereço</translation>
+    </message>
+    <message>
+        <source>Aim (turn the controller)</source>
+        <translation>Mira (girar o controle)</translation>
+    </message>
+    <message>
+        <source>Axes</source>
+        <translation>Eixos</translation>
+    </message>
+    <message>
+        <source>Back to default</source>
+        <translation>Voltar ao padrão</translation>
+    </message>
+    <message>
+        <source>Battery</source>
+        <translation>Bateria</translation>
+    </message>
+    <message>
+        <source>Button %1</source>
+        <translation>Botão %1</translation>
+    </message>
+    <message>
+        <source>Button layout</source>
+        <translation>Layout dos botões</translation>
+    </message>
+    <message>
+        <source>Button layout saved</source>
+        <translation>Layout dos botões salvo</translation>
+    </message>
+    <message>
+        <source>Button saved</source>
+        <translation>Botão salvo</translation>
+    </message>
+    <message>
+        <source>Capture</source>
+        <translation>Captura</translation>
+    </message>
+    <message>
+        <source>Clear %1</source>
+        <translation>Limpar %1</translation>
+    </message>
+    <message>
+        <source>Click A, B, X, Y, HOME or the light bar to change its colour.</source>
+        <translation>Clique em A, B, X, Y, HOME ou na barra de luz para mudar a cor.</translation>
+    </message>
+    <message>
+        <source>Click a zone to colour all its LEDs, or a single dot to colour just that one.</source>
+        <translation>Clique numa zona para colorir todos os LEDs dela, ou numa bolinha para colorir só aquele.</translation>
+    </message>
+    <message>
+        <source>Colour</source>
+        <translation>Cor</translation>
+    </message>
+    <message>
+        <source>Colour saved</source>
+        <translation>Cor salva</translation>
+    </message>
+    <message>
+        <source>Combined</source>
+        <translation>Combinado</translation>
+    </message>
+    <message>
+        <source>Controller</source>
+        <translation>Controle</translation>
+    </message>
+    <message>
+        <source>Discard changes</source>
+        <translation>Descartar alterações</translation>
+    </message>
+    <message>
+        <source>Each layout keeps its own A/B/X/Y colours: Xbox uses the ABXY zone, Switch uses the BAYX zone. The same layout switch is on the controller (hold the gear button).</source>
+        <translation>Cada layout tem as próprias cores de A/B/X/Y: o Xbox usa a zona ABXY e o Switch a zona BAYX. A mesma troca de layout existe no controle (segure o botão da engrenagem).</translation>
+    </message>
+    <message>
+        <source>Each press of the activation button turns the gyro on or off.</source>
+        <translation>Cada toque no botão de ativação liga ou desliga o gyro.</translation>
+    </message>
+    <message>
+        <source>Effect</source>
+        <translation>Efeito</translation>
+    </message>
+    <message>
+        <source>Factory defaults restored (backup saved first)</source>
+        <translation>Padrões de fábrica restaurados (backup salvo antes)</translation>
+    </message>
+    <message>
+        <source>Factory defaults: original colours and effect, Xbox layout, every button back to itself (C1/C2 = View, C3/C4 = Menu, T3 = Capture), all macros cleared, controller gyro off, vibration 75 %. A full backup is saved to ~/.local/share/t3pro first. Sticks and triggers are not touched; for those use the controller's own reset (hold View + Menu + M until the logo blinks).</source>
+        <translation>Padrões de fábrica: cores e efeito originais, layout Xbox, todos os botões de volta ao original (C1/C2 = View, C3/C4 = Menu, T3 = Captura), macros apagadas, gyro do controle desligado e vibração em 75%. Antes, um backup completo é salvo em ~/.local/share/t3pro. Sticks e gatilhos não são alterados; para eles use o reset do próprio controle (segure View + Menu + M até o logo piscar).</translation>
+    </message>
+    <message>
+        <source>Firmware</source>
+        <translation>Firmware</translation>
+    </message>
+    <message>
+        <source>Game rumble gain (t3pro-bridge)</source>
+        <translation>Ganho da vibração dos jogos (t3pro-bridge)</translation>
+    </message>
+    <message>
+        <source>Green dot = button with a custom setting. HOME and M are reserved by the controller.</source>
+        <translation>Ponto verde = botão com configuração personalizada. HOME e M são reservados pelo controle.</translation>
+    </message>
+    <message>
+        <source>Gyro bridge (virtual DualShock 4)</source>
+        <translation>Ponte do gyro (DualShock 4 virtual)</translation>
+    </message>
+    <message>
+        <source>Gyro settings saved</source>
+        <translation>Configurações do gyro salvas</translation>
+    </message>
+    <message>
+        <source>HOME + button shortcuts</source>
+        <translation>Atalhos HOME + botão</translation>
+    </message>
+    <message>
+        <source>HOME + button shortcuts and the rumble gain belong to the bridge and are kept.</source>
+        <translation>Os atalhos HOME + botão e o ganho de vibração pertencem à ponte e são mantidos.</translation>
+    </message>
+    <message>
+        <source>Hold HOME and press the button. HOME alone still opens Steam. Run by the t3pro-bridge service; changes apply within a second.</source>
+        <translation>Segure HOME e aperte o botão. O HOME sozinho continua abrindo a Steam. Executado pelo serviço t3pro-bridge; mudanças valem em até 1 segundo.</translation>
+    </message>
+    <message>
+        <source>Horizontal sensitivity</source>
+        <translation>Sensibilidade horizontal</translation>
+    </message>
+    <message>
+        <source>How it plays</source>
+        <translation>Como executa</translation>
+    </message>
+    <message>
+        <source>Invert horizontal</source>
+        <translation>Inverter horizontal</translation>
+    </message>
+    <message>
+        <source>Invert vertical</source>
+        <translation>Inverter vertical</translation>
+    </message>
+    <message>
+        <source>L4 / R4, C1–C4 and T1–T3 are on the back of the controller</source>
+        <translation>L4 / R4, C1–C4 e T1–T3 ficam na parte de trás do controle</translation>
+    </message>
+    <message>
+        <source>LED %1</source>
+        <translation>LED %1</translation>
+    </message>
+    <message>
+        <source>Left click</source>
+        <translation>Clique esquerdo</translation>
+    </message>
+    <message>
+        <source>Lights saved</source>
+        <translation>Luzes salvas</translation>
+    </message>
+    <message>
+        <source>Macro button</source>
+        <translation>Botão da macro</translation>
+    </message>
+    <message>
+        <source>Macro cleared</source>
+        <translation>Macro apagada</translation>
+    </message>
+    <message>
+        <source>Macro on %1 (stored in the controller)</source>
+        <translation>Macro no %1 (gravada no controle)</translation>
+    </message>
+    <message>
+        <source>Macro read back with a different number of steps</source>
+        <translation>A macro foi lida de volta com outro número de passos</translation>
+    </message>
+    <message>
+        <source>Macro saved</source>
+        <translation>Macro salva</translation>
+    </message>
+    <message>
+        <source>Media keys.</source>
+        <translation>Teclas de mídia.</translation>
+    </message>
+    <message>
+        <source>Mic mute</source>
+        <translation>Mutar microfone</translation>
+    </message>
+    <message>
+        <source>Middle click</source>
+        <translation>Clique do meio</translation>
+    </message>
+    <message>
+        <source>Mode</source>
+        <translation>Modo</translation>
+    </message>
+    <message>
+        <source>Model</source>
+        <translation>Modelo</translation>
+    </message>
+    <message>
+        <source>Motor level (stored in the pad)</source>
+        <translation>Nível dos motores (gravado no controle)</translation>
+    </message>
+    <message>
+        <source>Mouse buttons and/or the wheel.</source>
+        <translation>Botões e/ou roda do mouse.</translation>
+    </message>
+    <message>
+        <source>Mute</source>
+        <translation>Mudo</translation>
+    </message>
+    <message>
+        <source>Next</source>
+        <translation>Próxima</translation>
+    </message>
+    <message>
+        <source>None</source>
+        <translation>Nenhuma</translation>
+    </message>
+    <message>
+        <source>Nothing</source>
+        <translation>Nada</translation>
+    </message>
+    <message>
+        <source>On/off with a button</source>
+        <translation>Liga/desliga com um botão</translation>
+    </message>
+    <message>
+        <source>Once per press</source>
+        <translation>Uma vez por toque</translation>
+    </message>
+    <message>
+        <source>Only the back buttons (L4, R4, C1–C4, T1–T3) can hold a macro. Green dot = macro saved.</source>
+        <translation>Só os botões traseiros (L4, R4, C1–C4, T1–T3) aceitam macro. Ponto verde = macro salva.</translation>
+    </message>
+    <message>
+        <source>Original colours restored</source>
+        <translation>Cores originais restauradas</translation>
+    </message>
+    <message>
+        <source>Original colours: Xbox-style A/B/X/Y (green, red, blue, yellow), white buttons in the Switch layout, white HOME, blue bar, Phantom effect.</source>
+        <translation>Cores originais: A/B/X/Y no estilo Xbox (verde, vermelho, azul, amarelo), botões brancos no layout Switch, HOME branco, barra azul e efeito Fantasma.</translation>
+    </message>
+    <message>
+        <source>Per step: buttons or keys, then hold ms and wait ms. Keys use Linux names, e.g. LEFTCTRL+2, F12, LEFTALT+TAB.</source>
+        <translation>Por passo: botões ou teclas, depois ms segurando e ms de espera. As teclas usam nomes do Linux, ex.: LEFTCTRL+2, F12, LEFTALT+TAB.</translation>
+    </message>
+    <message>
+        <source>Pick a button</source>
+        <translation>Escolha um botão</translation>
+    </message>
+    <message>
+        <source>Pick modifiers (Ctrl, Shift, Alt, Win) plus up to 3 keys.</source>
+        <translation>Escolha modificadores (Ctrl, Shift, Alt, Win) e até 3 teclas.</translation>
+    </message>
+    <message>
+        <source>Pick up to %1 buttons pressed together.</source>
+        <translation>Escolha até %1 botões apertados juntos.</translation>
+    </message>
+    <message>
+        <source>Play/Pause</source>
+        <translation>Tocar/Pausar</translation>
+    </message>
+    <message>
+        <source>Previous</source>
+        <translation>Anterior</translation>
+    </message>
+    <message>
+        <source>Read again from the controller</source>
+        <translation>Ler de novo do controle</translation>
+    </message>
+    <message>
+        <source>Recording… press the sequence on the controller (real timings are kept). Press HOME or Stop to finish. Nothing is saved until you press Save.</source>
+        <translation>Gravando… aperte a sequência no controle (os tempos reais são mantidos). Aperte HOME ou Parar para terminar. Nada é salvo até você apertar Salvar.</translation>
+    </message>
+    <message>
+        <source>Repeat, cycle every</source>
+        <translation>Repetir, ciclo a cada</translation>
+    </message>
+    <message>
+        <source>Response</source>
+        <translation>Resposta</translation>
+    </message>
+    <message>
+        <source>Restore</source>
+        <translation>Restaurar</translation>
+    </message>
+    <message>
+        <source>Restore factory defaults</source>
+        <translation>Restaurar padrões de fábrica</translation>
+    </message>
+    <message>
+        <source>Restore original colours</source>
+        <translation>Restaurar cores originais</translation>
+    </message>
+    <message>
+        <source>Right click</source>
+        <translation>Clique direito</translation>
+    </message>
+    <message>
+        <source>Save HOME+%1</source>
+        <translation>Salvar HOME+%1</translation>
+    </message>
+    <message>
+        <source>Save gyro settings</source>
+        <translation>Salvar configurações do gyro</translation>
+    </message>
+    <message>
+        <source>Save to %1</source>
+        <translation>Salvar no %1</translation>
+    </message>
+    <message>
+        <source>Saving a macro replaces the button's own mapping. Clearing it maps the button back to itself.</source>
+        <translation>Salvar uma macro substitui o mapeamento do botão. Limpar faz o botão voltar a ele mesmo.</translation>
+    </message>
+    <message>
+        <source>Saving a remap on this button removes its macro.</source>
+        <translation>Salvar um mapeamento neste botão apaga a macro dele.</translation>
+    </message>
+    <message>
+        <source>Saving…</source>
+        <translation>Salvando…</translation>
+    </message>
+    <message>
+        <source>Sends</source>
+        <translation>Envia</translation>
+    </message>
+    <message>
+        <source>Shortcut removed</source>
+        <translation>Atalho removido</translation>
+    </message>
+    <message>
+        <source>Shortcut saved</source>
+        <translation>Atalho salvo</translation>
+    </message>
+    <message>
+        <source>Step %1 sends:</source>
+        <translation>O passo %1 envia:</translation>
+    </message>
+    <message>
+        <source>Stop recording</source>
+        <translation>Parar gravação</translation>
+    </message>
+    <message>
+        <source>Tarantula Pro not found. Plug its 2.4 GHz dongle in and switch the pad to XInput mode.</source>
+        <translation>Tarantula Pro não encontrado. Conecte o dongle 2.4 GHz e coloque o controle no modo XInput.</translation>
+    </message>
+    <message>
+        <source>Tarantula Pro not found. Plug its dongle in (XInput mode).</source>
+        <translation>Tarantula Pro não encontrado. Conecte o dongle (modo XInput).</translation>
+    </message>
+    <message>
+        <source>Test rumble</source>
+        <translation>Testar vibração</translation>
+    </message>
+    <message>
+        <source>The bar shows its own colour only in Solid mode; animated effects draw their own colours there.</source>
+        <translation>A barra só mostra a cor escolhida no modo Sólido; os efeitos animados usam as próprias cores nela.</translation>
+    </message>
+    <message>
+        <source>The controller does not use the gyro by itself.</source>
+        <translation>O controle não usa o gyro sozinho.</translation>
+    </message>
+    <message>
+        <source>The gyro bridge already gives Steam the raw gyro. If Steam gyro is also on, both will move the camera — use one or the other.</source>
+        <translation>A ponte já entrega o gyro cru para a Steam. Se o gyro da Steam também estiver ligado, os dois vão mover a câmera — use um ou outro.</translation>
+    </message>
+    <message>
+        <source>The gyro is always active.</source>
+        <translation>O gyro fica sempre ativo.</translation>
+    </message>
+    <message>
+        <source>The gyro works only while the activation button is held.</source>
+        <translation>O gyro só funciona enquanto o botão de ativação está apertado.</translation>
+    </message>
+    <message>
+        <source>The motors have 5 levels (0, 25, 50, 75, 100 %). Applies everywhere, also without the bridge.</source>
+        <translation>Os motores têm 5 níveis (0, 25, 50, 75, 100%). Vale em qualquer lugar, mesmo sem a ponte.</translation>
+    </message>
+    <message>
+        <source>The pad kept a different vibration level</source>
+        <translation>O controle manteve outro nível de vibração</translation>
+    </message>
+    <message>
+        <source>The pad kept different light settings</source>
+        <translation>O controle manteve outras configurações de luz</translation>
+    </message>
+    <message>
+        <source>The pad stored a different colour</source>
+        <translation>O controle gravou outra cor</translation>
+    </message>
+    <message>
+        <source>The t3pro-bridge service is not running, so these shortcuts are inactive.</source>
+        <translation>O serviço t3pro-bridge não está rodando, então estes atalhos estão inativos.</translation>
+    </message>
+    <message>
+        <source>Tilt (steering)</source>
+        <translation>Inclinação (volante)</translation>
+    </message>
+    <message>
+        <source>Tilt range</source>
+        <translation>Faixa de inclinação</translation>
+    </message>
+    <message>
+        <source>Toggle: one press holds it down, the next releases it</source>
+        <translation>Alternar: um toque mantém apertado, o próximo solta</translation>
+    </message>
+    <message>
+        <source>Turbo</source>
+        <translation>Turbo</translation>
+    </message>
+    <message>
+        <source>Vertical sensitivity</source>
+        <translation>Sensibilidade vertical</translation>
+    </message>
+    <message>
+        <source>Vibration level saved</source>
+        <translation>Nível de vibração salvo</translation>
+    </message>
+    <message>
+        <source>Volume +</source>
+        <translation>Volume +</translation>
+    </message>
+    <message>
+        <source>Volume −</source>
+        <translation>Volume −</translation>
+    </message>
+    <message>
+        <source>Wheel down</source>
+        <translation>Roda para baixo</translation>
+    </message>
+    <message>
+        <source>Wheel up</source>
+        <translation>Roda para cima</translation>
+    </message>
+    <message>
+        <source>While held</source>
+        <translation>Enquanto segura</translation>
+    </message>
+    <message>
+        <source>While holding a button</source>
+        <translation>Enquanto segura um botão</translation>
+    </message>
+    <message>
+        <source>Zones</source>
+        <translation>Zonas</translation>
+    </message>
+    <message>
+        <source>all LEDs</source>
+        <translation>todos os LEDs</translation>
+    </message>
+    <message>
+        <source>hold</source>
+        <translation>segurar</translation>
+    </message>
+    <message>
+        <source>name (optional)</source>
+        <translation>nome (opcional)</translation>
+    </message>
+    <message>
+        <source>running</source>
+        <translation>rodando</translation>
+    </message>
+    <message>
+        <source>stopped</source>
+        <translation>parado</translation>
+    </message>
+    <message>
+        <source>toggle</source>
+        <translation>alternar</translation>
+    </message>
+    <message>
+        <source>wait</source>
+        <translation>esperar</translation>
+    </message>
+    <message>
+        <source>● Record on the controller</source>
+        <translation>● Gravar pelo controle</translation>
+    </message>
+    <message>
+        <source>A / B / X / Y</source>
+        <translation>A / B / X / Y</translation>
+    </message>
+    <message>
+        <source>Bar</source>
+        <translation>Barra</translation>
+    </message>
+    <message>
+        <source>Switch layout (BAYX)</source>
+        <translation>Layout Switch (BAYX)</translation>
+    </message>
+    <message>
+        <source>Solid</source>
+        <translation>Sólido</translation>
+    </message>
+    <message>
+        <source>Breathing</source>
+        <translation>Respiração</translation>
+    </message>
+    <message>
+        <source>Phantom</source>
+        <translation>Fantasma</translation>
+    </message>
+    <message>
+        <source>Streamer</source>
+        <translation>Fluxo</translation>
+    </message>
+    <message>
+        <source>Radar</source>
+        <translation>Radar</translation>
+    </message>
+    <message>
+        <source> · gyro bridge on</source>
+        <translation> · ponte do gyro ativa</translation>
+    </message>
+    <message>
+        <source>PC shortcuts (run by the bridge)</source>
+        <translation>Atalhos de PC (executados pela ponte)</translation>
+    </message>
+    <message>
+        <source>HOME + button: hold HOME and press the button (HOME alone still opens Steam). Button alone: the button fires the shortcut by itself — it can even send HOME + A. Run by the t3pro-bridge service; changes apply within a second.</source>
+        <translation>HOME + botão: segure HOME e aperte o botão (o HOME sozinho continua abrindo a Steam). Só o botão: o botão dispara o atalho sozinho — pode até enviar HOME + A. Executado pelo serviço t3pro-bridge; mudanças valem em até 1 segundo.</translation>
+    </message>
+    <message>
+        <source>Trigger</source>
+        <translation>Acionar com</translation>
+    </message>
+    <message>
+        <source>HOME + button</source>
+        <translation>HOME + botão</translation>
+    </message>
+    <message>
+        <source>Button alone</source>
+        <translation>Só o botão</translation>
+    </message>
+    <message>
+        <source>The button must stay mapped to itself on the controller (no pad macro or remap on it), otherwise the bridge never sees it. Best on a back button (L4, R4, C1–C4, T1–T3).</source>
+        <translation>O botão precisa continuar mapeado para ele mesmo no controle (sem macro nem mapeamento no controle), senão a ponte não o enxerga. Ideal num botão traseiro (L4, R4, C1–C4, T1–T3).</translation>
+    </message>
+    <message>
+        <source>Per step: what to press, then hold ms and wait ms. Controller: A B X Y LB RB LT RT L3 R3 VIEW MENU UP DOWN LEFT RIGHT HOME CAMERA. Keyboard: Linux names, e.g. LEFTCTRL+2, F12, LEFTALT+TAB. Mouse: LEFT RIGHT MIDDLE SIDE EXTRA WHEEL_UP WHEEL_DOWN. Steam: QAM (quick access menu), MENU or KEYBOARD (on-screen keyboard on/off) — needs the Tarantula Pro Decky plugin, works whatever app is in front (button alone only).</source>
+        <translation>Por passo: o que apertar, depois ms segurando e ms de espera. Controle: A B X Y LB RB LT RT L3 R3 VIEW MENU UP DOWN LEFT RIGHT HOME CAMERA. Teclado: nomes do Linux, ex.: LEFTCTRL+2, F12, LEFTALT+TAB. Mouse: LEFT RIGHT MIDDLE SIDE EXTRA WHEEL_UP WHEEL_DOWN. Steam: QAM (menu de acesso rápido), MENU ou KEYBOARD (abre/fecha o teclado virtual) — precisa do plugin Decky do Tarantula Pro e funciona com qualquer app em primeiro plano (só no modo Só o botão).</translation>
+    </message>
+    <message>
+        <source>Save shortcut</source>
+        <translation>Salvar atalho</translation>
+    </message>
+    <message>
+        <source>Only the back buttons (L4, R4, C1–C4, T1–T3) can fire a shortcut alone.</source>
+        <translation>Só os botões traseiros (L4, R4, C1–C4, T1–T3) podem disparar um atalho sozinhos.</translation>
+    </message>
+    <message>
+        <source>Back buttons only. Saving maps the button on the controller to a spare key (L4 = F13 … T3 = F21) that the bridge turns into this shortcut; any pad macro or remap on it is replaced. Removing the shortcut maps the button back to itself.</source>
+        <translation>Só botões traseiros. Ao salvar, o botão é mapeado no controle para uma tecla livre (L4 = F13 … T3 = F21), que a ponte transforma neste atalho; macro ou mapeamento que existir nele é substituído. Remover o atalho faz o botão voltar a ele mesmo.</translation>
+    </message>
+    <message>
+        <source>Steam and the PC</source>
+        <translation>Steam e o PC</translation>
+    </message>
+    <message>
+        <source>Virtual PS4 controller with gyro (for gyro in Steam)</source>
+        <translation>Controle PS4 virtual com gyro (para gyro na Steam)</translation>
+    </message>
+    <message>
+        <source>On: Steam gets a PS4 controller with the gyro, plus HOME + button shortcuts. The real Xbox controller may still be listed (muted).</source>
+        <translation>Ligado: a Steam recebe um controle PS4 com o gyro e os atalhos HOME + botão. O controle Xbox real ainda pode aparecer na lista (sem resposta).</translation>
+    </message>
+    <message>
+        <source>Off: Steam sees only the real GameSir Xbox controller. Gyro as mouse, macros and remaps work from the controller itself (Motion tab). Back-button PC shortcuts keep working; HOME + button shortcuts are off.</source>
+        <translation>Desligado: a Steam vê só o GameSir Xbox Controller real. Gyro como mouse, macros e mapeamentos funcionam pelo próprio controle (aba Movimento). Os atalhos de PC nos botões traseiros continuam funcionando; os atalhos HOME + botão ficam desligados.</translation>
+    </message>
+    <message>
+        <source>HOME + button shortcuts need the virtual PS4 controller (Device tab), which is off. Use “Button alone” on a back button instead.</source>
+        <translation>Os atalhos HOME + botão precisam do controle PS4 virtual (aba Dispositivo), que está desligado. Use “Só o botão” num botão traseiro.</translation>
+    </message>
+    <message>
+        <source>Virtual PS4 controller on: gyro goes to Steam</source>
+        <translation>Controle PS4 virtual ligado: o gyro vai para a Steam</translation>
+    </message>
+    <message>
+        <source>Virtual PS4 controller off: Steam sees the real controller</source>
+        <translation>Controle PS4 virtual desligado: a Steam vê o controle real</translation>
+    </message>
 </context>
 </TS>
