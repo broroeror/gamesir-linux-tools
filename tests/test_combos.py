@@ -78,10 +78,14 @@ class ComboBridgeTests(unittest.TestCase):
 
     def test_slots_without_spare_bytes_refuse_combos(self):
         b = self.bridge_for(profiles.TARANTULA_PRO_8K)
+        lt = dict(profiles.TARANTULA_PRO_8K.REMAP_SLOTS)['LT']
+        self.assertTrue(b.canCombo('LT'))        # verified on hardware
+        old = profiles.TARANTULA_PRO_8K.REMAP_SHORT
+        profiles.TARANTULA_PRO_8K.REMAP_SHORT = frozenset({lt})
+        self.addCleanup(setattr, profiles.TARANTULA_PRO_8K, 'REMAP_SHORT', old)
         self.assertFalse(b.canCombo('LT'))
         b.setRemapCode('LT', cfg.pack_combo([CTRL, F12]))
         self.assertEqual(b._pending, {})
-        self.assertTrue(b.canCombo('C1'))
 
     def test_loaded_combo_shows_in_config(self):
         b = self.bridge_for(profiles.CYCLONE)

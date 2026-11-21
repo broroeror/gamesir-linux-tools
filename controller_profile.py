@@ -728,8 +728,9 @@ TARANTULA_PRO_8K = ControllerProfile(
         0x0204: 0x1f, 0x02ad: 0x20, 0x0356: 0x21, 0x03ff: 0x22,
         0x04a8: 0x23, 0x0551: 0x24, 0x05fa: 0x25,
     },
-    # LT/RT sit in the 8K's trigger region, whose following bytes aren't mapped yet.
-    REMAP_SHORT=frozenset((_tar(0x035f), _tar(0x037f))),
+    # LT/RT records match the Cyclone's ([type, key x3, flag, setting, 0a]); a
+    # Ctrl+Shift+F12 combo on LT played and restored cleanly (2026-11-21), so they
+    # take full records like every other button.
     MACRO_SLOTS=(('L4', 0x00b2), ('R4', 0x015b),
                  ('C1', 0x0204), ('C2', 0x02ad), ('C3', 0x0356), ('C4', 0x03ff),
                  ('T1', 0x04a8), ('T2', 0x0551), ('T3', 0x05fa)),
