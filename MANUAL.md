@@ -302,7 +302,10 @@ sudo pacman -S udev-hid-bpf
 sudo udev-hid-bpf install /usr/share/deadband/hid-bpf/0010-GameSir__Cyclone-2.bpf.o
 ```
 
-From a git clone, the file is in `packaging/hid-bpf/` instead. Unplug the
+From a git clone, the file is in `packaging/hid-bpf/` instead. With the AppImage,
+download `0010-GameSir__Cyclone-2.bpf.o` from the
+[release page](https://github.com/broroeror/gamesir-linux-tools/releases/latest)
+and point the install command at it. Unplug the
 controller and plug it back in, and the keys work from then on, including after a
 reboot. Bind them from the **Numpad** tab of the key picker. Only the description
 changes: nothing is written to the controller.

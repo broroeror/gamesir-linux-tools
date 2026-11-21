@@ -40,8 +40,13 @@ git push origin main && git push origin vX.Y.Z
 ### 5. Publish the release
 
 ```sh
-gh release create vX.Y.Z --title "vX.Y.Z — <short name>" --notes-file notes.md
+gh release create vX.Y.Z --title "vX.Y.Z — <short name>" --notes-file notes.md \
+  dist/Deadband-X.Y.Z-x86_64.AppImage packaging/hid-bpf/0010-GameSir__Cyclone-2.bpf.o
 ```
+
+Attach the AppImage (built with `packaging/appimage/build-appimage.sh`) and the
+media-key fix file: AppImage users have no other copy of it, and the Manual points
+them at the release page.
 
 Write the notes from the changelog section rather than from the commit log. Lead
 with what changed for the person using it, credit contributors by name, and say
