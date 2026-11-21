@@ -117,6 +117,15 @@ can't positively identify. Fork it and customize it however you like.
 > has auto-detected a different platform; GameSir's manual switches it to PC mode
 > with **Home + X held for 2 seconds**.
 >
+> The **original Tarantula Pro** (2024, not the 8K) speaks a different protocol
+> (GameSir's SAPJoy commands) and gets its own device tab: lights with a live
+> drawing, rebinds to buttons / keyboard / mouse / media with turbo and toggle,
+> timed macros (also recorded from the pad), the pad's own gyro (incl. gyro as
+> mouse), Xbox/Switch layout, vibration and factory defaults. It is configured
+> through its 2.4 GHz dongle (`3537:103e`, XInput mode). An optional bridge adds a
+> virtual DualShock 4 for gyro in Steam and PC shortcuts. See
+> [Tarantula Pro (original)](docs/T3PRO.md).
+>
 > **G7 Pro** support was contributed by [@brcly](https://github.com/brcly) and
 > verified on their hardware rather than mine. It covers the **Shadow Ember**
 > edition (`3537:109b` wired, `3537:109c` dongle), the **Amazon** edition
@@ -440,6 +449,12 @@ each profile in turn, confirming every switch; all four are writable.
 **Tarantula Pro 8K:** rebinds for all nine programmable buttons, macros,
 sticks, triggers, gyro and poll rate up to 8000 Hz, in its PC mode (`3537:103d`).
 Decoded from USB captures and verified on my own pad. Lighting isn't supported yet.
+
+**Tarantula Pro (original, dongle `3537:103e`):** lights, rebinds (pad /
+keyboard / mouse / media, turbo, toggle), macros, pad-side gyro, layout,
+vibration level and factory defaults, decoded from GameSir Connect running under
+Proton and verified on a real pad (firmware 2.06). Details in
+[docs/T3PRO.md](docs/T3PRO.md).
 
 **G7 Pro:** contributed by [@brcly](https://github.com/brcly), with the Wuchang
 edition and gyro support from [@sinchrotron](https://github.com/sinchrotron), and

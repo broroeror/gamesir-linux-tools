@@ -127,6 +127,6 @@ Pad frame: x right, y toward the player, z up.
 - `tools/t3pro_bridge.py`: turns the mapped state into a virtual DualShock 4 via
   `/dev/uhid`. hid-playstation and Steam accept it, so Steam Input gets the
   gyro, and DS4 rumble is forwarded to the pad. It grabs the real XInput node.
-- `packaging/t3pro/`: a udev rule that hides the raw XInput pad and starts the
+- `packaging/t3pro/` (`install.sh`): a udev rule that starts the
   per-user `t3pro-bridge.service` when the dongle appears.
 - `tools/t3pro_imu_cal.py`: a guided axis, sign and scale check.
