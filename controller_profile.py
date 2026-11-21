@@ -908,6 +908,9 @@ def detect_one(pid, product=None):
     (0x100b, product NOT containing 'cyclone') must stay a Cyclone, not be
     mis-tagged an 8K, which is the "2 Cyclones show as 2 8Ks" bug."""
     prof = by_product_id(pid)
+    # An unreported G7 Pro edition is tried as a G7 Pro (#72; see is_candidate).
+    if prof is None and _g7.is_candidate(pid, product):
+        return G7_PRO
     if (prof is CYCLONE and pid == _SHARED_PID
             and product and 'cyclone' not in product.lower()):
         return G7_8K

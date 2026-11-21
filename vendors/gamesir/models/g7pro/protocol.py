@@ -165,6 +165,21 @@ def edition_name(pid):
     return UNCONFIRMED_EDITIONS.get(pid)
 TRANSITION_PIDS = (PID_HID,)
 ALL_PIDS = CONFIG_PIDS + TRANSITION_PIDS + (PID_NATIVE,)
+
+
+def is_candidate(pid, product):
+    """An edition nobody has reported yet (#72): an id Deadband doesn't know whose
+    USB product string says it's a G7 Pro. Every edition so far names itself
+    "GameSir-G7 Pro" and shares one register map, so Deadband tries it as an
+    untested edition. That is safe to try because a configuration session only
+    offers Save after the pad has answered the reads, and every write is read
+    back; a mode that doesn't answer ends the session with a message."""
+    known = (set(ALL_PIDS) | set(UNCONFIRMED_PIDS) | set(LOCKED_PIDS)
+             | set(OTHER_PRODUCT_PIDS))
+    if pid in known:
+        return False
+    name = (product or '').lower().replace('-', ' ')
+    return 'g7 pro' in name and '8k' not in name
 # Compatibility names used by early versions of this integration.
 PID_RECEIVER = PID_DONGLE
 PID_COMPANION = PID_HID
@@ -495,9 +510,11 @@ def send_handshake(handle, interval=0.02, sleep=time.sleep):
         sleep(interval)
 
 
-def open_device(bus: int, address: int, sysfs: str):
-    """Open a configuration-ready wired controller or wireless dongle."""
-    return InterruptHandle.open(VID, CONFIG_PIDS, bus, address, sysfs,
+def open_device(bus: int, address: int, sysfs: str, candidate=None):
+    """Open a configuration-ready wired controller or wireless dongle; `candidate`
+    is the id of an untested edition (is_candidate) to allow as well."""
+    pids = CONFIG_PIDS + ((candidate,) if candidate is not None else ())
+    return InterruptHandle.open(VID, pids, bus, address, sysfs,
                                 IFACE, EP_OUT, EP_IN)
 
 

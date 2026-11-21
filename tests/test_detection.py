@@ -43,6 +43,22 @@ class DetectionTests(unittest.TestCase):
         self.assertNotIn(0x10a9, g7.CONFIG_PIDS)
         self.assertEqual(g7.LOCKED_MODES[0x10a9][1], 'Home + Share')
 
+    def test_unknown_g7_pro_edition_is_tried_by_name(self):
+        # #72: an unreported id that calls itself a G7 Pro is an untested edition
+        self.assertTrue(g7.is_candidate(0x10f1, 'GameSir-G7 Pro'))
+        self.assertIs(profiles.detect_one(0x10f1, 'GameSir-G7 Pro'), profiles.G7_PRO)
+        with patch.object(reader, '_probe_live', return_value=True):
+            label = reader._label(dict(controller('new', 0x10f1), port='1-1', bcd=0x0100))
+        self.assertEqual(label['name'], 'G7 Pro (untested edition)')
+        # never: known ids, other models, the 8K, or a nameless device
+        for pid, product in ((0x10ba, 'GameSir-G7 Pro'), (0x1022, 'GameSir-G7 Pro'),
+                             (0x10a9, 'GameSir-G7 Pro'), (0x1004, 'GameSir-G7 Pro'),
+                             (0x10f1, 'GameSir-G7 Pro 8K'), (0x10f1, 'GameSir-G7 SE'),
+                             (0x10f1, ''), (0x10f1, None)):
+            with self.subTest(pid=hex(pid), product=product):
+                self.assertFalse(g7.is_candidate(pid, product))
+        self.assertIsNone(profiles.detect_one(0x10f1, 'GameSir-T4 Kaleid'))
+
     def test_black_yellow_edition_is_configurable(self):
         for pid, wired in ((0x106a, True), (0x106b, False)):
             self.assertIs(profiles.detect_one(pid, 'GameSir-G7 Pro'), profiles.G7_PRO)

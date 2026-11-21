@@ -8,6 +8,12 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
 ## [Unreleased]
 
 ### Added
+- **New G7 Pro editions work without an update.** An ID Deadband doesn't know that
+  names itself "GameSir-G7 Pro" is tried as an *untested edition*: settings appear
+  only once the controller answers, every save is read back, and a controller that
+  doesn't answer within a few seconds is handed straight back to games. The udev
+  rule grants access to G7 Pros by name. Idea and read-only test by
+  [@sinchrotron](https://github.com/sinchrotron) (#72).
 - **G7 Pro black and yellow edition** (`3537:106a` wired, `106b` dongle), tested by
   its owner (#71). The udev rule gains both.
 - **Key combos** for remaps on the Cyclone 2, G7 Pro 8K PC and Tarantula Pro 8K:

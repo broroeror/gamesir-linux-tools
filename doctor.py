@@ -217,6 +217,14 @@ def _media_keys_dropped(desc):
     return len(desc) == 214 and desc[76:83] == bytes.fromhex('19002bffff0000')
 
 
+def _g7_candidate(dev):
+    """An unreported G7 Pro edition Deadband tries by name (#72)."""
+    try:
+        return _g7.is_candidate(dev.get('pid'), dev.get('product'))
+    except NameError:                  # partial install, no protocol module
+        return False
+
+
 def _sysfs_nodes():
     """Every /dev/hidrawN owned by a vendor we care about, from sysfs (needs no
     permissions — the same enumeration the app's detection uses).
@@ -730,6 +738,17 @@ def collect():
                     + ('' if os.access(node, os.R_OK | os.W_OK)
                         else ' USB access is missing; install the G7 SE udev rule and reconnect.'))
                 continue
+            if (dev.get('pid') not in USB_IDENTITIES and _g7_candidate(dev)):
+                meta = dev.get('usb') or {}
+                node = '/dev/bus/usb/%03d/%03d' % (meta.get('bus', 0), meta.get('address', 0))
+                rep['usb_devices'].append({
+                    'pid': dev['pid'], 'identity': 'G7 Pro, untested edition (tried by name)',
+                    'g7se': False, 'candidate': True,
+                    'product': dev.get('product', ''), 'port': dev['port'],
+                    'node': node, 'access': os.access(node, os.R_OK | os.W_OK),
+                    'interfaces': _interfaces(meta.get('sysfs')),
+                })
+                continue
             if dev.get('pid') not in USB_IDENTITIES:
                 # An identity Deadband doesn't know and that has no hidraw node
                 # (so the HID section can't show it): list it with its interfaces,
@@ -785,6 +804,12 @@ def collect():
                 'G7 SE (3537:108f) found in an Xbox mode Deadband hasn\'t been tested with '
                 'yet. Input works through the kernel\'s xpad driver; configuration is '
                 'tested on 3537:1069 only.')
+        elif n.get('candidate'):
+            rep['verdict'].append(
+                f'G7 Pro 3537:{n["pid"]:04x} found: an edition Deadband hasn\'t seen before. It '
+                'is tried as an untested edition: settings are only offered once the '
+                'controller answers, and every save is read back. Please share this report '
+                'in an issue so it can be added properly.')
         elif n['identity'] == 'not recognised':
             rep['verdict'].append(
                 f'GameSir 3537:{n["pid"]:04x} found, an identity Deadband doesn\'t recognise '
@@ -1020,7 +1045,7 @@ def format_report(rep):
                  f'({n.get("identity", "unknown")})  "{n["product"]}" port {n["port"]}')
         if _se and n['pid'] in _se.LAYOUT_PIDS:
             L.append('    diagnostic USB access: ' + ('OK' if n['access'] else 'PERMISSION DENIED'))
-        elif n['pid'] not in NEEDS_USB:
+        elif n['pid'] not in NEEDS_USB and not n.get('candidate'):
             # Deadband only opens the identities it can configure, plus the one
             # it transitions through. Everything else -- a detect-only edition,
             # or 1022, which is transitioned by holding SHARE + MENU on the pad

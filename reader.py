@@ -151,7 +151,10 @@ def _label(ctrl):
     otherwise shows as a phantom controller); `wired` drives the connection icon."""
     prof = profiles.detect_one(ctrl['pid'], ctrl.get('product'))
     bcd = ctrl.get('bcd') or (device_bcd(ctrl['nodes'][0]) if ctrl['nodes'] else None)
-    return {'id': ctrl['id'], 'name': prof.short if prof else 'Unknown',
+    name = prof.short if prof else 'Unknown'
+    if prof is profiles.G7_PRO and g7pro.is_candidate(ctrl['pid'], ctrl.get('product')):
+        name += ' (untested edition)'
+    return {'id': ctrl['id'], 'name': name,
             'port': ctrl['port'], 'pid': ctrl['pid'],
             'live': _probe_live(ctrl, prof),
             'wired': _is_wired(prof, ctrl['pid'], bcd)}
@@ -997,13 +1000,18 @@ def read_session_seusb(ctrl):
             state['config_phase'] = 'released'
 
 
+_G7_CANDIDATE_TIMEOUT = 4.0     # s an untested edition gets to answer (#72)
+
+
 def read_session_g7usb(ctrl):
     """Own a ready G7 vendor interface and multiplex config/live input."""
     global _active_usb_handle
     usbmeta = ctrl.get('usb') or {}
     try:
+        candidate = (ctrl['pid'] if g7pro.is_candidate(ctrl['pid'], ctrl.get('product'))
+                     else None)
         handle = g7pro.open_device(usbmeta['bus'], usbmeta['address'],
-                                   usbmeta['sysfs'])
+                                   usbmeta['sysfs'], candidate=candidate)
     except Exception as exc:
         state['config_claimed'] = False
         state['config_status'] = str(exc)
@@ -1019,7 +1027,9 @@ def read_session_g7usb(ctrl):
     state.update(gyro=None, accel=None, imu_time=0.0)
     state['driving'] = ctrl['id']
     state['config_claimed'] = True
-    state['config_status'] = 'Configuring · controller unavailable to games'
+    state['config_status'] = ('Configuring an untested G7 Pro edition · controller '
+                              'unavailable to games' if candidate is not None else
+                              'Configuring · controller unavailable to games')
     state['config_phase'] = 'claimed'
     state['access'] = 'ok'
     state['edit_profile'] = state.get('edit_profile') or state.get('profile') or 1
@@ -1052,6 +1062,15 @@ def read_session_g7usb(ctrl):
                 ids = [c['id'] for c in _rescan()]
                 if ctrl['id'] not in ids or state.get('selected') not in (None, ctrl['id']):
                     break
+            if (candidate is not None and not saw_vendor
+                    and time.monotonic() - session_started >= _G7_CANDIDATE_TIMEOUT):
+                # an untested edition that never answers: hand it back to games
+                telemetry_error = True
+                state['config_wanted'] = False
+                state['config_status'] = (f'G7 Pro {ctrl["pid"]:04x} isn\'t answering '
+                                          'configuration; it may be in another mode')
+                state['config_phase'] = 'failed'
+                break
             report = handle.read(64, timeout_ms=120)
             if not report:
                 continue
@@ -1062,6 +1081,8 @@ def read_session_g7usb(ctrl):
                     telemetry_error = True
                     state['config_wanted'] = False
                     state['config_status'] = (
+                        f'G7 Pro {ctrl["pid"]:04x} isn\'t answering configuration; it '
+                        'may be in another mode' if candidate is not None else
                         f'USB identity {ctrl["pid"]:04x} returned standard XInput '
                         'reports instead of configuration telemetry')
                     state['config_phase'] = 'failed'
