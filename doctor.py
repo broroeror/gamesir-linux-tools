@@ -21,6 +21,7 @@ Dependency-light on purpose: stdlib + hid only, NO Qt — it must run headless
 import glob
 import os
 import platform
+import re
 import stat
 import sys
 import time
@@ -478,12 +479,66 @@ def _version():
         return '?'
 
 
-def _same_file(left, right):
+def _rule_lines(path):
+    """The rules in a udev file, one per line, ignoring comments, blank lines
+    and spacing -- what udev acts on, not how the file happens to be laid out."""
+    lines = []
+    with open(path, encoding='utf-8', errors='replace') as f:
+        for line in f:
+            line = ' '.join(line.split())
+            if line and not line.startswith('#') and line not in lines:
+                lines.append(line)
+    return lines
+
+
+def _rule_label(line):
+    """A short name for one rule: the USB id or product name it matches."""
+    m = re.search(r'ATTRS?\{idProduct\}=="([0-9a-fA-F]{4})"', line)
+    if m:
+        v = re.search(r'ATTRS?\{idVendor\}=="([0-9a-fA-F]{4})"', line)
+        return f'{v.group(1) if v else "?"}:{m.group(1)}'.lower()
+    m = re.search(r'ATTRS?\{product\}=="([^"]*)"', line)
+    if m:
+        return f'"{m.group(1)}"'
+    return line if len(line) <= 40 else line[:37] + '...'
+
+
+def _compare_rules(installed, source):
+    """Which rules the shipped copy has that the installed one lacks, and the
+    reverse. A byte compare called a rule 'outdated' over a comment or a line
+    ending (#74); only the rules themselves decide whether it matters."""
     try:
-        with open(left, 'rb') as a, open(right, 'rb') as b:
-            return a.read() == b.read()
+        have, want = _rule_lines(installed), _rule_lines(source)
     except OSError:
-        return False
+        return None
+    return {'missing': [_rule_label(l) for l in want if l not in have],
+            'extra': [_rule_label(l) for l in have if l not in want]}
+
+
+def _rule_status(r):
+    """The one-line udev rule status for the report."""
+    if not r['installed']:
+        return 'NOT INSTALLED'
+    status = 'installed' + (' (packaged)' if r.get('packaged') else '')
+    missing, extra = r.get('missing') or [], r.get('extra') or []
+    if r.get('current') is None:
+        # no source tree to compare against (an installed app): installed is
+        # all we can honestly claim
+        return status
+
+    def some(labels):
+        shown = ', '.join(labels[:3])
+        return shown + (f', +{len(labels) - 3} more' if len(labels) > 3 else '')
+
+    if missing:
+        status += (f', missing {len(missing)} rule{"s" if len(missing) != 1 else ""} '
+                   f'from this version ({some(missing)})')
+    else:
+        status += ', matches this version'
+    if extra:
+        status += (f'; has {len(extra)} rule{"s" if len(extra) != 1 else ""} this '
+                   f'version doesn\'t ({some(extra)})')
+    return status
 
 
 # ------------------------------------------------------------ not Linux (macOS)
@@ -656,14 +711,20 @@ def collect():
 
     for label, (paths, source) in UDEV_RULES.items():
         found = _find_rule(paths)
+        # with no source tree (an installed app) we can't compare, so don't
+        # claim the rule is stale -- that reads as a problem when it isn't
+        diff = (_compare_rules(found, source)
+                if (found and os.path.exists(source)) else None)
         rep['rules'][label] = {
             'installed': found is not None,
             'path': found,
             'packaged': bool(found and found.startswith('/usr/lib/')),
             'source_present': os.path.exists(source),
-            # with no source tree (an installed app) we can't compare, so don't
-            # claim the rule is stale -- that reads as a problem when it isn't
-            'current': _same_file(found, source) if (found and os.path.exists(source)) else None,
+            # current = every rule this version ships is installed; extra
+            # local rules don't make it stale
+            'current': None if diff is None else not diff['missing'],
+            'missing': diff['missing'] if diff else [],
+            'extra': diff['extra'] if diff else [],
         }
 
     for n in _sysfs_nodes():
@@ -856,9 +917,12 @@ def collect():
                 # route, not copying a file they don't have
                 fix = ('    reinstall/update the package (it ships the rule), then\n'
                        '    sudo udevadm control --reload-rules && sudo udevadm trigger')
+            why = ('the udev rule is NOT installed' if not rule.get('installed')
+                   else 'the installed udev rule is missing rules this version '
+                        'has')
             rep['verdict'].append(
-                'GameSir device found but NOT openable (permission denied), and '
-                'the current udev rule is NOT installed. Fix:\n'
+                f'GameSir device found but NOT openable (permission denied), and '
+                f'{why}. Fix:\n'
                 + fix + '\nthen UNPLUG AND REPLUG the controller.')
         else:
             rep['verdict'].append(
@@ -998,15 +1062,7 @@ def format_report(rep):
              f'— backend: {rep["hidapi_backend"]}')
     L.append(f'- Raw USB: {rep.get("raw_usb_backend", "?")}')
     for label, r in rep['rules'].items():
-        if not r['installed']:
-            status = 'NOT INSTALLED'
-        elif r.get('current') is False:
-            status = 'installed, OUTDATED'
-        else:
-            # current is None when there's no source tree to compare against (an
-            # installed app). Installed is all we can honestly claim.
-            status = 'installed' + (' (packaged)' if r.get('packaged') else '')
-        L.append(f'- udev rule ({label}): {status}')
+        L.append(f'- udev rule ({label}): {_rule_status(r)}')
     L.append('')
     L.append('### Devices')
     # Link speed per physical device: decides what poll rate is actually deliverable.
