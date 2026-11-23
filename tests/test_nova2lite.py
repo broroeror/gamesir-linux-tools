@@ -73,14 +73,24 @@ class Nova2LiteTests(unittest.TestCase):
         # Empty/unpaired dongle response (data[1] == 0) is ignored and does not verify
         self.assertEqual(n2l.parse_device_info([0x01, 0x00] + [0x00] * 62), {})
         self.assertFalse(n2l.device_info_verified())
+        # Wireless discharging reply: bytes 16..17 are fixed (0x04, 0x02), byte 18 is battery %
         report = [0x01, 0x01] + [0x00] * 62
         report[10] = 0x82
         report[11] = 0x01
-        report[16] = 0x23   # low nibble 3 -> 75%
-        report[17] = 0x02   # charging
+        report[16] = 0x04
+        report[17] = 0x02
+        report[18] = 85
         info = n2l.parse_device_info(report)
-        self.assertEqual(info, {'firmware': '1.82', 'battery': 75, 'charging': True})
+        self.assertEqual(info, {'firmware': '1.82', 'battery': 85, 'charging': False})
         self.assertTrue(n2l.device_info_verified())
+        # Wired / charging reply: byte 18 is 0xFF
+        report[18] = 0xFF
+        self.assertEqual(n2l.parse_device_info(report),
+                         {'firmware': '1.82', 'battery': 100, 'charging': True})
+        # Bit-7 charging flag with percentage in bits 0..6
+        report[18] = 0x80 | 60
+        self.assertEqual(n2l.parse_device_info(report),
+                         {'firmware': '1.82', 'battery': 60, 'charging': True})
 
     def test_parse_input_report(self):
         report = bytearray(64)
