@@ -46,6 +46,9 @@ FEATURE_FEATURE_SET = 0x0001
 FEATURE_ONBOARD_PROFILES = 0x8100
 FEATURE_UNIFIED_BATTERY = 0x1004
 FEATURE_ADJUSTABLE_DPI = 0x2201
+FEATURE_EXTENDED_REPORT_RATE = 0x8061
+# 0x8061 rate index -> Hz (8 ms, 4 ms, 2 ms, 1 ms, 500/250/125 us)
+EXTENDED_RATES_HZ = {0: 125, 1: 250, 2: 500, 3: 1000, 4: 2000, 5: 4000, 6: 8000}
 
 # ONBOARD_PROFILES (0x8100) FUNCTION INDICES — RAW 0..15; request() applies the
 # <<4 to place them in the high nibble. Pass raw indices here, NOT the pre-shifted
@@ -244,6 +247,19 @@ class Hidpp:
                 return None
             d = self.request(idx, 0x01)              # fn1 get_status
             return {'percent': d[0], 'charging': len(d) > 2 and d[2] in (1, 2, 3)}
+        except Exception:
+            return None
+
+    def report_rate_hz(self):
+        """The rate the mouse is running at, from feature 0x8061 (extended
+        adjustable report rate) getReportRate, or None if it's absent or
+        unreadable. Read-only and best-effort, like battery(). Used when a
+        profile leaves its own rate byte unset (#77)."""
+        try:
+            idx = self.get_feature_index(FEATURE_EXTENDED_REPORT_RATE)
+            if not idx:
+                return None
+            return EXTENDED_RATES_HZ.get(self.request(idx, 0x02)[0])
         except Exception:
             return None
 

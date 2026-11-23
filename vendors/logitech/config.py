@@ -564,8 +564,14 @@ def profile_bindings(dev, sector, size):
                 'dpi': list(prof.resolutions),
                 'dpi_default': prof.default_dpi_index,
                 'dpi_shift': prof.shift_dpi_index,
-                'report_rate_hz': prof.report_rate_hz,
+                # a profile without its own rate runs at the mouse's (#77)
+                'report_rate_hz': prof.report_rate_hz or _device_rate(dev),
             }}
+
+
+def _device_rate(dev):
+    read = getattr(dev, 'report_rate_hz', None)
+    return (read() if callable(read) else None) or 0
 
 
 def apply_bindings(dev, info, headers, sector, button_changes=None,
@@ -683,7 +689,7 @@ def _plausible_profile(prof):
         return False, 'wrong number of DPI stages'
     if not all(50 <= int(r) <= 32000 for r in prof.resolutions):
         return False, f'DPI stages out of range ({prof.resolutions})'
-    if not 100 <= prof.report_rate_hz <= 8000:
+    if prof.rate_in_profile and not 100 <= prof.report_rate_hz <= 8000:
         return False, f'implausible report rate ({prof.report_rate_hz} Hz)'
     if prof.default_dpi_index >= onboard.N_RESOLUTIONS:
         return False, 'default DPI index out of range'

@@ -193,6 +193,12 @@ class Button:
         return bytes(self.raw)     # unset / unknown / stop-all
 
 
+# Byte 0 values that are NOT an interval. G HUB leaves 0xFF there on some mice
+# (#77); such a mouse runs at its own report rate (feature 0x8061, which Solaar
+# showed as 1 ms), so 0xFF reads as "not set in this profile", never 255 ms/4 Hz.
+RATE_UNSET = (0x00, 0xFF)
+
+
 @dataclass
 class OnboardProfile:
     """A decoded 256-byte onboard profile."""
@@ -212,8 +218,14 @@ class OnboardProfile:
     crc_computed: int = 0
 
     @property
+    def rate_in_profile(self):
+        """False when byte 0 holds no interval (RATE_UNSET)."""
+        return self.report_rate_ms not in RATE_UNSET
+
+    @property
     def report_rate_hz(self):
-        return round(1000 / self.report_rate_ms) if self.report_rate_ms else 0
+        """The stored rate, or 0 when the profile doesn't set one."""
+        return round(1000 / self.report_rate_ms) if self.rate_in_profile else 0
 
     @property
     def crc_ok(self):
@@ -324,7 +336,10 @@ class OnboardProfile:
             f'Profile @sector 0x{self.sector:04x} '
             f'{"(enabled)" if self.enabled else "(disabled)"}'
             f'{"  name=" + repr(self.name) if self.name else ""}',
-            f'  report rate : {self.report_rate_hz} Hz ({self.report_rate_ms} ms)',
+            (f'  report rate : {self.report_rate_hz} Hz ({self.report_rate_ms} ms)'
+             if self.rate_in_profile else
+             f'  report rate : not set in profile (0x{self.report_rate_ms:02x}; '
+             'the mouse\'s own setting applies)'),
             f'  DPI stages  : {self.resolutions}  '
             f'(default idx {self.default_dpi_index}, shift/sniper idx {self.shift_dpi_index})',
             f'  RGB         : {self.rgb}   write_count: {self.write_count}',

@@ -365,6 +365,33 @@ def main():
     check('profile_bindings returns the saved macro for the macros tab',
           ok and saved and [s.get('text') for s in saved['steps']] == ['saved'], msg)
 
+    # #77: G HUB leaves 0xFF in the rate byte; that is "not set", not 4 Hz
+    unset = make_profile('U')
+    unset[0] = 0xFF
+    unset[-2:] = onboard.crc16_ccitt(bytes(unset[:-2])).to_bytes(2, 'big')
+    p = onboard.OnboardProfile.decode(bytes(unset))
+    check('a 0xFF rate byte reads as not set, not 4 Hz',
+          p.crc_ok and not p.rate_in_profile and p.report_rate_hz == 0)
+    check('a profile without its own rate is still plausible',
+          config._plausible_profile(p)[0])
+
+    class RateMouse(FakeMouse):
+        def report_rate_hz(self):
+            return 1000
+    dev = RateMouse()
+    dev.s[1] = bytearray(unset)
+    check("the mouse's own rate is shown when the profile has none",
+          config.profile_bindings(dev, 1, SIZE)['sensor']['report_rate_hz'] == 1000)
+    plain = FakeMouse()                # no 0x8061 feature to fall back on
+    plain.s[1] = bytearray(unset)
+    check('without the mouse\'s own rate it shows 0 rather than guessing',
+          config.profile_bindings(plain, 1, SIZE)['sensor']['report_rate_hz'] == 0)
+    ok, msg = config.apply_bindings(dev, INFO, HEADERS, 1, sensor={'dpi_default': 2})
+    check('an unrelated edit leaves the 0xFF rate byte alone',
+          ok and dev.s[1][0] == 0xFF, msg)
+    ok, msg = config.apply_bindings(dev, INFO, HEADERS, 1, sensor={'report_rate_hz': 500})
+    check('choosing a rate stores a real interval', ok and dev.s[1][0] == 2, msg)
+
     print()
     if failures:
         print(f'FAILED ({len(failures)}): ' + '; '.join(failures))

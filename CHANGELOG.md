@@ -21,6 +21,15 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
   (#30). Combos set in GameSir's app now show their full name instead of only
   the first key.
 
+### Fixed
+- **G502 X report rate showed 4 Hz** when G HUB had left the profile's rate
+  unset (`0xFF`). Deadband now shows the rate the mouse is actually running at,
+  and leaves that byte alone unless you pick a rate. Reported by
+  [@EugenioBuffo](https://github.com/EugenioBuffo) (#77).
+- **`--doctor` no longer calls a udev rule "OUTDATED" over a comment or a line
+  ending.** It compares the rules themselves and names any that are missing,
+  such as `missing 2 rules from this version (3537:106a, 3537:106b)` (#74).
+
 ## [0.7.0] — 2026-11-13
 
 ### Added
