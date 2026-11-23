@@ -416,7 +416,7 @@
         <translation>Coletando…</translation>
     </message>
     <message>
-        <location filename="../qml/App/G7DevicePage.qml" line="+37"/>
+        <location filename="../qml/App/G7DevicePage.qml" line="+45"/>
         <source>G7 Pro configuration session</source>
         <translation>Sessão de configuração do G7 Pro</translation>
     </message>
@@ -451,6 +451,16 @@ Use Configurar controle acima para editar ou atualizar as configurações.</tran
         <location filename="../qml/App/LightsPage.qml" line="+203"/>
         <source>Brightness</source>
         <translation>Brilho</translation>
+    </message>
+    <message>
+        <location line="+17"/>
+        <source>How long the controller waits, unused, before turning itself off.</source>
+        <translation>Quanto tempo o controle espera sem uso antes de se desligar sozinho.</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>%1 min</source>
+        <translation>%1 min</translation>
     </message>
     <message>
         <location filename="../qml/App/Lights8kPage.qml" line="-207"/>
@@ -506,13 +516,14 @@ Use Configurar controle acima para editar ou atualizar as configurações.</tran
         <translation>Ligar/desligar automaticamente</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location filename="../qml/App/G7DevicePage.qml" line="-13"/>
+        <location filename="../qml/App/Lights8kPage.qml" line="+6"/>
         <location filename="../qml/App/LightsPage.qml" line="+27"/>
         <source>Sleep timer</source>
         <translation>Temporizador de suspensão</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location filename="../qml/App/Lights8kPage.qml" line="+18"/>
         <source>Dock LED</source>
         <translation>LED da base</translation>
     </message>

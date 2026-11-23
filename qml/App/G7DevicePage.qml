@@ -5,6 +5,13 @@ Item {
     id: page
     property int brightness: 100
     property bool autoOn: false
+    property int sleepMin: 0
+    // Tested values only: 0 ("off") is untested on the G7 Pro. A value set
+    // elsewhere (25 in #56) gets its own pill so it is never hidden.
+    readonly property var sleepChoices: [1, 5, 10, 20]
+    readonly property var sleepShown: sleepMin > 0 && sleepChoices.indexOf(sleepMin) < 0
+                                      ? sleepChoices.concat([sleepMin]).sort(function (a, b) { return a - b })
+                                      : sleepChoices
 
     function seed() {
         var c = bridge.config
@@ -12,6 +19,7 @@ Item {
         brightness = c.dock_brightness
         dockBright.value = c.dock_brightness   // explicit: a drag breaks a binding
         autoOn = c.dock_auto
+        sleepMin = c.sleep_minutes || 0
     }
     Component.onCompleted: seed()
     Connections { target: bridge; function onConfigLoaded() { page.seed() } }
@@ -68,6 +76,29 @@ Item {
             AccentSlider {
                 id: dockBright; width: parent.width; from: 0; to: 100
                 onMoved: { page.brightness = value; bridge.setG7Extra("dock_brightness", value) }
+            }
+        }
+
+        Card {
+            Layout.fillWidth: true
+            title: qsTranslate("UI", "Sleep timer")
+            Text {
+                width: parent.width; wrapMode: Text.WordWrap
+                text: qsTranslate("UI", "How long the controller waits, unused, before turning itself off.")
+                color: Theme.textDim
+                font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+            }
+            Flow {
+                width: parent.width; spacing: 8
+                Repeater {
+                    model: page.sleepShown
+                    delegate: PillButton {
+                        required property int modelData
+                        label: qsTranslate("UI", "%1 min").arg(modelData)
+                        highlight: page.sleepMin === modelData
+                        onClicked: { page.sleepMin = modelData; bridge.setG7Extra("sleep_minutes", modelData) }
+                    }
+                }
             }
         }
         }

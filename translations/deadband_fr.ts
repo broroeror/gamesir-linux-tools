@@ -416,7 +416,7 @@
         <translation>Collecte en cours…</translation>
     </message>
     <message>
-        <location filename="../qml/App/G7DevicePage.qml" line="+37"/>
+        <location filename="../qml/App/G7DevicePage.qml" line="+45"/>
         <source>G7 Pro configuration session</source>
         <translation>Session de configuration G7 Pro</translation>
     </message>
@@ -451,6 +451,16 @@ Utilisez Configurer la manette en haut pour modifier ou actualiser les réglages
         <location filename="../qml/App/LightsPage.qml" line="+203"/>
         <source>Brightness</source>
         <translation>Luminosité</translation>
+    </message>
+    <message>
+        <location line="+17"/>
+        <source>How long the controller waits, unused, before turning itself off.</source>
+        <translation>Durée d’inactivité avant que la manette ne s’éteigne d’elle-même.</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>%1 min</source>
+        <translation>%1 min</translation>
     </message>
     <message>
         <location filename="../qml/App/Lights8kPage.qml" line="-207"/>
@@ -506,13 +516,14 @@ Utilisez Configurer la manette en haut pour modifier ou actualiser les réglages
         <translation>Marche/arrêt automatique</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location filename="../qml/App/G7DevicePage.qml" line="-13"/>
+        <location filename="../qml/App/Lights8kPage.qml" line="+6"/>
         <location filename="../qml/App/LightsPage.qml" line="+27"/>
         <source>Sleep timer</source>
         <translation>Délai de veille</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location filename="../qml/App/Lights8kPage.qml" line="+18"/>
         <source>Dock LED</source>
         <translation>LED de la station</translation>
     </message>

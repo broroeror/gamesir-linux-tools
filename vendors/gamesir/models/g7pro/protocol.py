@@ -393,6 +393,7 @@ def decode_dock(blob: bytes):
     return {
         'dock_auto': bool(blob[0x1F6]) if len(blob) > 0x1F6 else False,
         'dock_brightness': blob[0x1F9] if len(blob) > 0x1F9 else 0,
+        'sleep_minutes': blob[0x1F7] if len(blob) > 0x1F7 else 0,
     }
 
 

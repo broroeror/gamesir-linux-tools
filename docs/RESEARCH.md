@@ -533,9 +533,12 @@ steps per typed character.
 
 ## To be tested
 
-- **G7 Pro sleep timer.** On a Zenless Zone Zero pad (#56) bank `0x20` `0x01F7`
-  sits where the 8K's sleep timer does relative to auto and brightness; the owner
-  set 5 and 25 and the pad switched off after that many minutes. Not in the app yet.
+- **G7 Pro sleep timer at 0.** The timer (bank `0x20` `0x01F7`, minutes) is in the
+  app: the owner of a Zenless Zone Zero pad set 5 and 25 (#56), and on an Amazon
+  edition a 1-minute timer applied through the Device tab switched the pad off
+  after a minute. Whether 0 means "never" as on the 8K is untested, so the app
+  doesn't offer it.
+
 - **White Trimode writes.** `1003`/`1004` are enabled on an owner's report that
   every value read back exactly as set on Windows (#9). Nobody has yet watched a
   write land on one the way `10ba` was tested.

@@ -396,6 +396,11 @@ G7_PRO = ControllerProfile(
         'ST_INVERT_X': 0x0151, 'ST_INVERT_Y': 0x0152, 'ST_SENS': 0x0153,
         'RS_INVERT_X': 0x0171, 'RS_INVERT_Y': 0x0172, 'RS_SENS': 0x0173,
         'DOCK_AUTO': 0x01f6, 'DOCK_BRIGHT': 0x01f9,    # bank 0x20
+        # minutes idle before the pad switches itself off; same block order as
+        # the 8K's (auto, sleep, dock mode, brightness). Confirmed on a Zenless
+        # Zone Zero pad (#56: 5 and 25 both took effect) and read as 10 on an
+        # Amazon edition. What 0 does here is untested, so it isn't offered.
+        'DOCK_SLEEP': 0x01f7,
     },
 )
 

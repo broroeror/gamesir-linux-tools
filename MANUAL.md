@@ -111,7 +111,7 @@ file (default name `deadband_<model>_<timestamp>.json`). To restore, pick that f
 inline **"Write loaded backup to controller"** button appears; it writes every block
 back, reads it back to confirm, re-sends anything that didn't take, and reports a
 clear pass/fail. The G7 Pro backup is semantic: it contains only the settings the
-app understands, including its dock settings, and can address all four banks
+app understands, including its dock settings and sleep timer, and can address all four banks
 directly. Think of this as your undo button: snapshot before experimenting,
 restore to return.
 

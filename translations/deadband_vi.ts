@@ -416,7 +416,7 @@
         <translation>Đang thu thập…</translation>
     </message>
     <message>
-        <location filename="../qml/App/G7DevicePage.qml" line="+37"/>
+        <location filename="../qml/App/G7DevicePage.qml" line="+45"/>
         <source>G7 Pro configuration session</source>
         <translation>Phiên cấu hình G7 Pro</translation>
     </message>
@@ -451,6 +451,16 @@ Dùng Cấu hình tay cầm ở trên để sửa hoặc làm mới cài đặt.
         <location filename="../qml/App/LightsPage.qml" line="+203"/>
         <source>Brightness</source>
         <translation>Độ sáng</translation>
+    </message>
+    <message>
+        <location line="+17"/>
+        <source>How long the controller waits, unused, before turning itself off.</source>
+        <translation>Thời gian tay cầm chờ khi không dùng trước khi tự tắt.</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>%1 min</source>
+        <translation>%1 phút</translation>
     </message>
     <message>
         <location filename="../qml/App/Lights8kPage.qml" line="-207"/>
@@ -506,13 +516,14 @@ Dùng Cấu hình tay cầm ở trên để sửa hoặc làm mới cài đặt.
         <translation>Tự bật/tắt nguồn</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location filename="../qml/App/G7DevicePage.qml" line="-13"/>
+        <location filename="../qml/App/Lights8kPage.qml" line="+6"/>
         <location filename="../qml/App/LightsPage.qml" line="+27"/>
         <source>Sleep timer</source>
         <translation>Hẹn giờ ngủ</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location filename="../qml/App/Lights8kPage.qml" line="+18"/>
         <source>Dock LED</source>
         <translation>LED đế sạc</translation>
     </message>

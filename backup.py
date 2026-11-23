@@ -484,6 +484,11 @@ def _g7_writes_from(data):
         raise ValueError('dock brightness must be one of 0/25/50/75/100')
     writes += [(0x20, x['DOCK_AUTO'], [1 if dock['dock_auto'] else 0]),
                (0x20, x['DOCK_BRIGHT'], [brightness])]
+    if 'sleep_minutes' in dock:         # backups from before it was readable lack it
+        # any byte: it is the pad's own value coming back (the picker is what
+        # stays limited to tested values)
+        minutes = byte(dock, 'sleep_minutes', 0, 255)
+        writes.append((0x20, x['DOCK_SLEEP'], [minutes]))
     return writes
 
 
@@ -511,6 +516,14 @@ def _allowed_addrs():
     allowed = {}
     for bank, addr, ln in _all_requests():
         allowed.setdefault(bank, set()).update(range(addr, addr + ln))
+    prof = ctrl.active()
+    if prof is ctrl.G7_PRO:
+        # The G7 Pro's dock settings are global (bank 0x20), outside the
+        # per-profile read plan above, so Apply refused every dock edit -- and
+        # everything staged with it -- until these three bytes were listed.
+        allowed.setdefault(0x20, set()).update(
+            prof.extras[k] for k in ('DOCK_AUTO', 'DOCK_SLEEP', 'DOCK_BRIGHT')
+            if k in prof.extras)
     return allowed
 
 
@@ -725,7 +738,10 @@ def _apply_g7_backup(data, writes, on_progress=None, on_done=None):
             if blob is None or actual != expected:
                 mismatches.append(f'profile {bank}')
         dock_blob = g7pro.stitch_blob(0x20, g7pro.DOCK_BLOB_SIZE, control.reg_result)
-        if dock_blob is None or g7pro.decode_dock(dock_blob) != data['device_settings']:
+        expected = data['device_settings']
+        actual = g7pro.decode_dock(dock_blob) if dock_blob is not None else None
+        # only the settings the backup holds: older ones predate the sleep timer
+        if actual is None or {k: actual.get(k) for k in expected} != expected:
             mismatches.append('dock settings')
         if on_done:
             if mismatches:

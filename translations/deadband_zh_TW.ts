@@ -416,7 +416,7 @@
         <translation>收集中…</translation>
     </message>
     <message>
-        <location filename="../qml/App/G7DevicePage.qml" line="+37"/>
+        <location filename="../qml/App/G7DevicePage.qml" line="+45"/>
         <source>G7 Pro configuration session</source>
         <translation>G7 Pro 設定工作階段</translation>
     </message>
@@ -451,6 +451,16 @@ Use Configure controller above to edit or refresh settings.</source>
         <location filename="../qml/App/LightsPage.qml" line="+203"/>
         <source>Brightness</source>
         <translation>亮度</translation>
+    </message>
+    <message>
+        <location line="+17"/>
+        <source>How long the controller waits, unused, before turning itself off.</source>
+        <translation>控制器閒置多久後自動關機。</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>%1 min</source>
+        <translation>%1 分鐘</translation>
     </message>
     <message>
         <location filename="../qml/App/Lights8kPage.qml" line="-207"/>
@@ -506,13 +516,14 @@ Use Configure controller above to edit or refresh settings.</source>
         <translation>自動開關電源</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location filename="../qml/App/G7DevicePage.qml" line="-13"/>
+        <location filename="../qml/App/Lights8kPage.qml" line="+6"/>
         <location filename="../qml/App/LightsPage.qml" line="+27"/>
         <source>Sleep timer</source>
         <translation>休眠計時器</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location filename="../qml/App/Lights8kPage.qml" line="+18"/>
         <source>Dock LED</source>
         <translation>底座 LED</translation>
     </message>

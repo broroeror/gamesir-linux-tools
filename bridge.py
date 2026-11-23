@@ -2854,6 +2854,13 @@ class GamesirBridge(QObject):
             self._config[name] = value
             self._queue(addr, [encoded], name.replace('_', ' ').title(), value,
                         bank=0x20, key=('g7', 0x20, name))
+        if name == 'sleep_minutes' and 'DOCK_SLEEP' in x:
+            minutes = int(value)
+            if not 1 <= minutes <= 255:
+                return          # 0 is untested on the G7 Pro; one byte holds the rest
+            self._config[name] = minutes
+            self._queue(x['DOCK_SLEEP'], [minutes], 'Sleep timer', f'{minutes} min',
+                        bank=0x20, key=('g7', 0x20, name))
 
     def _curve_block(self, key, name, intensity=100, points=None):
         """Build the curve block for `key` in the ACTIVE profile's format: a

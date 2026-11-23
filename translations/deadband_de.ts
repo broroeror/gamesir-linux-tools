@@ -416,7 +416,7 @@
         <translation>Daten werden erfasst…</translation>
     </message>
     <message>
-        <location filename="../qml/App/G7DevicePage.qml" line="+37"/>
+        <location filename="../qml/App/G7DevicePage.qml" line="+45"/>
         <source>G7 Pro configuration session</source>
         <translation>G7-Pro-Konfigurationssitzung</translation>
     </message>
@@ -451,6 +451,16 @@ Oben „Controller konfigurieren“ zum Bearbeiten oder Aktualisieren wählen.</
         <location filename="../qml/App/LightsPage.qml" line="+203"/>
         <source>Brightness</source>
         <translation>Helligkeit</translation>
+    </message>
+    <message>
+        <location line="+17"/>
+        <source>How long the controller waits, unused, before turning itself off.</source>
+        <translation>Wie lange der Controller unbenutzt wartet, bevor er sich selbst ausschaltet.</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>%1 min</source>
+        <translation>%1 Min.</translation>
     </message>
     <message>
         <location filename="../qml/App/Lights8kPage.qml" line="-207"/>
@@ -506,13 +516,14 @@ Oben „Controller konfigurieren“ zum Bearbeiten oder Aktualisieren wählen.</
         <translation>Automatisch ein-/ausschalten</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location filename="../qml/App/G7DevicePage.qml" line="-13"/>
+        <location filename="../qml/App/Lights8kPage.qml" line="+6"/>
         <location filename="../qml/App/LightsPage.qml" line="+27"/>
         <source>Sleep timer</source>
         <translation>Ruhezeit</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location filename="../qml/App/Lights8kPage.qml" line="+18"/>
         <source>Dock LED</source>
         <translation>Dock-LED</translation>
     </message>
