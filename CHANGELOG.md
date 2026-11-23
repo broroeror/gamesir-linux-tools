@@ -22,6 +22,10 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
   the first key.
 
 ### Fixed
+- **Nova 2 Lite battery always read 100%.** The level is read from the right
+  byte now, so the receiver shows the real percentage. Fix by
+  [@ry2x](https://github.com/ry2x), reported by
+  [@Arcitec](https://github.com/Arcitec) (#74, #76).
 - **G502 X report rate showed 4 Hz** when G HUB had left the profile's rate
   unset (`0xFF`). Deadband now shows the rate the mouse is actually running at,
   and leaves that byte alone unless you pick a rate. Reported by
