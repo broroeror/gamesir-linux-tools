@@ -255,18 +255,25 @@ def streams_live_data(devnode: str, secs: float = 0.5) -> bool:
 
 
 def parse_device_info(data) -> dict:
-    """Decode a 0x01 device-info reply into firmware/battery/charging fields."""
+    """Decode a 0x01 device-info reply into firmware/battery/charging fields.
+
+    Byte 18 carries the battery state: 0..100 for wireless state-of-charge %
+    (with bit 7 optionally flagging charging), or 0xFF when wired/charging.
+    Bytes 16..17 are fixed header bytes (0x04, 0x02)."""
     global _device_info_verified
-    if not data or len(data) < 18 or data[0] != 0x01 or data[1] == 0x00:
+    if not data or len(data) < 19 or data[0] != 0x01 or data[1] == 0x00:
         return {}
     out = {}
     fw_lo, fw_hi = data[10], data[11]
     if fw_hi or fw_lo:
         out['firmware'] = f'{fw_hi}.{fw_lo:02x}'
-    bat_raw = data[16] & 0x0F
-    if bat_raw <= 5:
-        out['battery'] = min(100, bat_raw * 25)
-    out['charging'] = (data[17] == 0x02) or (bat_raw >= 5)
+    bat_raw = data[18]
+    if bat_raw == 0xFF:
+        out['battery'] = 100
+        out['charging'] = True
+    else:
+        out['charging'] = bool(bat_raw & 0x80)
+        out['battery'] = min(100, bat_raw & 0x7F)
     if 'firmware' in out and 'battery' in out:
         _device_info_verified = True
     return out
