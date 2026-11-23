@@ -516,14 +516,6 @@ def _allowed_addrs():
     allowed = {}
     for bank, addr, ln in _all_requests():
         allowed.setdefault(bank, set()).update(range(addr, addr + ln))
-    prof = ctrl.active()
-    if prof is ctrl.G7_PRO:
-        # The G7 Pro's dock settings are global (bank 0x20), outside the
-        # per-profile read plan above, so Apply refused every dock edit -- and
-        # everything staged with it -- until these three bytes were listed.
-        allowed.setdefault(0x20, set()).update(
-            prof.extras[k] for k in ('DOCK_AUTO', 'DOCK_SLEEP', 'DOCK_BRIGHT')
-            if k in prof.extras)
     return allowed
 
 

@@ -26,8 +26,6 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
   backups. Found by [@henryford](https://github.com/henryford) (#56).
 
 ### Fixed
-- **G7 Pro charging-dock settings couldn't be applied.** Changing auto on/off or
-  the dock brightness made Apply refuse everything staged with it.
 - **Nova 2 Lite battery always read 100%.** The level is read from the right
   byte now, so the receiver shows the real percentage. Fix by
   [@ry2x](https://github.com/ry2x), reported by

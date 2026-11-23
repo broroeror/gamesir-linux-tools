@@ -57,26 +57,28 @@ class SleepTimer(unittest.TestCase):
                          {'dock_auto': True, 'dock_brightness': 100, 'sleep_minutes': 10})
         self.assertEqual(profiles.G7_PRO.extras['DOCK_SLEEP'], SLEEP)
 
-    def test_stages_one_byte_in_bank_0x20_that_apply_accepts(self):
+    def test_stages_one_byte_in_bank_0x20(self):
         self.bridge.setG7Extra('sleep_minutes', 25)
         item = self.bridge._pending[('g7', 0x20, 'sleep_minutes')]
         self.assertEqual((item['bank'], item['addr'], item['data']), (0x20, SLEEP, [25]))
         self.assertEqual(item['display'], '25 min')
-        backup._validate_writes([(0x20, SLEEP, [25])])     # Apply's register-map check
 
-    def test_apply_accepts_the_other_dock_settings_too(self):
-        # Apply refused these since 05101d4: bank 0x20 wasn't in its map
-        self.bridge.setG7Extra('dock_auto', 0)
-        self.bridge.setG7Extra('dock_brightness', 50)
-        backup._validate_writes([(r['bank'], r['addr'], r['data'])
-                                 for r in self.bridge._pending.values()])
+    def test_apply_writes_it_through_the_g7_path(self):
+        # The G7 Pro saves through applyConfig's own path (not the transactional
+        # one or backup._validate_writes); drive that path for real.
+        self.bridge.setG7Extra('sleep_minutes', 1)
+        done = threading.Event()
+        writes = []
 
-    def test_apply_still_refuses_the_rest_of_bank_0x20(self):
-        for addr in (0x0000, 0x01F5, 0x01F8, 0x01FA):
-            with self.assertRaises(ValueError):
-                backup._validate_writes([(0x20, addr, [1])])
-        with self.assertRaises(ValueError):          # a 2-byte write running past the timer
-            backup._validate_writes([(0x20, SLEEP, [10, 1])])
+        def write_reg(bank, addr, data, write_style=None, gen=None):
+            writes.append((bank, addr, list(data), write_style))
+            return True
+        with patch.object(control, 'write_reg', side_effect=write_reg), \
+             patch.object(self.bridge, '_verify_applied', side_effect=lambda *a: done.set()):
+            self.bridge.applyConfig()
+            self.assertTrue(done.wait(2))
+        self.assertEqual(writes, [(0x20, SLEEP, [1], 'g7')])
+        self.assertIsNone(self.bridge._g7_dock)          # the dock block is re-read
 
     def test_untested_or_oversized_values_are_not_staged(self):
         for value in (0, 256, -1):
