@@ -1002,6 +1002,14 @@ def read_session_seusb(ctrl):
 
 
 _G7_CANDIDATE_TIMEOUT = 4.0     # s an untested edition gets to answer (#72)
+# A paired pad streams ~62 telemetry frames a second even when idle (measured on
+# an Amazon-edition dongle). Silence this long on a DONGLE means no pad behind
+# it: some dongles stay on USB with their pad off (#56), and Save would only
+# time out. Wired pads are the USB device themselves, so they aren't checked.
+_G7_PAD_SILENCE = 2.0
+G7_STATUS_CLAIMED = 'Configuring · controller unavailable to games'
+G7_STATUS_NO_PAD = ("The dongle is connected, but the controller isn't answering. "
+                    'Turn the controller on.')
 
 
 def read_session_g7usb(ctrl):
@@ -1030,8 +1038,10 @@ def read_session_g7usb(ctrl):
     state['config_claimed'] = True
     state['config_status'] = ('Configuring an untested G7 Pro edition · controller '
                               'unavailable to games' if candidate is not None else
-                              'Configuring · controller unavailable to games')
+                              G7_STATUS_CLAIMED)
     state['config_phase'] = 'claimed'
+    state['g7_pad_absent'] = False
+    on_dongle = g7pro.connection_kind(ctrl['pid']) is False
     state['access'] = 'ok'
     state['edit_profile'] = state.get('edit_profile') or state.get('profile') or 1
     gen = control.generation()
@@ -1042,6 +1052,7 @@ def read_session_g7usb(ctrl):
     standard_frames = 0
     telemetry_error = False
     session_error = False
+    last_input = session_started
     try:
         for _ in range(3):
             control.g7_heartbeat(gen)
@@ -1072,6 +1083,11 @@ def read_session_g7usb(ctrl):
                                           'configuration; it may be in another mode')
                 state['config_phase'] = 'failed'
                 break
+            if (on_dongle and not state.get('g7_pad_absent')
+                    and time.monotonic() - last_input >= _G7_PAD_SILENCE):
+                state['g7_pad_absent'] = True
+                state['config_status'] = G7_STATUS_NO_PAD
+                state['config_phase'] = 'claimed'    # still claimed: no overlay
             report = handle.read(64, timeout_ms=120)
             if not report:
                 continue
@@ -1093,6 +1109,11 @@ def read_session_g7usb(ctrl):
                     and report[3] == g7pro.RESPONSE_MARKER:
                 saw_vendor = True
             if g7pro.parse_input(report, state):
+                last_input = time.monotonic()
+                if state.get('g7_pad_absent'):
+                    state['g7_pad_absent'] = False
+                    state['config_status'] = G7_STATUS_CLAIMED
+                    state['config_phase'] = 'claimed'
                 button_capture.record(ctrl['id'])
                 continue
             if len(report) >= 9 and report[0] == 0x10 and report[3] == 0x3C:
@@ -1127,6 +1148,7 @@ def read_session_g7usb(ctrl):
             _active_usb_handle = None
         state['driving'] = None
         state['config_claimed'] = False
+        state['g7_pad_absent'] = False
         state.update(gyro=None, accel=None, imu_time=0.0)
         if not state.get('config_wanted') and not telemetry_error and not session_error:
             state['config_status'] = 'Released to games'

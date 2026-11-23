@@ -26,6 +26,11 @@ curated, user-facing summary; the complete history is in git. Format loosely fol
   backups. Found by [@henryford](https://github.com/henryford) (#56).
 
 ### Fixed
+- **G7 Pro dongle with its controller off.** Some dongles stay connected when
+  their controller turns off or sleeps, so Deadband offered settings that could
+  only time out on Save. It now says the controller isn't answering, holds Save,
+  and keeps your changes until the controller is back. Reported by
+  [@henryford](https://github.com/henryford) (#56).
 - **Nova 2 Lite battery always read 100%.** The level is read from the right
   byte now, so the receiver shows the real percentage. Fix by
   [@ry2x](https://github.com/ry2x), reported by

@@ -13,7 +13,7 @@
     <name>UI</name>
     <message>
         <location filename="../qml/App/AxisConfigPage.qml" line="+13"/>
-        <location filename="../qml/Main.qml" line="+742"/>
+        <location filename="../qml/Main.qml" line="+772"/>
         <source>Left Stick</source>
         <translation>Linker Stick</translation>
     </message>
@@ -180,7 +180,7 @@
     <message>
         <location line="+1"/>
         <location line="+9"/>
-        <location filename="../qml/Main.qml" line="-500"/>
+        <location filename="../qml/Main.qml" line="-530"/>
         <location line="+13"/>
         <source>JSON files (*.json)</source>
         <translation>JSON-Dateien (*.json)</translation>
@@ -544,7 +544,7 @@ Oben „Controller konfigurieren“ zum Bearbeiten oder Aktualisieren wählen.</
     </message>
     <message>
         <location line="+20"/>
-        <location filename="../qml/Main.qml" line="+752"/>
+        <location filename="../qml/Main.qml" line="+782"/>
         <source>Presets</source>
         <translation>Voreinstellungen</translation>
     </message>
@@ -1202,7 +1202,7 @@ Oben „Controller konfigurieren“ zum Bearbeiten oder Aktualisieren wählen.</
     <message>
         <location filename="../qml/App/MousePage.qml" line="-60"/>
         <location filename="../qml/App/TargetPicker.qml" line="+85"/>
-        <location filename="../qml/Main.qml" line="-800"/>
+        <location filename="../qml/Main.qml" line="-830"/>
         <source>Buttons</source>
         <translation>Tasten</translation>
     </message>
@@ -1326,7 +1326,7 @@ Oben „Controller konfigurieren“ zum Bearbeiten oder Aktualisieren wählen.</
     <message>
         <location line="+8"/>
         <location filename="../qml/Main.qml" line="+360"/>
-        <location line="+440"/>
+        <location line="+470"/>
         <source>Configure controller</source>
         <translation>Controller konfigurieren</translation>
     </message>
@@ -1387,7 +1387,7 @@ Oben „Controller konfigurieren“ zum Bearbeiten oder Aktualisieren wählen.</
     </message>
     <message>
         <location filename="../qml/App/StatusPill.qml" line="+20"/>
-        <location filename="../qml/Main.qml" line="-310"/>
+        <location filename="../qml/Main.qml" line="-340"/>
         <source>Connected</source>
         <translation>Verbunden</translation>
     </message>
@@ -1535,7 +1535,7 @@ Oben „Controller konfigurieren“ zum Bearbeiten oder Aktualisieren wählen.</
     </message>
     <message>
         <location line="+1"/>
-        <location filename="../qml/Main.qml" line="+506"/>
+        <location filename="../qml/Main.qml" line="+536"/>
         <source>Background</source>
         <translation>Hintergrund</translation>
     </message>
@@ -1682,7 +1682,7 @@ Oben „Controller konfigurieren“ zum Bearbeiten oder Aktualisieren wählen.</
         <translation>Test läuft…</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="-1027"/>
+        <location filename="../qml/Main.qml" line="-1057"/>
         <source>this profile</source>
         <translation>dieses Profil</translation>
     </message>
@@ -1708,12 +1708,12 @@ Oben „Controller konfigurieren“ zum Bearbeiten oder Aktualisieren wählen.</
     </message>
     <message>
         <location line="+1"/>
-        <location line="+761"/>
+        <location line="+791"/>
         <source>Motion</source>
         <translation>Bewegung</translation>
     </message>
     <message>
-        <location line="-760"/>
+        <location line="-790"/>
         <source>Device</source>
         <translation>Gerät</translation>
     </message>
@@ -1724,12 +1724,12 @@ Oben „Controller konfigurieren“ zum Bearbeiten oder Aktualisieren wählen.</
     </message>
     <message>
         <location line="+1"/>
-        <location line="+734"/>
+        <location line="+764"/>
         <source>Macros</source>
         <translation>Makros</translation>
     </message>
     <message>
-        <location line="-732"/>
+        <location line="-762"/>
         <source>DPI</source>
         <translation>DPI</translation>
     </message>
@@ -1915,7 +1915,17 @@ Wie Systemeinstellungen → Spielecontroller; sofort angewendet und gespeichert.
         <translation>Abfragerate</translation>
     </message>
     <message>
-        <location line="+46"/>
+        <location line="+33"/>
+        <source>⚠ The dongle is connected, but the controller isn&apos;t answering</source>
+        <translation>⚠ Der Empfänger ist verbunden, aber der Controller antwortet nicht</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Turn the controller on. Changes you&apos;ve made stay waiting and can be saved once it&apos;s back.</source>
+        <translation>Schalte den Controller ein. Deine Änderungen bleiben vorgemerkt und lassen sich speichern, sobald er wieder da ist.</translation>
+    </message>
+    <message>
+        <location line="+38"/>
         <source>⚠ Found your controller, but a library it needs isn&apos;t installed</source>
         <translation>⚠ Controller gefunden, aber eine benötigte Bibliothek fehlt</translation>
     </message>

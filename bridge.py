@@ -353,7 +353,8 @@ class GamesirBridge(QObject):
         sig = (state['connected'], state['mode_ok'], state['battery'],
                state['charging'], state['profile'], state.get('edit_profile'), state['led_slot'],
                state['firmware'], state['controller'], state['wired'],
-               state.get('access'), state.get('config_claimed'), state.get('config_status'))
+               state.get('access'), state.get('config_claimed'), state.get('config_status'),
+               state.get('g7_pad_absent'))
         if sig != self._status_sig:
             self._status_sig = sig
             self.statusChanged.emit()
@@ -1127,6 +1128,12 @@ class GamesirBridge(QObject):
     @Property(str, notify=statusChanged)
     def configStatus(self):
         return state.get('config_status') or ''
+
+    @Property(bool, notify=statusChanged)
+    def g7PadAbsent(self):
+        """A claimed G7 Pro dongle whose pad has gone quiet (off or asleep):
+        Save would only time out, so Apply is held until it's back (#56)."""
+        return bool(state.get('g7_pad_absent')) and self._prof is profiles.G7_PRO
 
     @Property(str, notify=statusChanged)
     def configPhase(self):
@@ -2949,6 +2956,11 @@ class GamesirBridge(QObject):
         # writes go over its own enveloped channel with per-field quirks.
         if self._prof.write_style in ('cyclone', 'g7se', 'gip', 't4n2'):
             self._apply_transactional()
+            return
+        if self._prof is profiles.G7_PRO and state.get('g7_pad_absent'):
+            # keep the staged edits: they apply once the pad answers again
+            self._set_apply_status("Apply refused: the controller isn't answering "
+                                   'the dongle. Turn it on, then Apply again.')
             return
         edit = state.get('edit_profile') or state.get('profile')
         default_bank = self._prof.profile_bank(edit)

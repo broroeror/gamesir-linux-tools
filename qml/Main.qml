@@ -636,6 +636,36 @@ Window {
                         height: 1; color: Theme.cardBorder }
         }
 
+        // ---------------------------------------------- G7 dongle without its pad
+        // Some dongles stay on USB with their pad off (#56); saving would only
+        // time out, so say what's going on. Apply is held by the bridge too.
+        Rectangle {
+            visible: win.activeDevice === "controller" && bridge.g7PadAbsent
+            Layout.fillWidth: true
+            Layout.leftMargin: 20; Layout.rightMargin: 20; Layout.topMargin: 10
+            implicitHeight: padCol.implicitHeight + 20
+            radius: Theme.radius
+            color: Theme.card; border.color: Theme.warn; border.width: 1
+            Column {
+                id: padCol
+                anchors.left: parent.left; anchors.right: parent.right
+                anchors.top: parent.top; anchors.margins: 10
+                anchors.leftMargin: 14; anchors.rightMargin: 14
+                spacing: 4
+                Text {
+                    width: parent.width; wrapMode: Text.WordWrap
+                    color: Theme.warn; font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontM; font.weight: Font.DemiBold
+                    text: qsTranslate("UI", "⚠ The dongle is connected, but the controller isn't answering")
+                }
+                Text {
+                    width: parent.width; wrapMode: Text.WordWrap
+                    color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontS
+                    text: qsTranslate("UI", "Turn the controller on. Changes you've made stay waiting and can be saved once it's back.")
+                }
+            }
+        }
+
         // ---------------------------------------------- device-access banner
         // A controller was FOUND but can't be OPENED (permission / hidapi
         // backend). Without this, that state is an eternal "Searching…" with
